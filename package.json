@@ -1,0 +1,30 @@
+{
+  "name": "nglzzz-twitch-bot",
+  "version": "0.1.0",
+  "description": "Twitch Chat Bot by nglzzz",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint "
+  },
+  "keywords": [
+    "twitch",
+    "chat",
+    "bot"
+  ],
+  "author": "nglzzz <deriglazov.nikita@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-handlebars": "^5.2.0",
+    "helmet": "^4.4.1",
+    "mongoose": "^5.11.13",
+    "tmi.js": "^1.7.1",
+    "ws": "^7.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.18.0"
+  }
+}

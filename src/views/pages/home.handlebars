@@ -1,0 +1,77 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function(){
+        setTimeout(() => {
+            const isSpeechSynthesisEnabled = typeof window.speechSynthesis !== 'undefined'
+                    && window.speechSynthesis.getVoices().length > 0;
+
+            const ws = new WebSocket('ws://localhost:{{websocketPort}}');
+
+            function leftPad(value, length) {
+                return ('0'.repeat(length) + value).slice(-length);
+            }
+
+            function getPitchByNickname(value) {
+                let charNumbers = leftPad(value.charCodeAt(0).toString(), 3);
+                let firstNumber = charNumbers.slice(0, 1);
+                let secondNumbers = charNumbers.slice(1, 2);
+
+                let number = firstNumber + '.' + secondNumbers;
+                return +number;
+            }
+
+            function speak(nickname, text) {
+                if (isSpeechSynthesisEnabled) {
+                    console.log('Speaking by browser');
+                    speakBySpeechSynthesis(nickname, text);
+                } else {
+                    console.log('Speaking by server');
+                    speakByServer(nickname, text);
+                }
+            }
+
+            function speakBySpeechSynthesis(nickname, text) {
+                const message = new SpeechSynthesisUtterance();
+                message.lang = 'ru-RU';
+                message.text = text;
+                message.pitch = getPitchByNickname(nickname);
+                message.rate = 1;
+                window.speechSynthesis.speak(message);
+            }
+
+            function speakByServer(nickname, text) {
+                fetch('/speech?' + new URLSearchParams({
+                    pitch: getPitchByNickname(nickname),
+                    text: text
+                }), {
+                    method: 'GET',
+                    headers: {}
+                }).then(r => r.json()).then(data => {
+                    const Sound = (function () {
+                        const df = document.createDocumentFragment();
+                        return function Sound(src) {
+                            const snd = new Audio(src);
+                            df.appendChild(snd); // keep in fragment until finished playing
+                            snd.addEventListener('ended', function () {
+                                df.removeChild(snd);
+                            });
+                            snd.play();
+                            return snd;
+                        };
+                    }());
+                    Sound("data:audio/wav;base64," + data.audioContent);
+                });
+            }
+
+            ws.addEventListener('message', event => {
+                try {
+                    const jsonData = JSON.parse(event.data);
+
+                    speak(jsonData.nickname.toUpperCase(), jsonData.text);
+                } catch (e) {
+                    console.log(`Something wend wrong with: ${e}`);
+                }
+                ws.send('Trying to play: ' + event.data);
+            });
+        }, 200);
+    });
+</script>

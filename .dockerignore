@@ -1,0 +1,6 @@
+.idea
+node_modules
+*.log
+docker/Dockerfile
+.dockerignore
+.git
