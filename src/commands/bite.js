@@ -1,13 +1,18 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const getChatters = require('../chat/chatters');
+const messageHelper = require('../helpers/messages');
 
-async function onBiteCommand(channel, tags) {
+async function onBiteCommand(channel, tags, message) {
   const viewers = getChannelViewers();
 
-  const randomUser = viewers.length > 0
-    ? arrayHelper.getRandomArrayElement(viewers)
-    : arrayHelper.getRandomArrayElement(getChatters());
+  let subject = messageHelper.getSubjectFromMessage(message);
+
+  if (subject.length === 0) {
+    subject = viewers.length > 0
+      ? arrayHelper.getRandomArrayElement(viewers)
+      : arrayHelper.getRandomArrayElement(getChatters());
+  }
 
   const list = [
     'ушко',
@@ -26,7 +31,7 @@ async function onBiteCommand(channel, tags) {
     'лобок',
   ];
 
-  return `@${tags.username} кусает @${randomUser} за ${arrayHelper.getRandomArrayElement(list)}`;
+  return `@${tags.username} кусает @${subject} за ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onBiteCommand;

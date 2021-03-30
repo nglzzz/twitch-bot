@@ -24,6 +24,10 @@ async function onNicknameCommand(channel, tags) {
     'Zero',
     'analniy',
     'navalniy',
+    'Sad',
+    'Yobani',
+    'YoBa',
+    'Russish',
   ];
   const second = [
     '_nagibator',
@@ -38,7 +42,7 @@ async function onNicknameCommand(channel, tags) {
     'Pussy',
     'Pup0k',
     'Chlen',
-    '4ter',
+    '4iter',
     '_Gnom',
     'Maddyson',
     'OmNomNom',
@@ -52,6 +56,15 @@ async function onNicknameCommand(channel, tags) {
     '_leprikon__',
     'Anal',
     'Rubin',
+    'Gamer',
+    'Gepatid',
+    'Ever',
+    'Delux',
+    'Yoba',
+    'Boy',
+    'Girl',
+    'Baby',
+    'Slaver',
   ];
   const last = [
     '007',
@@ -62,6 +75,7 @@ async function onNicknameCommand(channel, tags) {
     '',
     '',
     'YA',
+    '228',
   ];
 
   return 'Новый никнейм для @' + tags.username + ' ' +

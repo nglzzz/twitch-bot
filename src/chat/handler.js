@@ -11,3 +11,15 @@ tmiClient.registerCommand('!ball', require('../commands/8ball'), '!шар');
 tmiClient.registerCommand('!love', require('../commands/love'), '!любовь');
 tmiClient.registerCommand('!joke', require('../commands/joke'), '!анекдот');
 tmiClient.registerCommand('!test', require('../commands/roulette'), '!тест');
+
+
+// TODO:
+// !гороскоп
+// !Steam
+// !Ds !discord
+// !youtube
+// !обнять
+// !шлеп
+// !Хатьфу
+// !шанс <СОБЫТИЕ>
+// звоковые команды (дуит, смех, фбр)

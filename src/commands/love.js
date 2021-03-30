@@ -1,8 +1,9 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const numberHelper = require('../helpers/numberHelper');
+const messageHelper = require('../helpers/messages');
 
 async function obLoveCommand(channel, tags, message) {
-  const subject = getSubjectFromMessage(message).replace('@', '');
+  const subject = messageHelper.getSubjectFromMessage(message);
   const chatter = tags['display-name'];
 
   if (subject.length === 0) {
@@ -30,14 +31,6 @@ async function obLoveCommand(channel, tags, message) {
   ];
 
   return arrayHelper.getRandomArrayElement(list);
-}
-
-const getSubjectFromMessage = (message) => {
-  let words = message.split(' ');
-  words.shift(); // remove first word because it's command name
-  words.filter(item => item !== ' '); // remove all spaces
-
-  return words.join(' ');
 }
 
 module.exports = obLoveCommand;
