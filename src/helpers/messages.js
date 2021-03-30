@@ -7,7 +7,7 @@ const getSubjectFromMessage = (message) => {
   words.shift(); // remove first word because it's command name
   words.filter(item => item !== ' '); // remove all spaces
 
-  return words.join(' ');
+  return words.join(' ').replace('@', '');
 }
 
 module.exports = {
