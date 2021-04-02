@@ -1,4 +1,4 @@
-const messageHelper = require('../helpers/messages');
+const messageHelper = require('../helpers/messageHelper');
 
 async function onHoroscopeCommand(channel, tags) {
   const list = [
