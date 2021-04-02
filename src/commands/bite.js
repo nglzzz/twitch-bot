@@ -1,7 +1,7 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const getChatters = require('../chat/chatters');
-const messageHelper = require('../helpers/messages');
+const messageHelper = require('../helpers/messageHelper');
 
 async function onBiteCommand(channel, tags, message) {
   const viewers = getChannelViewers();

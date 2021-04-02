@@ -1,6 +1,6 @@
 const websocketServer = require('../app/websocket');
 const tmiClient = require('../app/tmi');
-const messageHelper = require('../helpers/messages');
+const messageHelper = require('../helpers/messageHelper');
 
 websocketServer.on('connection', function (ws) {
   tmiClient.on('message', (channel, tags, message, self) => {

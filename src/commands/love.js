@@ -1,6 +1,6 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const numberHelper = require('../helpers/numberHelper');
-const messageHelper = require('../helpers/messages');
+const messageHelper = require('../helpers/messageHelper');
 
 async function obLoveCommand(channel, tags, message) {
   const subject = messageHelper.getSubjectFromMessage(message);

@@ -10,11 +10,13 @@ tmiClient.registerCommand('!nickname', require('../commands/nickname'), '!ник
 tmiClient.registerCommand('!ball', require('../commands/8ball'), '!шар');
 tmiClient.registerCommand('!love', require('../commands/love'), '!любовь');
 tmiClient.registerCommand('!joke', require('../commands/joke'), '!анекдот');
+tmiClient.registerCommand('!horoscope', require('../commands/horoscope'), '!гороскоп');
 tmiClient.registerCommand('!test', require('../commands/roulette'), '!тест');
 
 
 // TODO:
 // !гороскоп
+// !wiki <что ищем>
 // !Steam
 // !Ds !discord
 // !youtube
@@ -22,4 +24,5 @@ tmiClient.registerCommand('!test', require('../commands/roulette'), '!тест')
 // !шлеп
 // !Хатьфу
 // !шанс <СОБЫТИЕ>
+// !монетка <сторона>
 // звоковые команды (дуит, смех, фбр)
