@@ -5,6 +5,7 @@ const speech = require('../utils/speech');
 
 routes.get('/', (req, res) => {
   res.set('Content-Security-Policy', 'default-src \'self\' \'unsafe-inline\'; connect-src *; font-src * data:');
+  res.set('X-Frame-Options', 'ALLOWALL');
   res.render('pages/home', {
     websocketPort: config.DOCKER_WEBSOCKET_PORT || config.WEBSOCKET_PORT
   });
