@@ -15,7 +15,6 @@ tmiClient.registerCommand('!test', require('../commands/roulette'), '!тест')
 
 
 // TODO:
-// !гороскоп
 // !wiki <что ищем>
 // !Steam
 // !Ds !discord
