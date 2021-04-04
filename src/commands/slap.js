@@ -24,7 +24,7 @@ async function onSlapCommand(channel, tags, message) {
     'груди',
     'защитному костюму HEV',
     'члену',
-    'сосоку',
+    'соску',
     'губам',
     'залупе',
     'ушам',
