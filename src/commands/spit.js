@@ -14,7 +14,7 @@ async function onSpitCommand(channel, tags, message) {
       ? arrayHelper.getRandomArrayElement(viewers)
       : arrayHelper.getRandomArrayElement(getChatters());
 
-    firstSentence = `@${tags.username} набирает слюны в рот и не глядя харкает в толку, попадая @${subject}`;
+    firstSentence = `@${tags.username} набирает слюны в рот и не глядя харкает в толпу, попадая @${subject}`;
   } else {
     firstSentence = `@${tags.username} хорошо прицелившись харкает @${subject}`;
   }
