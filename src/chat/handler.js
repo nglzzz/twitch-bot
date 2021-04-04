@@ -11,17 +11,17 @@ tmiClient.registerCommand('!ball', require('../commands/8ball'), '!шар');
 tmiClient.registerCommand('!love', require('../commands/love'), '!любовь');
 tmiClient.registerCommand('!joke', require('../commands/joke'), '!анекдот');
 tmiClient.registerCommand('!horoscope', require('../commands/horoscope'), '!гороскоп');
-tmiClient.registerCommand('!test', require('../commands/roulette'), '!тест');
+tmiClient.registerCommand('!roulette', require('../commands/roulette'), '!рулетка');
+tmiClient.registerCommand('!steam', require('../commands/steam'), '!стим');
+tmiClient.registerCommand('!discord', require('../commands/discord'), '!дискорд');
+tmiClient.registerCommand('!youtube', require('../commands/youtube'), '!ютуб');
+tmiClient.registerCommand('!chance', require('../commands/chance'), '!шанс');
+tmiClient.registerCommand('!coin', require('../commands/coin'), '!монетка');
+tmiClient.registerCommand('!шлёп', require('../commands/slap'), '!шлеп');
+tmiClient.registerCommand('!тьфу', require('../commands/spit'), '!хатьфу');
 
 
 // TODO:
 // !wiki <что ищем>
-// !Steam
-// !Ds !discord
-// !youtube
 // !обнять
-// !шлеп
-// !Хатьфу
-// !шанс <СОБЫТИЕ>
-// !монетка <сторона>
 // звоковые команды (дуит, смех, фбр)
