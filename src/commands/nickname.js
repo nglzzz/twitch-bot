@@ -46,6 +46,7 @@ async function onNicknameCommand(channel, tags) {
     'Ya',
     'YES',
     'Jopa',
+    'Honey',
   ];
   const second = [
     '_nagibator',
