@@ -47,6 +47,8 @@ async function onNicknameCommand(channel, tags) {
     'YES',
     'Jopa',
     'Honey',
+    'Cyber',
+    'zloy',
   ];
   const second = [
     '_nagibator',
@@ -103,6 +105,8 @@ async function onNicknameCommand(channel, tags) {
     'CEKC',
     'Jopa',
     '}|{opa',
+    'Eblan',
+    'Pupsik',
   ];
   const last = [
     '007',

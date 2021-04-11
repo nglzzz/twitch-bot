@@ -4,7 +4,7 @@
             const isSpeechSynthesisEnabled = typeof window.speechSynthesis !== 'undefined'
                     && window.speechSynthesis.getVoices().length > 0;
 
-            const ws = new WebSocket('ws://localhost:{{websocketPort}}');
+            const ws = new WebSocket('ws://'+ window.location.hostname +':{{websocketPort}}');
 
             function leftPad(value, length) {
                 return ('0'.repeat(length) + value).slice(-length);
@@ -62,11 +62,22 @@
                 });
             }
 
+            function playAudio(audioName) {
+                let audio = new Audio(`/audio/${audioName}`);
+                audio.volume = 0.5;
+                audio.play();
+            }
+
             ws.addEventListener('message', event => {
                 try {
                     const jsonData = JSON.parse(event.data);
 
-                    speak(jsonData.nickname.toUpperCase(), jsonData.text);
+                    if ('speech' === jsonData.type) {
+                        speak(jsonData.nickname.toUpperCase(), jsonData.text);
+                    }
+                    if ('audio' === jsonData.type) {
+                      playAudio(jsonData.name);
+                    }
                 } catch (e) {
                     console.log(`Something wend wrong with: ${e}`);
                 }

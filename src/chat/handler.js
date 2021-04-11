@@ -24,4 +24,3 @@ tmiClient.registerCommand('!тьфу', require('../commands/spit'), '!хатьф
 // TODO:
 // !wiki <что ищем>
 // !обнять
-// звоковые команды (дуит, смех, фбр)

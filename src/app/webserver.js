@@ -12,6 +12,7 @@ const host = '0.0.0.0';
 app.engine('handlebars', handlebars({ defaultLayout: 'main' }));
 app.set('views', './src/views');
 app.set('view engine', 'handlebars');
+app.use(express.static('public'));
 app.use(helmet());
 
 // Use our routes

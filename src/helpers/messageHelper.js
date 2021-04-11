@@ -2,6 +2,10 @@ function isHighlightMessage(tags) {
   return typeof tags['msg-id'] !== 'undefined' && 'highlighted-message' === tags['msg-id'];
 }
 
+function isSubscriberMessage(tags) {
+  return typeof tags.subscriber !== 'undefined' && tags.subscriber;
+}
+
 const getSubjectFromMessage = (message) => {
   let words = message.split(' ');
   words.shift(); // remove first word because it's command name
@@ -44,4 +48,5 @@ module.exports = {
   getSubjectFromMessage: getSubjectFromMessage,
   formatStringToNumber: formatStringToNumber,
   getDigitalRoot: getDigitalRoot,
+  isSubscriberMessage: isSubscriberMessage,
 };
