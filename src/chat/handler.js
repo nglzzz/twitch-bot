@@ -19,6 +19,7 @@ tmiClient.registerCommand('!chance', require('../commands/chance'), '!шанс')
 tmiClient.registerCommand('!coin', require('../commands/coin'), '!монетка');
 tmiClient.registerCommand('!шлёп', require('../commands/slap'), '!шлеп');
 tmiClient.registerCommand('!тьфу', require('../commands/spit'), '!хатьфу');
+tmiClient.registerCommand('!boobs', require('../commands/boobs'), '!грудь');
 
 
 // TODO:
