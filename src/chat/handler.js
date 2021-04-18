@@ -20,6 +20,10 @@ tmiClient.registerCommand('!coin', require('../commands/coin'), '!монетка
 tmiClient.registerCommand('!шлёп', require('../commands/slap'), '!шлеп');
 tmiClient.registerCommand('!тьфу', require('../commands/spit'), '!хатьфу');
 tmiClient.registerCommand('!boobs', require('../commands/boobs'), '!грудь');
+tmiClient.registerCommand('!raffle', require('../commands/raffle'), '!розыгрыш');
+
+// Rewards
+tmiClient.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
 
 
 // TODO:

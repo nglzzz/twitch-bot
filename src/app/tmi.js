@@ -18,17 +18,29 @@ client.connect().catch(console.error);
 
 const commandsList = [];
 
-client.on('redeem', (channel, username, rewardType, tags) => {
-  console.log(rewardType);
-  switch(rewardType) {
-    // Message that appears "highlighted" in the chat.
-    case 'highlighted-message': break;
-    // Message that skips the subscriber-only mode
-    case 'skip-subs-mode-message': break;
-    // Custom reward ID
-    case '27c8e486-a386-40cc-9a4b-dbb5cf01e439': break;
-  }
-});
+client.registerReward = (handleRewardId, rewardHandler) => {
+  client.on('message', (channel, tags, message, self) => {
+    if (self) return;
+
+    const rewardType = tags['msg-id'] || tags['custom-reward-id'] || null;
+
+    if (!rewardType) return;
+
+    if (rewardType === handleRewardId) {
+      rewardHandler(channel, tags, message).then(handlerResult => {
+        if (Array.isArray(handlerResult)) {
+          let delay = 0;
+          handlerResult.forEach(message => {
+            setTimeout(() => client.say(channel, message), delay);
+            delay += 1500;
+          });
+        } else {
+          client.say(channel, handlerResult);
+        }
+      })
+    }
+  });
+};
 
 client.registerCommand = (commandName, commandHandler, alias) => {
   commandsList.push(commandName);
@@ -63,6 +75,7 @@ client.getCommandList = () => {
  *
  * @type {tmi.Client}
  * @function registerCommand
+ * @function registerReward
  * @function getCommandList
  */
 module.exports = client;
