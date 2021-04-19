@@ -6,9 +6,15 @@ const chatters = [];
 tmiClient.on('message', (channel, tags, message, self) => {
   if (self) return;
 
-  if (arrayHelder.getBotList().indexOf(tags.username) === -1) {
-    chatters.push(tags.username);
+  if (arrayHelder.getBotList().indexOf(tags.username) !== -1) {
+    return;
   }
+
+  if (chatters.indexOf(tags.username) !== -1) {
+    return;
+  }
+
+  chatters.push(tags.username);
 });
 
 const getChatters = () => chatters;
