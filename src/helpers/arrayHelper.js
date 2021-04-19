@@ -16,6 +16,7 @@ const getBotList = () => {
     'streamelements',
     'mirrobot',
     'nightbot',
+    'wizebot',
   ];
 }
 
