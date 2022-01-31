@@ -48,10 +48,14 @@ client.registerCommand = (commandName, commandHandler, alias) => {
   client.on('message', (channel, tags, message, self) => {
     if (self) return;
 
-    const isCommandNameEqual = message.toLowerCase().indexOf(commandName) === 0;
-    const isAliasCommandEqual = typeof alias !== 'undefined' && message.toLowerCase().indexOf(alias) === 0;
+    if (message[0] !== '!') {
+        return;
+    }
 
-    if (isCommandNameEqual || isAliasCommandEqual) {
+    const messageCommand = message.toLowerCase().split(' ').shift();
+
+    if ([commandName, alias].includes(messageCommand)) {
+      tags.streamer = typeof tags.badges.broadcaster !== 'undefined' && tags.badges.broadcaster === '1';
       commandHandler(channel, tags, message).then(handlerResult => {
         if (Array.isArray(handlerResult)) {
           let delay = 0;

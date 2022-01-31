@@ -1,4 +1,3 @@
-const tmiClient = require('../app/tmi');
 const axios = require('axios');
 
 async function onJokeCommand(channel, tags) {

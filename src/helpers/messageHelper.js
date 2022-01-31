@@ -11,7 +11,7 @@ const getSubjectFromMessage = (message) => {
   words.shift(); // remove first word because it's command name
   words.filter(item => item !== ' '); // remove all spaces
 
-  return words.join(' ').replace('@', '');
+  return words.join(' ').replace('@', '').trim();
 }
 
 const formatStringToNumber = (string, maxLength) => {
