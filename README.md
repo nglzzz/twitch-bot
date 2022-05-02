@@ -24,3 +24,5 @@ TODO List:
 [] Public it as package
 
 [] Add shortcodes
+
+[] Middlewares for messages

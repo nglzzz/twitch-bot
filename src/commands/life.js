@@ -39,6 +39,9 @@ async function onLifeCommand(channel, tags) {
     'Лобызатель',
     'Сосатель',
     'Копатель',
+    'Депрессивный Каратель',
+    'Оптимистичный Вонючка',
+    'Слабый Школьник'
   ];
   const middleName = [
     'Консольных',
@@ -105,6 +108,7 @@ async function onLifeCommand(channel, tags) {
     'Развратников',
     'Девственниц',
     'Блудниц',
+    'Школоты',
   ];
 
   return `@${tags.username}

@@ -17,6 +17,8 @@ tmiClient.registerCommand('!steam', require('../commands/steam'), '!стим');
 tmiClient.registerCommand('!discord', require('../commands/discord'), '!дискорд');
 tmiClient.registerCommand('!youtube', require('../commands/youtube'), '!ютуб');
 tmiClient.registerCommand('!goodgame', require('../commands/goodgame'), '!gg');
+tmiClient.registerCommand('!trovo', require('../commands/trovo'), '!трово');
+tmiClient.registerCommand('!wasd', require('../commands/wasd'), '!васд');
 tmiClient.registerCommand('!chance', require('../commands/chance'), '!шанс');
 tmiClient.registerCommand('!coin', require('../commands/coin'), '!монетка');
 tmiClient.registerCommand('!шлёп', require('../commands/slap'), '!шлеп');
