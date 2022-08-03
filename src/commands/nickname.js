@@ -132,8 +132,9 @@ async function onNicknameCommand(channel, tags) {
     'all',
     '4oK',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return 'Новый никнейм для @' + tags.username + ' ' +
+  return 'Новый никнейм для @' + chatter + ' ' +
     arrayHelper.getRandomArrayElement(first) +
     arrayHelper.getRandomArrayElement(second) +
     arrayHelper.getRandomArrayElement(last);

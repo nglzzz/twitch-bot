@@ -1,6 +1,6 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
-const getChatters = require('../chat/chatters');
+const { getChatters } = require('../chat/chatters');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onBiteCommand(channel, tags, message) {
@@ -30,8 +30,9 @@ async function onBiteCommand(channel, tags, message) {
     'анус',
     'лобок',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `@${tags.username} кусает @${subject} за ${arrayHelper.getRandomArrayElement(list)}`;
+  return `@${chatter} кусает @${subject} за ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onBiteCommand;

@@ -1,6 +1,6 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
-const getChatters = require('../chat/chatters');
+const { getChatters } = require('../chat/chatters');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onSlapCommand(channel, tags, message) {
@@ -30,8 +30,9 @@ async function onSlapCommand(channel, tags, message) {
     'ушам',
     'невероятному остроумию',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `@${tags.username} шлёпает @${subject} по ${arrayHelper.getRandomArrayElement(list)}`;
+  return `@${chatter} шлёпает @${subject} по ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onSlapCommand;

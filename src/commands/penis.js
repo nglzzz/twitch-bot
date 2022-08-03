@@ -14,9 +14,10 @@ async function onPenisCommand(channel, tags) {
     '30 см - Мутант',
     '50 см - Носить не тяжело?',
     '3,141592653589 см - это размер твоего члена. Число пи вечно тебя преследует, верно?'
-  ]
+  ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `Член у @${tags.username}: ${arrayHelper.getRandomArrayElement(list)}`;
+  return `Член у @${chatter}: ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onPenisCommand;

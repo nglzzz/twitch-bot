@@ -11,8 +11,9 @@ async function onIqCommand(channel, tags) {
     '160 - Эйнштейн в чате!',
     '200 - Думаешь кто-то поверит в это?',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `IQ у @${tags.username}: ${arrayHelper.getRandomArrayElement(list)}`;
+  return `IQ у @${chatter}: ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onIqCommand;

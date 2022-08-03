@@ -106,10 +106,11 @@ async function onHoroscopeCommand(channel, tags) {
     'Отличный день для покупки говна на алиэкспрес',
   ];
 
+  const chatter = tags['display-name'] ?? tags.username;
   const uniqueTodayString = tags.username + (new Date()).toISOString().slice(0, 10);
   const prediction =  list[messageHelper.formatStringToNumber(uniqueTodayString, 2)];
 
-  return `Звезды говорят что сегодня @${tags.username} ждёт: ${prediction}`;
+  return `Звезды говорят что сегодня @${chatter} ждёт: ${prediction}`;
 }
 
 module.exports = onHoroscopeCommand;

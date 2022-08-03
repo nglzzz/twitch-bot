@@ -11,9 +11,10 @@ async function onBoobsCommand(channel, tags) {
     'Шестой размер, тело тянет вниз',
     'Десятый размер! С такими сложно встать с кровати',
     'Двадцатый размер! Рекорд!',
-  ]
+  ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `Грудь у @${tags.username}: ${arrayHelper.getRandomArrayElement(list)}`;
+  return `Грудь у @${chatter}: ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onBoobsCommand;

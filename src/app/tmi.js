@@ -18,6 +18,18 @@ client.connect().catch(console.error);
 
 const commandsList = [];
 
+const chatMessageHandler = (handlerResult) => {
+  if (Array.isArray(handlerResult)) {
+    let delay = 0;
+    handlerResult.forEach(message => {
+      setTimeout(() => client.say(channel, message), delay);
+      delay += 1500;
+    });
+  } else {
+    client.say(channel, handlerResult);
+  }
+};
+
 client.registerReward = (handleRewardId, rewardHandler) => {
   client.on('message', (channel, tags, message, self) => {
     if (self) return;
@@ -27,17 +39,7 @@ client.registerReward = (handleRewardId, rewardHandler) => {
     if (!rewardType) return;
 
     if (rewardType === handleRewardId) {
-      rewardHandler(channel, tags, message).then(handlerResult => {
-        if (Array.isArray(handlerResult)) {
-          let delay = 0;
-          handlerResult.forEach(message => {
-            setTimeout(() => client.say(channel, message), delay);
-            delay += 1500;
-          });
-        } else {
-          client.say(channel, handlerResult);
-        }
-      })
+      rewardHandler(channel, tags, message).then(chatMessageHandler);
     }
   });
 };
@@ -46,9 +48,7 @@ client.registerCommand = (commandName, commandHandler, alias) => {
   commandsList.push(commandName);
 
   client.on('message', (channel, tags, message, self) => {
-    if (self) return;
-
-    if (message[0] !== '!') {
+    if (self || message[0] !== '!') {
         return;
     }
 
@@ -56,19 +56,10 @@ client.registerCommand = (commandName, commandHandler, alias) => {
 
     if ([commandName, alias].includes(messageCommand)) {
       tags.streamer = typeof tags.badges.broadcaster !== 'undefined' && tags.badges.broadcaster === '1';
-      commandHandler(channel, tags, message).then(handlerResult => {
-        if (Array.isArray(handlerResult)) {
-          let delay = 0;
-          handlerResult.forEach(message => {
-            setTimeout(() => client.say(channel, message), delay);
-            delay += 1500;
-          });
-        } else {
-          client.say(channel, handlerResult);
-        }
-      });
+
+      commandHandler(channel, tags, message).then(chatMessageHandler);
     }
-  })
+  });
 };
 
 client.getCommandList = () => {

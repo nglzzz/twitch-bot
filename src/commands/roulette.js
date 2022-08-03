@@ -1,5 +1,6 @@
 async function onRouletteCommand(channel, tags) {
   let isAlive = Math.random() >= 0.5;
+  const chatter = tags['display-name'] ?? tags.username;
 
   // broadcaster can't be banned
   if (typeof tags.badges.broadcaster !== 'undefined' && tags.badges.broadcaster) {
@@ -7,14 +8,14 @@ async function onRouletteCommand(channel, tags) {
   }
 
   const result = [
-    `/me @${tags.username} прикладывает револьвер к голове и взводит курок...`,
+    `/me @${chatter} прикладывает револьвер к голове и взводит курок...`,
   ];
 
   if (isAlive) {
-    result.push(`/me @${tags.username} нажимает на курок. И... Выживает!`);
+    result.push(`/me @${chatter} нажимает на курок. И... Выживает!`);
   } else {
-    result.push(`/me @${tags.username} нажимает на курок. И... Погибает!`);
-    result.push(`/timeout @${tags.username} 30s`);
+    result.push(`/me @${chatter} нажимает на курок. И... Погибает!`);
+    result.push(`/timeout @${chatter} 30s`);
   }
 
   return result;

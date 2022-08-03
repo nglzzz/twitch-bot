@@ -1,6 +1,4 @@
 const db = require('../app/db');
-const enums = require('../const/enums');
-const Schema = db.Schema;
 
 const subGameSchema = new db.Schema({
     game: String,
@@ -11,12 +9,12 @@ const subGameSchema = new db.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-subGameSchema.methods.setAsWinner = function setAsWinner() {
+subGameSchema.methods.setAsWinner = () => {
     this.winnerDate = new Date();
     this.closedDate = new Date();
 };
 
-subGameSchema.methods.close = function setAsWinner() {
+subGameSchema.methods.close = () => {
     this.closedDate = new Date();
 };
 

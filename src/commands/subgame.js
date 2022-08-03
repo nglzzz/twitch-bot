@@ -10,6 +10,7 @@ async function onSubGameCommand(channel, tags, message) {
 
   const subject = messageHelper.getSubjectFromMessage(message);
   const user = tags.username;
+  const chatter = tags['display-name'] ?? tags.username;
 
   if (subject.length === 0) {
     return getCurrentUserGame(user);
@@ -32,7 +33,7 @@ async function onSubGameCommand(channel, tags, message) {
 
   subGame.save();
 
-  return `@${user}, заказ принят. Игра: "${subject}"`;
+  return `@${chatter}, заказ принят. Игра: "${subject}"`;
 }
 
 async function getCurrentUserGame(username) {

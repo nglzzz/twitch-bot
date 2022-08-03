@@ -110,8 +110,9 @@ async function onLifeCommand(channel, tags) {
     'Блудниц',
     'Школоты',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `@${tags.username}
+  return `@${chatter}
      ${arrayHelper.getRandomArrayElement(firstName)}
      ${arrayHelper.getRandomArrayElement(middleName)}
      ${arrayHelper.getRandomArrayElement(lastName)}`;

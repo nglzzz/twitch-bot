@@ -8,8 +8,9 @@ async function onHelloCommand(channel, tags) {
     'Вечер в хату',
     'Шалом',
   ];
+  const chatter = tags['display-name'] ?? tags.username;
 
-  return `@${tags.username}, ${arrayHelper.getRandomArrayElement(list)}`;
+  return `@${chatter}, ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onHelloCommand;
