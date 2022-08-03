@@ -7,7 +7,7 @@ async function onJokeCommand(channel, tags) {
 async function getJokeFromCastLoads() {
     const response = await axios({
       method: 'POST',
-      url: 'https://castlots.org/generator-anekdotov-online/generate.php',
+      url: 'http://castlots.org/generator-anekdotov-online/generate.php',
       headers: {
         'X-Requested-With': 'XMLHttpRequest'
       }
