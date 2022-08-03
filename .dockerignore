@@ -4,3 +4,4 @@ node_modules
 docker/Dockerfile
 .dockerignore
 .git
+!./storage/cookies.json
