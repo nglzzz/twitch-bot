@@ -18,7 +18,7 @@ client.connect().catch(console.error);
 
 const commandsList = [];
 
-const chatMessageHandler = (handlerResult) => {
+const chatMessageHandler = (handlerResult, channel) => {
   if (Array.isArray(handlerResult)) {
     let delay = 0;
     handlerResult.forEach(message => {
@@ -39,7 +39,7 @@ client.registerReward = (handleRewardId, rewardHandler) => {
     if (!rewardType) return;
 
     if (rewardType === handleRewardId) {
-      rewardHandler(channel, tags, message).then(chatMessageHandler);
+      rewardHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
     }
   });
 };
@@ -49,17 +49,16 @@ client.registerCommand = (commandName, commandHandler, alias) => {
 
   client.on('message', (channel, tags, message, self) => {
     if (self || message[0] !== '!') {
-        return;
+      return;
     }
 
     const messageCommand = message.toLowerCase().split(' ').shift();
 
     if ([commandName, alias].includes(messageCommand)) {
       tags.streamer = typeof tags.badges.broadcaster !== 'undefined' && tags.badges.broadcaster === '1';
-
-      commandHandler(channel, tags, message).then(chatMessageHandler);
+      commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
     }
-  });
+  })
 };
 
 client.getCommandList = () => {
