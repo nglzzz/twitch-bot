@@ -48,14 +48,12 @@ client.registerCommand = (commandName, commandHandler, alias) => {
   commandsList.push(commandName);
 
   client.on('message', (channel, tags, message, self) => {
-    if (self || message[0] !== '!') {
-      return;
-    }
+    if(self || !message.startsWith('!')) return;
 
     const messageCommand = message.toLowerCase().split(' ').shift();
 
     if ([commandName, alias].includes(messageCommand)) {
-      tags.streamer = typeof tags.badges.broadcaster !== 'undefined' && tags.badges.broadcaster === '1';
+      tags.streamer = tags?.badges?.broadcaster === '1';
       commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
     }
   })
