@@ -13,11 +13,10 @@ async function getJokeFromCastLoads() {
       }
     });
 
-    const isJsonData = typeof response.data === 'object';
-    const isJokeExists = typeof response.data.va !== 'undefined';
+    const joke = response?.data?.va;
 
-    if (isJsonData && isJokeExists) {
-      return response.data.va;
+    if (typeof joke !== 'undefined') {
+      return joke;
     }
 
     return getJokeFromAnekdotRu();
@@ -26,7 +25,7 @@ async function getJokeFromCastLoads() {
 const getJokeFromAnekdotRu = () => {
   console.log('anekdot.ru');
 
-  return 'something wrong';
+  return 'Лупа и Пупа устроились на работу. Проработали целый месяц, трудились не покладая рук и не жалея живота своего. В конце месяца Лупа и Пупа пошли получать зарплату. В бухгалтерии все как обычно перепутали. И, в итоге, Лупа получил за Пупу, а Пупа за ЛУПУ!';
 }
 
 module.exports = onJokeCommand;
