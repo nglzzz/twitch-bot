@@ -1,5 +1,7 @@
 async function onBoostyCommand(channel, tags) {
-  return `Брат, @${chatter}, подпишись на бусти ${arrayHelper.getRandomArrayElement(list)} ;)`;
+  const chatter = tags['display-name'] ?? tags.username;
+
+  return `Брат, @${chatter}, подпишись на бусти https://boosty.to/nglzzz ;)`;
 }
 
 module.exports = onBoostyCommand;
