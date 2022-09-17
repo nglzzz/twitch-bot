@@ -31,6 +31,7 @@ tmiClient.registerCommand('!delete-subgame', require('../commands/deleteSubgame'
 tmiClient.registerCommand('!copypast', require('../commands/copypast'), '!копипаста');
 tmiClient.registerCommand('!kill', require('../commands/kill'), '!убить');
 tmiClient.registerCommand('!sex', require('../commands/sex'), '!секс');
+tmiClient.registerCommand('!boosty', require('../commands/boosty'), '!бусти');
 
 // Rewards
 tmiClient.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));

@@ -16,7 +16,7 @@ const copyPastTimer = setInterval(() => {
 
   const randomMessage = arrayHelper.getRandomArrayElement(copyPastList);
   tmiClient.say(config.CHANNEL, randomMessage);
-}, 1000 * 60 * 20); // every 20 minutes
+}, 1000 * 60 * 25); // every 20 minutes
 
 const saveViewersTimer = setInterval(async () => {
   try {
