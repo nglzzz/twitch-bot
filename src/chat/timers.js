@@ -2,12 +2,15 @@ const tmiClient = require('../app/tmi');
 const copyPastList = require('../utils/copypasts');
 const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
+const { getLatestChatters } = require('./chatters');
 const getChannelViewers = require('../twitchApi/viewers');
 const viewerModel = require('../models/viewer.model');
 const getChannelInfo = require('../twitchApi/channelInfo');
 
 const copyPastTimer = setInterval(() => {
-  if (!arrayHelper.getBotList().includes(config.BOT_NAME.toLocaleLowerCase())) {
+  const latestChatter = (getLatestChatters()[getLatestChatters().length - 1]).toLowerCase();
+
+  if (arrayHelper.getBotList().includes(latestChatter)) {
     return;
   }
 
