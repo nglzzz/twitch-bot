@@ -4,7 +4,8 @@ async function onLinksCommand(channel, tags) {
     'Канал на Trovo: https://trovo.live/s/nglzzz |' +
     'Канал на WASD: https://wasd.tv/nglzzz |' +
     'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz |' +
-    'Discord: https://discord.gg/uKCbdCGwTb';
+    'Discord: https://discord.gg/uKCbdCGwTb |' +
+    'Тикток: https://www.tiktok.com/@nglzzz_channel';
 }
 
 module.exports = onLinksCommand;

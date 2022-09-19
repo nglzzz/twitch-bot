@@ -8,7 +8,12 @@ const viewerModel = require('../models/viewer.model');
 const getChannelInfo = require('../twitchApi/channelInfo');
 
 const copyPastTimer = setInterval(() => {
-  const latestChatter = (getLatestChatters()[getLatestChatters().length - 1]).toLowerCase();
+  let latestChatter = '';
+  const latestChatters = getLatestChatters();
+
+  if (latestChatters.length > 0) {
+    latestChatter = (latestChatters[latestChatters.length - 1]).toLowerCase();
+  }
 
   if (arrayHelper.getBotList().includes(latestChatter)) {
     return;
