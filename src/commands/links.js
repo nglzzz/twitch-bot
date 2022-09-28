@@ -5,7 +5,7 @@ async function onLinksCommand(channel, tags) {
     'Канал на WASD: https://wasd.tv/nglzzz |' +
     'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz |' +
     'Discord: https://discord.gg/uKCbdCGwTb |' +
-    'Тикток: https://www.tiktok.com/@nglzzz_channel';
+    'Тикток: https://www.tiktok.com/@nglzzz_twitch?lang=ru-RU';
 }
 
 module.exports = onLinksCommand;
