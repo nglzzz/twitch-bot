@@ -1,4 +1,5 @@
 const axios = require('axios');
+const API_URL = 'http://castlots.org/generator-anekdotov-online/generate.php';
 
 async function onJokeCommand(channel, tags) {
   return await getJokeFromCastLoads();
@@ -7,7 +8,7 @@ async function onJokeCommand(channel, tags) {
 async function getJokeFromCastLoads() {
     const response = await axios({
       method: 'POST',
-      url: 'http://castlots.org/generator-anekdotov-online/generate.php',
+      url: API_URL,
       headers: {
         'X-Requested-With': 'XMLHttpRequest'
       }

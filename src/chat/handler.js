@@ -14,7 +14,7 @@ tmiClient.registerCommand('!joke', require('../commands/joke'), '!анекдот
 tmiClient.registerCommand('!horoscope', require('../commands/horoscope'), '!гороскоп');
 tmiClient.registerCommand('!roulette', require('../commands/roulette'), '!рулетка');
 tmiClient.registerCommand('!steam', require('../commands/steam'), '!стим');
-tmiClient.registerCommand('!discord', require('../commands/discord'), '!дискорд');
+tmiClient.registerCommand('!discord', require('../commands/discord'), '!ds');
 tmiClient.registerCommand('!youtube', require('../commands/youtube'), '!ютуб');
 tmiClient.registerCommand('!goodgame', require('../commands/goodgame'), '!gg');
 tmiClient.registerCommand('!trovo', require('../commands/trovo'), '!трово');
@@ -33,6 +33,7 @@ tmiClient.registerCommand('!kill', require('../commands/kill'), '!убить');
 tmiClient.registerCommand('!sex', require('../commands/sex'), '!секс');
 tmiClient.registerCommand('!boosty', require('../commands/boosty'), '!бусти');
 tmiClient.registerCommand('!tiktok', require('../commands/tiktok'), '!тикток');
+tmiClient.registerCommand('!чат', require('../commands/chat'), '!chat');
 
 // Rewards
 tmiClient.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));

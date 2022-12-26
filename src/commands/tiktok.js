@@ -1,5 +1,5 @@
 async function onTiktokCommand(channel, tags) {
-  return `Тикток канала: https://www.tiktok.com/@nglzzz_twitch?lang=ru-RU`;
+  return `Тикток канал: https://www.tiktok.com/@gore_streamer?lang=ru-RU`;
 }
 
 module.exports = onTiktokCommand;
