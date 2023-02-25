@@ -48,24 +48,24 @@ client.registerReward = (handleRewardId, rewardHandler) => {
 
 client.registerCommand = (commandName, commandHandler, alias) => {
   commandsList.push(commandName);
+
+  // handle commands
+  client.on('message', (channel, tags, message, self) => {
+    // allow to use chatGPT command as @botName
+    if (message.includes(`@${config.BOT_NAME}`)) {
+      message = '!chat ' + message.replace(`@${config.BOT_NAME}`, '');
+    }
+
+    if (self || !message.startsWith('!')) return;
+
+    const messageCommand = message.toLowerCase().split(' ').shift();
+
+    if ([commandName, alias].includes(messageCommand)) {
+      tags.streamer = tags?.badges?.broadcaster === '1';
+      commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
+    }
+  })
 };
-
-// handle commands
-client.on('message', (channel, tags, message, self) => {
-  // allow to use chatGPT command as @botName
-  if (message.includes(`@${config.BOT_NAME}`)) {
-    message = '!chat ' + message.replace(`@${config.BOT_NAME}`, '');
-  }
-
-  if (self || !message.startsWith('!')) return;
-
-  const messageCommand = message.toLowerCase().split(' ').shift();
-
-  if ([commandName, alias].includes(messageCommand)) {
-    tags.streamer = tags?.badges?.broadcaster === '1';
-    commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
-  }
-})
 
 // random ask from bot
 client.on('message', (channel, tags, message, self) => {
