@@ -10,7 +10,7 @@ async function onChatCommand(channel, tags, message) {
     return 'Невозможно ответить на пустое сообщение';
   }
 
-  const answer = sendRequestToChatGpt(text);
+  const answer = await sendRequestToChatGpt(text);
 
   if (typeof answer !== 'undefined') {
     return `@${chatter}, ${answer}`;
