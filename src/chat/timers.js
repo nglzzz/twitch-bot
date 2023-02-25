@@ -19,7 +19,9 @@ const copyPastTimer = setInterval(() => {
     return;
   }
 
-  const randomMessage = arrayHelper.getRandomArrayElement(copyPastList);
+  const randomMessage = arrayHelper.getRandomArrayElement(copyPastList)
+    .replace('*streamername*', config.CHANNEL)
+    .replace('*botname*', config.BOT_NAME);
   tmiClient.say(config.CHANNEL, randomMessage);
 }, 1000 * 60 * 25); // every 25 minutes
 

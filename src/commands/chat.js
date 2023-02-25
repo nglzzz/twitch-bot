@@ -1,7 +1,6 @@
-const config = require('../config');
 const messageHelper = require('../helpers/messageHelper');
-const axios = require('axios');
-const API_URL = 'https://api.openai.com/v1/completions';
+const sendRequestToChatGpt = require('../utils/chatGPT');
+
 
 async function onChatCommand(channel, tags, message) {
   let text = messageHelper.getSubjectFromMessage(message).trim();
@@ -11,25 +10,7 @@ async function onChatCommand(channel, tags, message) {
     return 'Невозможно ответить на пустое сообщение';
   }
 
-  const response = await axios({
-    url: API_URL,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.OPENAI_API_KEY}`
-    },
-    data: {
-      prompt: text,
-      model: 'text-davinci-003',
-      temperature: 0,
-      max_tokens: 1000,
-      top_p: 1,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
-    }
-  });
-
-  const answer = response?.data?.choices[0]?.text;
+  const answer = sendRequestToChatGpt(text);
 
   if (typeof answer !== 'undefined') {
     return `@${chatter}, ${answer}`;

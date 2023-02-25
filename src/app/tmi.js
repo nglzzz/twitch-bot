@@ -1,5 +1,7 @@
 const tmi = require('tmi.js');
 const config = require('../config');
+const {randomInteger} = require('../helpers/numberHelper');
+const doRandomAsk = require('../utils/botAsking');
 
 const client = new tmi.Client({
   options: { debug: config.DEBUG || true, messagesLogLevel: 'info' },
@@ -46,18 +48,35 @@ client.registerReward = (handleRewardId, rewardHandler) => {
 
 client.registerCommand = (commandName, commandHandler, alias) => {
   commandsList.push(commandName);
-
-  client.on('message', (channel, tags, message, self) => {
-    if(self || !message.startsWith('!')) return;
-
-    const messageCommand = message.toLowerCase().split(' ').shift();
-
-    if ([commandName, alias].includes(messageCommand)) {
-      tags.streamer = tags?.badges?.broadcaster === '1';
-      commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
-    }
-  })
 };
+
+// handle commands
+client.on('message', (channel, tags, message, self) => {
+  // allow to use chatGPT command as @botName
+  if (message.includes(`@${config.BOT_NAME}`)) {
+    message = '!chat ' + message.replace(`@${config.BOT_NAME}`, '');
+  }
+
+  if (self || !message.startsWith('!')) return;
+
+  const messageCommand = message.toLowerCase().split(' ').shift();
+
+  if ([commandName, alias].includes(messageCommand)) {
+    tags.streamer = tags?.badges?.broadcaster === '1';
+    commandHandler(channel, tags, message).then((handlerResult) => chatMessageHandler(handlerResult, channel));
+  }
+})
+
+// random ask from bot
+client.on('message', (channel, tags, message, self) => {
+  if (self || message.startsWith('!') || message.includes(`@${config.BOT_NAME}`)) return;
+
+  const randomInt = randomInteger(0, 100);
+  if (randomInt <= 5) { // chance 5%
+    const chatter = tags['display-name'] ?? tags.username;
+    doRandomAsk(chatter).then((handlerResult) => chatMessageHandler(handlerResult, channel));
+  }
+})
 
 client.getCommandList = () => {
   return commandsList;
