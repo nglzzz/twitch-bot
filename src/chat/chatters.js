@@ -1,11 +1,11 @@
-const client = require('../app/tmi');
+const Chat = require('../app/chat');
 const { MAX_LATEST_CHATTERS } = require('../const/enums');
 
 const chatters = [];
 const latestChatters = [];
 
 // Save chatters to global array
-client.on('message', (channel, tags, message, self) => {
+Chat.getClient().on('message', (channel, tags, message, self) => {
   latestChatters.filter((chatter) => chatter !== tags.username);
   latestChatters.push(tags.username);
   if (latestChatters.length > MAX_LATEST_CHATTERS) {

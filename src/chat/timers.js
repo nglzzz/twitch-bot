@@ -1,4 +1,4 @@
-const tmiClient = require('../app/tmi');
+const Chat = require('../app/chat');
 const copyPastList = require('../utils/copypasts');
 const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
@@ -22,7 +22,7 @@ const copyPastTimer = setInterval(() => {
   const randomMessage = arrayHelper.getRandomArrayElement(copyPastList)
     .replace('*streamername*', config.CHANNEL)
     .replace('*botname*', config.BOT_NAME);
-  tmiClient.say(config.CHANNEL, randomMessage);
+  Chat.handleMessageResult(randomMessage, config.CHANNEL);
 }, 1000 * 60 * 25); // every 25 minutes
 
 const saveViewersTimer = setInterval(async () => {

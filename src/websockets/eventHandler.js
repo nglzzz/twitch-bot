@@ -1,5 +1,5 @@
 const websocketServer = require('../app/websocket');
-const tmiClient = require('../app/tmi');
+const Chat = require('../app/chat');
 const messageHelper = require('../helpers/messageHelper');
 const allowedAudioCommands = [
   '!badabum',
@@ -23,7 +23,7 @@ const allowedAudioCommands = [
 ];
 
 websocketServer.on('connection', function (ws) {
-  tmiClient.on('message', (channel, tags, message, self) => {
+  Chat.getClient().on('message', (channel, tags, message, self) => {
     if (messageHelper.isHighlightMessage(tags) && messageHelper.isSubscriberMessage(tags)) {
       ws.send(JSON.stringify({
         type: 'speech',
