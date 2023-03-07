@@ -1,5 +1,5 @@
 const messageHelper = require('../helpers/messageHelper');
-const sendRequestToChatGpt = require('../utils/chatGPT');
+const ChatGPT = require('../utils/chatGPT');
 
 
 async function onChatCommand(channel, tags, message) {
@@ -10,7 +10,7 @@ async function onChatCommand(channel, tags, message) {
     return 'Невозможно ответить на пустое сообщение';
   }
 
-  const answer = await sendRequestToChatGpt(text);
+  const answer = await ChatGPT.addMessage(chatter, text);
 
   if (typeof answer !== 'undefined') {
     return `@${chatter}, ${answer}`;

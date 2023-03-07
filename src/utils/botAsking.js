@@ -1,5 +1,5 @@
 const numberHelper = require('../helpers/numberHelper');
-const sendRequestToChatGpt = require('../utils/chatGPT');
+const ChatGpt = require('../utils/chatGPT');
 const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
 
@@ -52,9 +52,11 @@ async function doRandomAsk(subject) {
   ];
 
   const symbols = numberHelper.randomInteger(15, 50);
-  const ask = arrayHelper.getRandomArrayElement(askList).replace('@subject', subject) + ' минимум на ' + symbols + ' символов';
+  const question = arrayHelper
+    .getRandomArrayElement(askList)
+    .replace('@subject', subject) + ' минимум на ' + symbols + ' символов';
 
-  const answer = await sendRequestToChatGpt(ask);
+  const answer = await ChatGpt.addMessage(subject, question, config.BOT_NAME);
 
   return `@${subject} ${answer}`;
 }
