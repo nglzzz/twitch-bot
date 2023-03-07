@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config');
+const MAX_CONTEXT_SIZE = 12;
 
 class ChatGptFactory
 {
@@ -17,7 +18,7 @@ class ChatGPT
 {
   static _instance;
   _context = {};
-  defaultBehavior = 'Ты дружелюбный бот на твиче';
+  defaultBehavior = 'Ты дружелюбный бот на твиче стримера ' + config.CHANNEL;
 
   static getInstance() {
     if (this._instance) {
@@ -44,6 +45,13 @@ class ChatGPT
       role: typeof from !== 'undefined' && from === config.BOT_NAME ? 'assistant' : role,
       content: message,
     });
+
+    // reload context
+    if (this._context[user].length >= MAX_CONTEXT_SIZE) {
+      const first = this._context[user].shift();
+      const last = this._context[user].pop;
+      this._context[user] = [first, last];
+    }
   }
 }
 
