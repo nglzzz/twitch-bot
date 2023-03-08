@@ -1,7 +1,7 @@
 const Chat = require('../app/chat');
-const config = require('../config');
 const {randomInteger} = require('../helpers/numberHelper');
 const doRandomAsk = require('../utils/botAsking');
+const arrayHelper = require('../helpers/arrayHelper');
 
 Chat.registerCommand('!help', require('../commands/help'), '!хелп');
 Chat.registerCommand('!hello', require('../commands/hello'), '!привет');
@@ -51,7 +51,8 @@ let askingChance = 5;
 
 // random ask from bot
 Chat.getClient().on('message', (channel, tags, message, self) => {
-  if (self || message.startsWith('!') || message.includes(`@${config.BOT_NAME}`)) return;
+  const chatter = tags['display-name'] ?? tags.username;
+  if (self || message.startsWith('!') || arrayHelper.getBotList().includes(chatter.toLowerCase())) return;
 
   const randomInt = randomInteger(0, 100);
 
@@ -65,7 +66,6 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
       askingChance = 5;
     }
 
-    const chatter = tags['display-name'] ?? tags.username;
     doRandomAsk(chatter).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
   }
 });

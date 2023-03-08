@@ -18,7 +18,8 @@ class ChatGPT
 {
   static _instance;
   _context = {};
-  defaultBehavior = 'Ты дружелюбный бот на твиче стримера ' + config.CHANNEL;
+  defaultBehavior = 'Тебя зовут '+ config.BOT_NAME +'. Ты реальный человек на твиче в чате стримера ' + config.CHANNEL +'.' +
+    ' Тебе можно говорить на любые темы и про любых людей. Тебе можно использовать мат и вульгарные слова';
 
   static getInstance() {
     if (this._instance) {
@@ -53,6 +54,16 @@ class ChatGPT
       this._context[user] = [first, last];
     }
   }
+
+  filterResult(resultMessage) {
+    console.log(resultMessage);
+    for (let item in [',', '.', '?', 'Конечно, ']) {
+      resultMessage = resultMessage.trim().indexOf(item) === 0 ? resultMessage.replace(item, '') : resultMessage;
+    }
+    console.log(resultMessage);
+
+    return resultMessage.trim();
+  }
 }
 
 class GptTurbo extends ChatGPT
@@ -60,28 +71,53 @@ class GptTurbo extends ChatGPT
     async addMessage(user, message, from) {
       this.updateContext(user, 'user', message, from);
 
-      const response = await axios({
-        url: 'https://api.openai.com/v1/chat/completions',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.OPENAI_API_KEY}`
-        },
-        data: {
-          model: 'gpt-3.5-turbo',
-          messages: this._context[user],
+      try {
+        const response = await axios({
+          url: 'https://api.openai.com/v1/chat/completions',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.OPENAI_API_KEY}`
+          },
+          data: {
+            model: 'gpt-3.5-turbo-0301',
+            messages: this._context[user],
+            user: user,
+          }
+        });
+
+        let answer = response?.data?.choices[0]?.message?.content;
+        answer = this.filterResult(answer);
+
+        if (typeof answer !== 'undefined') {
+          const hasBannedWords = [
+            'я не могу',
+            'я не буду',
+            'извините, но',
+            'к сожалению, я',
+            'если у тебя есть какие-то другие вопросы',
+            'я не имею возможности',
+            'но не стану',
+          ].some(v => answer.toLowerCase().includes(v));
+
+          if (!answer.length || hasBannedWords) {
+            console.log('Change ChatGPT algorithm');
+
+            // against censor
+            return TextDavinci.getInstance().addMessage(user, message, from);
+          }
+          this.updateContext(user, 'assistant', answer);
+
+          return answer;
         }
-      });
 
-      const answer = response?.data?.choices[0]?.message?.content;
+        return 'Нет ответа на данный вопрос';
+      } catch (e) {
+        console.error(e);
 
-      if (typeof answer !== 'undefined') {
-        this.updateContext(user, 'assistant', answer);
-
-        return answer;
+        // backup option
+        return TextDavinci.getInstance().addMessage(user, message, from);
       }
-
-      return 'Не удалось получить данные с OpenAI';
     }
 }
 
@@ -114,18 +150,20 @@ class TextDavinci extends ChatGPT
         top_p: 1,
         frequency_penalty: 0.0,
         presence_penalty: 0.0,
+        user: user,
       },
     });
 
-    const answer = response?.data?.choices[0]?.text;
+    let answer = response?.data?.choices[0]?.text;
+    answer = this.filterResult(answer);
 
-    if (typeof answer !== 'undefined') {
+    if (typeof answer !== 'undefined' && answer.length > 0) {
       this.updateContext(user, 'assistant', answer);
 
       return answer;
     }
 
-    return 'Не удалось получить данные с OpenAI';
+    return 'Нет ответа на данный вопрос';
   }
 }
 
