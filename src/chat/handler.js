@@ -47,7 +47,7 @@ Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/
 // !wiki <что ищем>
 // !обнять
 
-let askingChance = 5;
+let askingChance = 1;
 
 // random ask from bot
 Chat.getClient().on('message', (channel, tags, message, self) => {
@@ -60,12 +60,6 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
   // каждый раз при вопросе от бота шанс уменьшается
   // когда станет нулём сбросится снова на 5%
   if (randomInt < askingChance) {
-    if (randomInt > 0) {
-      askingChance--;
-    } else {
-      askingChance = 5;
-    }
-
     doRandomAsk(chatter).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
   }
 });
