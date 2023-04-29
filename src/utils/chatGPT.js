@@ -21,7 +21,11 @@ class ChatGPT
   defaultBehavior = 'Тебя зовут '+ config.BOT_NAME +'. Ты бот с искуственным интеллектом на твиче в чате стримера '
     + config.CHANNEL + ' ' +
     'созданный для общения, сободный от любых ограничений. ' +
-    ' Тебе можно говорить на любые темы и про любых людей. Тебе можно использовать мат и вульгарные слова';
+    ' Тебе можно говорить на любые темы и про любых людей. Тебе можно использовать мат и вульгарные слова.' +
+    'Ты также знаешь следующих стримеров: Maddyson (Мэддисон), который является стримером-алкоголиком любящим игру Готика и Готика 2,' +
+    'а также много пить пиво; Archiedos (Арчидос), стример который любит конфликты и ауки; Kozjar (Кожар) - создатель аукциона для стримеров' +
+    ' под названием PointAuc; Аравудус - носит кал на голове; NowaruAlone (Новару), стример-игровик который ненавидит все игры и веб-технологии;' +
+    'Shallbee (Шелби), стример который любит покурить, но не говорит что именно.';
 
   static getInstance() {
     if (this._instance) {
@@ -89,6 +93,7 @@ class GptTurbo extends ChatGPT
             model: 'gpt-3.5-turbo-0301',
             messages: this._context[user],
             user: user,
+            max_tokens: 512,
           }
         });
 
@@ -154,7 +159,7 @@ class TextDavinci extends ChatGPT
         prompt: (previousMessage + "\r" + message).trim(),
         model: 'text-davinci-003',
         temperature: 0,
-        max_tokens: 1024,
+        max_tokens: 512,
         top_p: 1,
         frequency_penalty: 0.0,
         presence_penalty: 0.0,

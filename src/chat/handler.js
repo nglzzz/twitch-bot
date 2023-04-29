@@ -47,7 +47,7 @@ Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/
 // !wiki <что ищем>
 // !обнять
 
-let askingChance = 1;
+const askingChance = 1;
 
 // random ask from bot
 Chat.getClient().on('message', (channel, tags, message, self) => {
@@ -56,10 +56,11 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
 
   const randomInt = randomInteger(0, 100);
 
-  // шанс вопроса от бота по умолчанию 5 процентов.
-  // каждый раз при вопросе от бота шанс уменьшается
-  // когда станет нулём сбросится снова на 5%
-  if (randomInt < askingChance) {
+  // шанс вопроса от бота 1 процент. Но это тоже много,
+  // поэтому при выпадении 1 процента ещё проверка на 50/50 происходит
+  const chanceSuccess = randomInt < askingChance && randomInteger(0, 50) < 50;
+
+  if (chanceSuccess) {
     doRandomAsk(chatter).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
   }
 });
