@@ -23,7 +23,7 @@ const copyPastTimer = setInterval(() => {
     .replace('*streamername*', config.CHANNEL)
     .replace('*botname*', config.BOT_NAME);
   Chat.handleMessageResult(randomMessage, config.CHANNEL);
-}, 1000 * 60 * 25); // every 25 minutes
+}, 1000 * 60 * 40); // every 40 minutes
 
 const saveViewersTimer = setInterval(async () => {
   try {
