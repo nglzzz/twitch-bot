@@ -4,7 +4,7 @@ const { getChatters } = require('../chat/chatters');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onSexCommand(channel, tags, message) {
-  const viewers = getChannelViewers();
+  const viewers = await getChannelViewers();
 
   let subject = messageHelper.getSubjectFromMessage(message);
 
