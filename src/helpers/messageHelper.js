@@ -9,12 +9,9 @@ function isSubscriberMessage(tags) {
 const getSubjectFromMessage = (message) => {
   let words = message.split(' ');
   words.shift(); // remove first word because it's command name
+  words.filter(item => item !== ' '); // remove all spaces
 
-  if (words.length === 0) {
-    return '';
-  }
-
-  return words.shift().replace('@', '').replace('󠀀', '').trim(); // this second should be the subject
+  return words.join(' ').replace('@', '').trim();
 }
 
 const formatStringToNumber = (string, maxLength) => {
