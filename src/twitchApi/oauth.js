@@ -14,14 +14,14 @@ const getOAuthToken = async (force = false) => {
   }
 
   const response = await axios({
-    method: "post",
-    url: "https://id.twitch.tv/oauth2/token",
+    method: 'post',
+    url: 'https://id.twitch.tv/oauth2/token',
     data: {
       client_id: config.TWITCH_API_CLIENT_ID,
       client_secret: config.TWITCH_API_CLIENT_SECRET,
-      grant_type: "client_credentials"
+      grant_type: 'client_credentials'
     },
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
   const responseData = response.data;
 

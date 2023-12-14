@@ -11,7 +11,7 @@ async function onSpitCommand(channel, tags, message) {
   const chatter = tags['display-name'] ?? tags.username;
 
   if (subject.length === 0) {
-    subject = viewers.length > 0
+    subject = viewers && viewers.length > 0
       ? arrayHelper.getRandomArrayElement(viewers)
       : arrayHelper.getRandomArrayElement(getChatters());
 
