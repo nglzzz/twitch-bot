@@ -40,6 +40,7 @@ Chat.registerCommand('!чат', require('../commands/chat'), '!chat');
 Chat.registerCommand('!пк', require('../commands/specs'), '!specs');
 Chat.registerCommand('!tg', require('../commands/tg'), '!telegram');
 Chat.registerCommand('!tgds', require('../commands/tgds'), '!dstg');
+Chat.registerCommand('!обнять', require('../commands/tgds'), '!hug');
 
 // Rewards
 Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
@@ -47,7 +48,6 @@ Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/
 
 // TODO:
 // !wiki <что ищем>
-// !обнять
 
 const askingChance = 1;
 
@@ -63,6 +63,6 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
   const chanceSuccess = randomInt < askingChance && randomInteger(0, 50) < 50;
 
   if (chanceSuccess) {
-    doRandomAsk(chatter).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
+    doRandomAsk(chatter, message).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
   }
 });

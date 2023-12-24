@@ -5,6 +5,7 @@ async function onLinksCommand(channel, tags) {
     'Канал на WASD: https://wasd.tv/nglzzz |' +
     'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz |' +
     'Discord: https://discord.gg/uKCbdCGwTb |' +
+    'Telegram: https://t.me/nglzzzTV |' +
     'Тикток: https://www.tiktok.com/@gore_streamer?lang=ru-RU';
 }
 

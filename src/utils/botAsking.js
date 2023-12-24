@@ -1,8 +1,18 @@
 const ChatGpt = require('../utils/chatGPT');
 const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
+const {randomInteger} = require('../helpers/numberHelper');
 
-async function doRandomAsk(subject) {
+async function doRandomAsk(subject, message) {
+  const question = randomInteger(0, 50) < 50 ? getPreparedAsk(subject) : getAskFromMessage(subject, message);
+
+  ChatGpt.updateContext(subject, 'user', question);
+  const answer = await ChatGpt.addMessage(subject, question, config.BOT_NAME);
+
+  return `@${subject} ${answer}`;
+}
+
+function getPreparedAsk(subject) {
   const askList = [
     'Задай вопрос для @subject о любви',
     'Задай вопрос для @subject о свободе',
@@ -50,14 +60,14 @@ async function doRandomAsk(subject) {
     'Задай мне вопрос о любимых позах в постеле',
   ];
 
-  const question = arrayHelper
+  return arrayHelper
     .getRandomArrayElement(askList)
-    .replaceAll('@subject', subject);
+    .replaceAll('@subject', subject)
+    + ` Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
+}
 
-  ChatGpt.updateContext(subject, 'user', question);
-  const answer = await ChatGpt.addMessage(subject, question, config.BOT_NAME);
-
-  return `@${subject} ${answer}`;
+function getAskFromMessage(subject, message) {
+  const preparedForBot = `Придумай ответ в шутливой форме на сообщение от ${subject} "${message}". Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
 }
 
 module.exports = doRandomAsk;
