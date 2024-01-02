@@ -63,11 +63,11 @@ function getPreparedAsk(subject) {
   return arrayHelper
     .getRandomArrayElement(askList)
     .replaceAll('@subject', subject)
-    + ` Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
+    + ` Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}" и больше не пиши "@${subject}"`;
 }
 
 function getAskFromMessage(subject, message) {
-  const preparedForBot = `Придумай ответ в шутливой форме на сообщение от ${subject} "${message}". Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
+  return `Придумай ответ в шутливой форме на сообщение от ${subject} "${message}". Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
 }
 
 module.exports = doRandomAsk;
