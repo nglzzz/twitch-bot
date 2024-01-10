@@ -6,7 +6,8 @@ async function onLinksCommand(channel, tags) {
     'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz |' +
     'Discord: https://discord.gg/uKCbdCGwTb |' +
     'Telegram: https://t.me/nglzzzTV |' +
-    'Тикток: https://www.tiktok.com/@gore_streamer?lang=ru-RU';
+    'Тикток: https://www.tiktok.com/@gore_streamer?lang=ru-RU |' +
+    'Второй канал: https://twitch.tv/nglztv';
 }
 
 module.exports = onLinksCommand;
