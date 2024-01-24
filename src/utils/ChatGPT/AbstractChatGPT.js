@@ -34,6 +34,14 @@ class AbstractChatGPT
       this.resetContext(user);
     }
 
+    // check duplicate
+    if (this._context[user].length > 0) {
+      const last = this._context[user].pop();
+      if (last === message) {
+        return;
+      }
+    }
+
     this._context[user].push({
       role: typeof from !== 'undefined' && from === config.BOT_NAME ? 'assistant' : role,
       content: message,
@@ -42,7 +50,7 @@ class AbstractChatGPT
     // reload context
     if (this._context[user].length >= MAX_CONTEXT_SIZE) {
       const first = this._context[user].shift();
-      const last = this._context[user].pop;
+      const last = this._context[user].pop();
       this._context[user] = [first, last];
     }
   }

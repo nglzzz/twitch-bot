@@ -4,7 +4,8 @@ const config = require('../config');
 const {randomInteger} = require('../helpers/numberHelper');
 
 async function doRandomAsk(subject, message) {
-  const question = randomInteger(0, 50) < 50 ? getPreparedAsk(subject) : getAskFromMessage(subject, message);
+  let question = randomInteger(0, 50) < 50 ? getPreparedAsk(subject) : getAskFromMessage(subject, message);
+  question = question.replace(subject + ' ' + subject, subject); // fix double subject
 
   ChatGpt.updateContext(subject, 'user', question);
   const answer = await ChatGpt.addMessage(subject, question, config.BOT_NAME);
@@ -58,16 +59,16 @@ function getPreparedAsk(subject) {
     'Задай мне вопрос о моих предпочтениях в сексе',
     'Задай мне вопрос какие мне девушки нравятся',
     'Задай мне вопрос о любимых позах в постеле',
+    'Попроси @subject поддержать канал донатом',
   ];
 
   return arrayHelper
     .getRandomArrayElement(askList)
-    .replaceAll('@subject', subject)
-    + ` Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}" и больше не пиши "@${subject}"`;
+    .replaceAll('@subject', subject);
 }
 
 function getAskFromMessage(subject, message) {
-  return `Придумай ответ в шутливой форме на сообщение от ${subject} "${message}". Сообщение отправляй сразу в форме ответа начиная с обращения "@${subject}"`;
+  return `Придумай ответ в шутливой форме на сообщение от ${subject} "${message}".`;
 }
 
 module.exports = doRandomAsk;

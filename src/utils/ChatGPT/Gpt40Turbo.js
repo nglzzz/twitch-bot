@@ -1,7 +1,7 @@
 const axios = require('axios');
 const config = require('../../config');
 const AbstractChatGPT = require('./AbstractChatGPT');
-const TextDavinci = require('./TextDavinci');
+const Pawan = require('./Pawan');
 
 class Gpt40Turbo extends AbstractChatGPT
 {
@@ -68,7 +68,7 @@ class Gpt40Turbo extends AbstractChatGPT
   }
 
   resendByBackupModel(user, message, from, defaultAnswer) {
-    return TextDavinci.getInstance().addMessage(user, message, from, defaultAnswer);
+    return Pawan.getInstance().addMessage(user, message, from, defaultAnswer);
   }
 }
 
