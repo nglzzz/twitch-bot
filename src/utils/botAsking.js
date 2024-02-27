@@ -4,7 +4,7 @@ const config = require('../config');
 const {randomInteger} = require('../helpers/numberHelper');
 
 async function doRandomAsk(subject, message) {
-  let question = randomInteger(0, 50) < 50 ? getPreparedAsk(subject) : getAskFromMessage(subject, message);
+  let question = randomInteger(0, 50) < 15 ? getPreparedAsk(subject) : getAskFromMessage(subject, message);
   question = question.replace(subject + ' ' + subject, subject); // fix double subject
 
   ChatGpt.updateContext(subject, 'user', question);

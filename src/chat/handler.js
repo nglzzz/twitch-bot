@@ -61,7 +61,7 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
 
   // шанс вопроса от бота 1 процент. Но это тоже много,
   // поэтому при выпадении 1 процента ещё проверка на 50/50 происходит
-  const chanceSuccess = randomInt < askingChance && randomInteger(0, 50) < 50;
+  const chanceSuccess = randomInt < askingChance && randomInteger(0, 100) < 50;
 
   if (chanceSuccess) {
     doRandomAsk(chatter, message).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
