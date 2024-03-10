@@ -43,6 +43,7 @@ Chat.registerCommand('!tgds', require('../commands/tgds'), '!dstg');
 Chat.registerCommand('!обнять', require('../commands/hug'), '!hug');
 Chat.registerCommand('!канал2', require('../commands/channel2'), '!channel2');
 Chat.registerCommand('!donate', require('../commands/donate'), '!донат');
+Chat.registerCommand('!rating', require('../commands/rating'), '!рейтинг');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
@@ -52,6 +53,8 @@ Chat.registerCommand('!donate', require('../commands/donate'), '!донат');
 // !wiki <что ищем>
 
 const askingChance = 1;
+global.ratingStart = false;
+global.ratingList = {};
 
 // random ask from bot
 Chat.getClient().on('message', (channel, tags, message, self) => {
@@ -66,5 +69,12 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
 
   if (chanceSuccess) {
     doRandomAsk(chatter, message).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
+  }
+
+  if (ratingStart) {
+    const rating = parseInt(message.trim());
+    if (rating > 0 && rating < 10) {
+      ratingList[chatter] = rating;
+    }
   }
 });
