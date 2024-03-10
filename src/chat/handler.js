@@ -73,7 +73,7 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
 
   if (ratingStart) {
     const rating = parseInt(message.trim());
-    if (rating > 0 && rating < 10) {
+    if (rating > 0 && rating <= 10) {
       ratingList[chatter] = rating;
     }
   }
