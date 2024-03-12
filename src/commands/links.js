@@ -1,12 +1,11 @@
 async function onLinksCommand(channel, tags) {
-  return 'YouTube канал: https://www.youtube.com/@nglzzz |' +
-    'Канал на GoodGame: https://goodgame.ru/channel/nglzzz |' +
-    'Канал на Trovo: https://trovo.live/s/nglzzz |' +
-    'Канал на WASD: https://wasd.tv/nglzzz |' +
-    'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz |' +
-    'Discord: https://discord.gg/uKCbdCGwTb |' +
-    'Telegram: https://t.me/nglzzzTV |' +
-    'Тикток: https://www.tiktok.com/@gore_streamer?lang=ru-RU |' +
+  return 'Донат: https://www.donationalerts.com/c/nglzzz | ' +
+    'Memealerts: https://memealerts.com/nglzzz | ' +
+    'Telegram: https://t.me/nglzzzTV | ' +
+    'Discord: https://discord.gg/uKCbdCGwTb | ' +
+    'YouTube канал: https://www.youtube.com/@nglzzz | ' +
+    'Аккаунт в Steam: https://steamcommunity.com/id/nglzzz | ' +
+    'Тикток: https://www.tiktok.com/@gore_streamer?lang=ru-RU | ' +
     'Второй канал: https://twitch.tv/nglztv';
 }
 

@@ -21,7 +21,7 @@ Chat.registerCommand('!discord', require('../commands/discord'), '!ds');
 Chat.registerCommand('!youtube', require('../commands/youtube'), '!ютуб');
 Chat.registerCommand('!goodgame', require('../commands/goodgame'), '!gg');
 Chat.registerCommand('!trovo', require('../commands/trovo'), '!трово');
-Chat.registerCommand('!wasd', require('../commands/wasd'), '!васд');
+// Chat.registerCommand('!wasd', require('../commands/wasd'), '!васд');
 Chat.registerCommand('!chance', require('../commands/chance'), '!шанс');
 Chat.registerCommand('!coin', require('../commands/coin'), '!монетка');
 Chat.registerCommand('!шлёп', require('../commands/slap'), '!шлеп');
@@ -44,6 +44,7 @@ Chat.registerCommand('!обнять', require('../commands/hug'), '!hug');
 Chat.registerCommand('!канал2', require('../commands/channel2'), '!channel2');
 Chat.registerCommand('!donate', require('../commands/donate'), '!донат');
 Chat.registerCommand('!rating', require('../commands/rating'), '!рейтинг');
+Chat.registerCommand('!memealerts', require('../commands/memealerts'), '!мемы');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
