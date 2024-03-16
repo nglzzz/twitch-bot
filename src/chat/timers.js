@@ -20,10 +20,12 @@ const copyPastTimer = setInterval(() => {
   }
 
   const randomMessage = arrayHelper.getRandomArrayElement(copyPastList)
-    .replace('*streamername*', config.CHANNEL)
-    .replace('*botname*', config.BOT_NAME);
+    .split('*streamername*')
+    .join(config.CHANNEL)
+    .split('*botname*')
+    .join(config.BOT_NAME);
   Chat.handleMessageResult(randomMessage, config.CHANNEL);
-}, 1000 * 60 * 60); // every 60 minutes
+}, 1000 * 60 * 50); // every 50 minutes
 
 const saveViewersTimer = setInterval(async () => {
   try {
