@@ -4,7 +4,7 @@ const config = require(SRC_PATH + '/config');
 class PointAucClient
 {
     constructor(apiKey) {
-        this.apiKey = apiKey || config.POINTAUC_TOKEN;
+        this.apiKey = (apiKey || config.POINTAUC_TOKEN).trim();
     }
 
     async makeBid(cost, user, message) {

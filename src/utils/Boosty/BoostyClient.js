@@ -5,7 +5,7 @@ const path = require('path');
 class BoostyClient
 {
     constructor(apiKey) {
-        this.apiKey = apiKey || this.getTokenFromFile();
+        this.apiKey = (apiKey || this.getTokenFromFile()).trim();
     }
 
     async getSubscribers(limit) {
