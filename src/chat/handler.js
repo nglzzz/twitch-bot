@@ -45,6 +45,7 @@ Chat.registerCommand('!канал2', require('../commands/channel2'), '!channel2
 Chat.registerCommand('!donate', require('../commands/donate'), '!донат');
 Chat.registerCommand('!rating', require('../commands/rating'), '!рейтинг');
 Chat.registerCommand('!memealerts', require('../commands/memealerts'), '!мемы');
+Chat.registerCommand('!sub', require('../commands/sub'), '!саб');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
