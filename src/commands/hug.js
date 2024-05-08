@@ -18,6 +18,8 @@ async function onHugCommand(channel, tags, message) {
     'нежно',
     'крепко',
     'с любовью',
+    'с яростью',
+    'с жалостью',
     'со слезами на глазах',
     'и благодарит за всё',
     'по дружески',
@@ -26,7 +28,7 @@ async function onHugCommand(channel, tags, message) {
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
-  return `@${chatter} обнимает @${subject} по ${arrayHelper.getRandomArrayElement(list)}`;
+  return `@${chatter} обнимает @${subject} ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
 module.exports = onHugCommand;
