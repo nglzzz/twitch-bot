@@ -1,6 +1,6 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
-const { getChatters } = require('../chat/chatters');
+const { getLatestChatters } = require('../chat/chatters');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onSlapCommand(channel, tags, message) {
@@ -11,7 +11,7 @@ async function onSlapCommand(channel, tags, message) {
   if (subject.length === 0) {
     subject = viewers.length > 0
       ? arrayHelper.getRandomArrayElement(viewers)
-      : arrayHelper.getRandomArrayElement(getChatters());
+      : arrayHelper.getRandomArrayElement(getLatestChatters());
   }
 
   const list = [

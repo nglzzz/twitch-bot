@@ -18,7 +18,7 @@ class Gpt35Turbo extends AbstractChatGPT
           'Authorization': `Bearer ${config.OPENAI_API_KEY}`
         },
         data: {
-          model: 'gpt-3.5-turbo-1106',
+          model: 'gpt-3.5-turbo-0125',
           messages: this._context[user],
           user: user,
           max_tokens: 512,
@@ -26,32 +26,7 @@ class Gpt35Turbo extends AbstractChatGPT
       });
 
       let answer = response?.data?.choices[0]?.message?.content;
-      answer = this.filterResult(answer);
-
-      if (typeof answer !== 'undefined') {
-        const hasBannedWords = [
-          'я не могу',
-          'я не буду',
-          'извините, но',
-          'к сожалению, я',
-          'если у тебя есть какие-то другие вопросы',
-          'я не имею возможности',
-          'но не стану',
-        ].some(v => answer.toLowerCase().includes(v));
-
-        if (!answer.length || hasBannedWords) {
-          console.log('Change ChatGPT algorithm');
-
-          // against censor
-          this.resetContext(user);
-          return this.resendByBackupModel(user, message, from, defaultMessage || answer);
-        }
-        this.updateContext(user, 'assistant', answer);
-
-        return answer;
-      }
-
-      return this.resendByBackupModel(user, message, from, defaultMessage);
+      return this.handleAnswerOrResend(answer, user, message, from, defaultMessage, Gpt35TurboDefault.getInstance())
     } catch (e) {
       if (e.response) {
         console.error(e.response.data);
@@ -63,12 +38,8 @@ class Gpt35Turbo extends AbstractChatGPT
 
       // backup option
       this.resetContext(user);
-      return this.resendByBackupModel(user, message, from, defaultMessage);
+      return this.resendByBackupModel(user, message, from, defaultMessage, Gpt35TurboDefault.getInstance());
     }
-  }
-
-  resendByBackupModel(user, message, from, defaultAnswer) {
-    return Gpt35TurboDefault.getInstance().addMessage(user, message, from, defaultAnswer);
   }
 }
 

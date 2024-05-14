@@ -2,9 +2,8 @@ const axios = require('axios');
 const config = require('../../config');
 const AbstractChatGPT = require('./AbstractChatGPT');
 const Gpt40Turbo = require('./Gpt40Turbo');
-const Gpt4o = require('./Gpt4o');
 
-class Gpt35TurboDefault extends AbstractChatGPT
+class Gpt4o extends AbstractChatGPT
 {
   async addMessage(user, message, from, defaultMessage) {
     const url = 'https://api.proxyapi.ru/openai/v1/chat/completions'; // for openai: https://api.openai.com/v1/chat/completions
@@ -19,7 +18,7 @@ class Gpt35TurboDefault extends AbstractChatGPT
           'Authorization': `Bearer ${config.OPENAI_API_KEY}`
         },
         data: {
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4o',
           messages: this._context[user],
           user: user,
           max_tokens: 512,
@@ -27,7 +26,7 @@ class Gpt35TurboDefault extends AbstractChatGPT
       });
 
       let answer = response?.data?.choices[0]?.message?.content;
-      return this.handleAnswerOrResend(answer, user, message, from, defaultMessage, Gpt4o.getInstance());
+      return this.handleAnswerOrResend(answer, user, message, from, defaultMessage, Gpt40Turbo.getInstance());
     } catch (e) {
       if (e.response) {
         console.error(e.response.data);
@@ -39,9 +38,9 @@ class Gpt35TurboDefault extends AbstractChatGPT
 
       // backup option
       this.resetContext(user);
-      return this.resendByBackupModel(user, message, from, defaultMessage, Gpt4o.getInstance());
+      return this.resendByBackupModel(user, message, from, defaultMessage, Gpt40Turbo.getInstance());
     }
   }
 }
 
-module.exports = Gpt35TurboDefault;
+module.exports = Gpt4o;

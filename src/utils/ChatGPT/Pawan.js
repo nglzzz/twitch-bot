@@ -39,12 +39,8 @@ class Pawan extends AbstractChatGPT
 
       // backup option
       this.resetContext(user);
-      return this.resendByBackupModel(user, message, from, defaultMessage);
+      return this.resendByBackupModel(user, message, from, defaultMessage, TextDavinci.getInstance());
     }
-  }
-
-  resendByBackupModel(user, message, from, defaultAnswer) {
-    return TextDavinci.getInstance().addMessage(user, message, from, defaultAnswer);
   }
 }
 

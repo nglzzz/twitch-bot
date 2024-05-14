@@ -1,6 +1,6 @@
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
-const { getChatters } = require('../chat/chatters');
+const { getLatestChatters } = require('../chat/chatters');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onKillCommand(channel, tags, message) {
@@ -11,7 +11,7 @@ async function onKillCommand(channel, tags, message) {
   if (subject.length === 0) {
     subject = viewers.length > 0
       ? arrayHelper.getRandomArrayElement(viewers)
-      : arrayHelper.getRandomArrayElement(getChatters());
+      : arrayHelper.getRandomArrayElement(getLatestChatters());
   }
 
   const list = [
@@ -29,6 +29,8 @@ async function onKillCommand(channel, tags, message) {
     `сбивает @${subject} на икарусе`,
     `морально уничтожает @${subject}`,
     `отрубает голову @${subject}`,
+    `зацеловывает @${subject} до смерти`,
+    `высасывает все соки из @${subject}`,
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
