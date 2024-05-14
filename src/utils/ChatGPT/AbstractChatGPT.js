@@ -37,7 +37,7 @@ class AbstractChatGPT
 
     // check duplicate
     if (this._context[user].length > 0) {
-      const last = this._context[user].pop();
+      const last = this._context[user][this._context[user].length];
       if (last === message) {
         return;
       }
@@ -97,6 +97,7 @@ class AbstractChatGPT
         return this.resendByBackupModel(user, message, from, defaultMessage || answer, backupModel);
       }
       this.updateContext(user, 'assistant', answer);
+      console.log(this._context);
 
       return answer;
     }
