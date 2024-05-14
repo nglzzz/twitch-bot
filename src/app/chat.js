@@ -4,7 +4,7 @@ const config = require('../config');
 class Chat {
   static _instance;
   _client;
-  _commandsList = [];
+  _commandsList = {};
 
   constructor() {
     this._client = new tmi.Client({
@@ -47,7 +47,10 @@ class Chat {
   }
 
   registerCommand(commandName, commandHandler, alias) {
-    this._commandsList.push(commandName);
+    this._commandsList[commandName] = commandHandler;
+    if (alias) {
+      this._commandsList[alias] = commandHandler;
+    }
 
     // handle commands
     this._client.on('message', (channel, tags, message, self) => {
