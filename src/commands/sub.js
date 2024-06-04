@@ -1,6 +1,8 @@
 const BoostyClient = require('../utils/Boosty/BoostyClient');
 const PointAucClient = require('../utils/PointAuc/PointAucClient');
-const messageHelper = require("../helpers/messageHelper");
+const messageHelper = require('../helpers/messageHelper');
+
+let lastBids = {};
 
 async function onSubCommand(channel, tags, message) {
     const boostyClient = new BoostyClient();
@@ -17,6 +19,10 @@ async function onSubCommand(channel, tags, message) {
         return `@${chatter} ты не бусти саб, но можешь им стать! Ссылка на бусти - https://boosty.to/nglzzz`;
     }
 
+    if (!canBidByTime(subscriber.id)) {
+        return `@${chatter} ты уже делал ставку на этом аукционе`;
+    }
+
     const subject = messageHelper.getSubjectFromMessage(message);
 
     const pointAucClient = new PointAucClient();
@@ -25,6 +31,7 @@ async function onSubCommand(channel, tags, message) {
         chatter,
         subject,
     )) {
+        lastBids[subscriber.id] = Date.now();
         return `@${chatter} вариант успешно добавлен!`;
     }
 
@@ -54,6 +61,19 @@ function getBoostyNicknameFromTwitchNickname(twitchNickname) {
             return 'nastya_denji';
         default: return twitchNickname;
     }
+}
+
+function canBidByTime(subscriberId) {
+    const timeoutMinutes = 20;
+    const lastBidTimestamp = lastBids[subscriberId] ?? null;
+
+    if (lastBidTimestamp === null) {
+        return true;
+    }
+
+    const elapsedTime = (Date.now() - lastBidTimestamp) / 1000 / 60;
+
+    return elapsedTime > timeoutMinutes;
 }
 
 module.exports = onSubCommand;

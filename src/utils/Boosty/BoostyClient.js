@@ -10,7 +10,7 @@ class BoostyClient
 
     async getSubscribers(limit) {
         limit = 100 || limit;
-        const url = `https://api.boosty.to/v1/blog/nglzzz/subscribers?sort_by=on_time&limit=${limit}&order=gt`;
+        const url = `https://api.boosty.to/v1/blog/nglzzz/subscribers?is_active=true&sort_by=on_time&limit=${limit}&order=gt`;
 
         if (!this.apiKey) {
             console.log('Boosty API key not found');
@@ -36,12 +36,14 @@ class BoostyClient
 
                 for (const subscriber of response?.data) {
                     data[subscriber.name.toLowerCase()] = {
+                        id: subscriber.id,
                         name: subscriber.name,
                         price: subscriber.price,
                         level: {
                             name: subscriber.price === 0 ? 'Фоловер' : subscriber.level.name,
                         },
                         text: `${subscriber.name} - ${subscriber.level.name} (${subscriber.price})`,
+                        subscribed: subscriber.subscribed
                     };
                 }
             } while(response?.total && response.total > total)
@@ -69,7 +71,7 @@ class BoostyClient
 
         const data = {};
         for (let name in subscribers) {
-            if (subscribers[name].price > 0) {
+            if (subscribers[name].price > 0 && subscribers[name].subscribed) {
                 data[name] = subscribers[name];
             }
         }
