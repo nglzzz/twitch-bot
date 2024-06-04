@@ -1,4 +1,5 @@
 const Chat = require('../app/chat');
+const arrayHelper = require('../helpers/arrayHelper');
 const { MAX_LATEST_CHATTERS } = require('../const/enums');
 
 const chatters = [];
@@ -6,6 +7,13 @@ const latestChatters = [];
 
 // Save chatters to global array
 Chat.getClient().on('message', (channel, tags, message, self) => {
+  if (arrayHelper.getBotList().includes(tags.username.toLowerCase())) {
+    return;
+  }
+  if (latestChatters.includes(tags.username)) {
+    return;
+  }
+
   latestChatters.filter((chatter) => chatter !== tags.username);
   latestChatters.push(tags.username);
   if (latestChatters.length > MAX_LATEST_CHATTERS) {
