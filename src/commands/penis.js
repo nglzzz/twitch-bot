@@ -2,6 +2,7 @@ const arrayHelper = require('../helpers/arrayHelper');
 
 async function onPenisCommand(channel, tags) {
   const list = [
+    'Ноль! У тебя нет члена',
     '2 мм. - Господа, несите лупу!',
     '2 см - Член же не главное?',
     '10 см - Зато мама говорит что ты красивый PogChamp',
