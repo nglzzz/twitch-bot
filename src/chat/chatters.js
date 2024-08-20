@@ -7,9 +7,6 @@ const latestChatters = [];
 
 // Save chatters to global array
 Chat.getClient().on('message', (channel, tags, message, self) => {
-  if (arrayHelper.getBotList().includes(tags.username.toLowerCase())) {
-    return;
-  }
   if (latestChatters.includes(tags.username)) {
     return;
   }
