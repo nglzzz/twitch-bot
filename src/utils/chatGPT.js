@@ -5,8 +5,10 @@ const Gpt40Turbo = require('./ChatGPT/Gpt40Turbo');
 const TextDavinci = require('./ChatGPT/TextDavinci');
 const Pawan = require('./ChatGPT/Pawan');
 const Gpt4o = require('./ChatGPT/Gpt4o');
+const Gpt4oMini = require('./ChatGPT/Gpt4oMini');
 
 /**
+ * В случае если установлена модель gpt-4o-min-turbo-1106 то запускается gpt-3.5-turbo-1106
  * В случае если установлена модель gpt-3.5-turbo-1106 то запускается Gpt35Turbo
  * Если Gpt35Turbo вернёт ошибку, то произойдёт попытка запроса с помощью Gpt35TurboDefault (gpt-3.5-turbo)
  * Если Gpt35TurboDefault вернёт ошибку, то произойдёт попытка запроса с помощью Gpt4o (gpt-4o).
@@ -20,6 +22,9 @@ class ChatGptFactory
     switch (model) {
       case 'gpt-4o':
         return Gpt4o.getInstance();
+      case 'gpt-4o-mini':
+        return Gpt4oMini.getInstance();
+      case 'gpt-3.5':
       case 'gpt-3.5-turbo-1106':
         return Gpt35Turbo.getInstance();
       case 'gpt-3.5-turbo':

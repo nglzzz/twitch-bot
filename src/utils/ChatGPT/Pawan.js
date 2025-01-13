@@ -5,6 +5,8 @@ const TextDavinci = require('./TextDavinci');
 
 class Pawan extends AbstractChatGPT
 {
+  modelName = 'pawan';
+
   async addMessage(user, message, from, defaultMessage) {
     const url = 'https://api.pawan.krd/v1/chat/completions';
     this.updateContext(user, 'user', message, from);

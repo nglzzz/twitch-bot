@@ -4,6 +4,8 @@ const AbstractChatGPT = require('./AbstractChatGPT');
 
 class TextDavinci extends AbstractChatGPT
 {
+  modelName = 'text-davinci-003';
+
   async addMessage(user, message, from, defaultMessage) {
     const url = 'https://api.openai.com/v1/completions';
     let previousMessage;
