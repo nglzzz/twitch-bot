@@ -5,9 +5,9 @@ const config = require('../config');
 const { getLatestChatters } = require('./chatters');
 const getChannelViewers = require('../twitchApi/viewers');
 const viewerModel = require('../models/viewer.model');
-const getChannelInfo = require('../twitchApi/channelInfo');
+const { isChannelLive } = require('../twitchApi/channelInfo');
 
-const copyPastTimer = setInterval(() => {
+const copyPastTimer = setInterval(async () => {
   let latestChatter = '';
   const latestChatters = getLatestChatters();
 
@@ -15,7 +15,15 @@ const copyPastTimer = setInterval(() => {
     latestChatter = (latestChatters[latestChatters.length - 1]).toLowerCase();
   }
 
+  console.log(`Latest chatter: ${latestChatter}`);
+
   if (arrayHelper.getBotList().includes(latestChatter)) {
+    return;
+  }
+
+  const isLive = await isChannelLive();
+  if (!isLive) {
+    console.log('Channel is not live');
     return;
   }
 
@@ -25,15 +33,14 @@ const copyPastTimer = setInterval(() => {
     .split('*botname*')
     .join(config.BOT_NAME);
   Chat.handleMessageResult(randomMessage, config.CHANNEL);
-}, 1000 * 60 * 50); // every 50 minutes
+}, 1000 * 60 * 45); // every 45 minutes
 
 const saveViewersTimer = setInterval(async () => {
   try {
     try {
-      const channelInfo = await getChannelInfo();
-      const isOnline = channelInfo.length > 0;
+      const isLive = await isChannelLive();
 
-      if (!isOnline) {
+      if (!isLive) {
         return;
       }
     } catch (e) {

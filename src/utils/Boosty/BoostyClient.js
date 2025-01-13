@@ -4,6 +4,9 @@ const path = require('path');
 
 class BoostyClient
 {
+    MAX_ATTEMPTS = 3;
+    attempts = 0;
+
     constructor(apiKey) {
         this.apiKey = (apiKey || this.getTokenFromFile()).trim();
     }
@@ -14,6 +17,13 @@ class BoostyClient
 
         if (!this.apiKey) {
             console.log('Boosty API key not found');
+            return {};
+        }
+
+        this.attempts++;
+        if (this.attempts > this.MAX_ATTEMPTS) {
+            console.error('Failed to retrieve subscribers after multiple attempts. Skipping.');
+            this.attempts = 0;
             return {};
         }
 
@@ -56,6 +66,10 @@ class BoostyClient
                 console.error(e.response.headers);
             } else {
                 console.error(e);
+            }
+
+            if (this.attempts < this.MAX_ATTEMPTS) {
+                return this.getSubscribers(limit);
             }
 
             return {};

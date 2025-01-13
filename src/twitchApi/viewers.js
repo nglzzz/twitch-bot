@@ -1,10 +1,8 @@
 const axios = require('axios');
 const config = require('../config');
 const arrayHelper = require('../helpers/arrayHelper');
-const getOAuthToken = require('./oauth');
 
 const getChannelViewers = async () => {
-  const oauthToken = await getOAuthToken();
   let response;
 
   try {
@@ -12,7 +10,7 @@ const getChannelViewers = async () => {
     response = await axios.get(url, {
       headers: {
         'Client-Id': config.TWITCH_API_CLIENT_ID,
-        'Authorization': `Bearer ${oauthToken.token}`,
+        'Authorization': `Bearer ${config.TWITCH_ACCESS_TOKEN}`,
       },
     });
   } catch (e) {
