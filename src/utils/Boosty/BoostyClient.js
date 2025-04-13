@@ -58,6 +58,8 @@ class BoostyClient
                 }
             } while(response?.total && response.total > total)
 
+            this.attempts = 0;
+
             return data;
         } catch (e) {
             if (e.response) {

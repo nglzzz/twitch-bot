@@ -40,6 +40,8 @@ async function onSubCommand(channel, tags, message) {
 
 function getCostFromBoostyPrice(boostyPrice) {
     switch (boostyPrice) {
+        case 10:
+            return 500;
         case 100:
             return 25000;
         case 250:
