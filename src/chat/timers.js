@@ -33,7 +33,7 @@ const copyPastTimer = setInterval(async () => {
     .split('*botname*')
     .join(config.BOT_NAME);
   Chat.handleMessageResult(randomMessage, config.CHANNEL);
-}, 1000 * 60 * 45); // every 45 minutes
+}, 1000 * 60 * 40); // every 40 minutes
 
 const saveViewersTimer = setInterval(async () => {
   try {
