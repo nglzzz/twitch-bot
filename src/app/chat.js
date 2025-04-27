@@ -55,7 +55,7 @@ class Chat {
     // handle commands
     this._client.on('message', (channel, tags, message, self) => {
       // allow to use chatGPT command as @botName
-      if (message.includes(`@${config.BOT_NAME}`)) {
+      if (message.toLowerCase().includes(`@${config.BOT_NAME}`.toLowerCase())) {
         message = '!chat ' + message.replace(`@${config.BOT_NAME}`, '');
       }
 

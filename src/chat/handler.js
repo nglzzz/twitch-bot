@@ -48,6 +48,8 @@ Chat.registerCommand('!memealerts', require('../commands/memealerts'), '!мем�
 Chat.registerCommand('!sub', require('../commands/sub'), '!саб');
 Chat.registerCommand('!spam', require('../commands/spam'), '!спам');
 Chat.registerCommand('!bitcoin', require('../commands/bitcoin'), '!биткоин');
+Chat.registerCommand('!удалить', require('../commands/delete'), '!delete');
+Chat.registerCommand('!чел', require('../commands/dude'), '!dude');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
