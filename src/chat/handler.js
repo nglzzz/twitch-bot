@@ -48,6 +48,9 @@ Chat.registerCommand('!memealerts', require('../commands/memealerts'), '!мем�
 Chat.registerCommand('!sub', require('../commands/sub'), '!саб');
 Chat.registerCommand('!spam', require('../commands/spam'), '!спам');
 Chat.registerCommand('!bitcoin', require('../commands/bitcoin'), '!биткоин');
+Chat.registerCommand('!btc', require('../commands/bitcoin'), '!биткойн');
+Chat.registerCommand('!ethereum', require('../commands/ethereum'), '!эфириум');
+Chat.registerCommand('!eth', require('../commands/ethereum'), '!эфир');
 Chat.registerCommand('!удалить', require('../commands/delete'), '!delete');
 Chat.registerCommand('!чел', require('../commands/dude'), '!dude');
 
