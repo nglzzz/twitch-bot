@@ -504,8 +504,10 @@ const list = [
   'ЛОЛ',
   'KEKW',
   'LUL',
-  'Bitcoin',
-  'Terpi',
+  'nglzzzTerpi',
+  'nglzzzBitcoin',
+  'nglzzzSoy',
+  'nglzzzAuc',
   'Mad',
   'Soy',
   'Auc',
@@ -514,6 +516,8 @@ const list = [
   '@*streamername* включи Слугу народа',
   '🖕🖕🖕🖕🖕',
   'сосал?',
+  'F',
+  'F5',
 ];
 
 module.exports = list;
