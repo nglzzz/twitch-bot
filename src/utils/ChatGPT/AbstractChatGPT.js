@@ -32,7 +32,7 @@ class AbstractChatGPT
   }
 
   async addMessage(user, message, from, defaultMessage) {
-    const url = 'https://api.proxyapi.ru/openai/v1/chat/completions'; // for openai: https://api.openai.com/v1/chat/completions
+    const url = this.getUrl();
     this.updateContext(user, 'user', message, from);
 
     try {
@@ -66,6 +66,10 @@ class AbstractChatGPT
       this.resetContext(user);
       return this.resendByBackupModel(user, message, from, defaultMessage, this.getBackupModel());
     }
+  }
+
+  getUrl() {
+    return 'https://api.proxyapi.ru/openai/v1/chat/completions'; // for openai: https://api.openai.com/v1/chat/completions
   }
 
   getBackupModel() {

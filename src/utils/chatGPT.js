@@ -6,8 +6,10 @@ const TextDavinci = require('./ChatGPT/TextDavinci');
 const Pawan = require('./ChatGPT/Pawan');
 const Gpt4o = require('./ChatGPT/Gpt4o');
 const Gpt4oMini = require('./ChatGPT/Gpt4oMini');
+const DeepSeek = require('./ChatGPT/DeepSeek');
 
 /**
+ * В случае если установлен DeepSeek, то запускается DeepSeek, иначе gpt-4o-mini
  * В случае если установлена модель gpt-4o-min-turbo-1106 то запускается gpt-3.5-turbo-1106
  * В случае если установлена модель gpt-3.5-turbo-1106 то запускается Gpt35Turbo
  * Если Gpt35Turbo вернёт ошибку, то произойдёт попытка запроса с помощью Gpt35TurboDefault (gpt-3.5-turbo)
@@ -20,6 +22,8 @@ class ChatGptFactory
 {
   static create(model) {
     switch (model) {
+      case 'deepseek':
+        return DeepSeek.getInstance();
       case 'gpt-4o':
         return Gpt4o.getInstance();
       case 'gpt-4o-mini':
