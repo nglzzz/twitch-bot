@@ -53,6 +53,7 @@ Chat.registerCommand('!ethereum', require('../commands/ethereum'), '!эфири�
 Chat.registerCommand('!eth', require('../commands/ethereum'), '!эфир');
 Chat.registerCommand('!удалить', require('../commands/delete'), '!delete');
 Chat.registerCommand('!чел', require('../commands/dude'), '!dude');
+Chat.registerCommand('!кинопоиск', require('../commands/kinopoisk'), '!kinopoisk');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
