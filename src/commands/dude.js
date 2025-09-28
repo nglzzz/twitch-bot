@@ -8,9 +8,23 @@ async function onDudeCommand(channel, tags, message) {
 
   let subject = messageHelper.getSubjectFromMessage(message);
 
-  const dude = viewers.length > 0
+  const bots = arrayHelper.getBotList();
+
+  let dude = viewers.length > 0
     ? arrayHelper.getRandomArrayElement(viewers)
     : arrayHelper.getRandomArrayElement(getLatestChatters());
+
+  let count = 0;
+  while (bots.includes(dude.toLowerCase())) {
+    dude = viewers.length > 0
+      ? arrayHelper.getRandomArrayElement(viewers)
+      : arrayHelper.getRandomArrayElement(getLatestChatters());
+
+    count++;
+    if (count > 100) {
+      break;
+    }
+  }
 
   return ` @${dude} ${subject}`;
 }

@@ -21,6 +21,7 @@ const getBotList = () => {
     'mirrobot',
     'nightbot',
     'wizebot',
+    'jeetbot',
   ];
 }
 
