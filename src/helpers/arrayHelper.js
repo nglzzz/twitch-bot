@@ -22,6 +22,7 @@ const getBotList = () => {
     'nightbot',
     'wizebot',
     'jeetbot',
+    'twirapp',
   ];
 }
 
