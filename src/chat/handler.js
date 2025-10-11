@@ -2,6 +2,8 @@ const Chat = require('../app/chat');
 const {randomInteger} = require('../helpers/numberHelper');
 const doRandomAsk = require('../utils/botAsking');
 const arrayHelper = require('../helpers/arrayHelper');
+const copyPastList = require('../utils/copypasts');
+const config = require('../config');
 
 Chat.registerCommand('!help', require('../commands/help'), '!хелп');
 Chat.registerCommand('!hello', require('../commands/hello'), '!привет');
@@ -54,6 +56,7 @@ Chat.registerCommand('!eth', require('../commands/ethereum'), '!эфир');
 Chat.registerCommand('!удалить', require('../commands/delete'), '!delete');
 Chat.registerCommand('!чел', require('../commands/dude'), '!dude');
 Chat.registerCommand('!кинопоиск', require('../commands/kinopoisk'), '!kinopoisk');
+Chat.registerCommand('!kick', require('../commands/kick'), '!кик');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
@@ -78,7 +81,15 @@ Chat.getClient().on('message', (channel, tags, message, self) => {
   const chanceSuccess = randomInt < askingChance && randomInteger(0, 100) < 50;
 
   if (chanceSuccess) {
-    doRandomAsk(chatter, message).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
+    if (randomInteger(0, 100) < 5) {
+      const res = `@${chatter} ` + arrayHelper.getRandomArrayElement(copyPastList)
+        .replace('*streamername*', config.CHANNEL)
+        .replace('*botname*', config.BOT_NAME);
+
+      Chat.handleMessageResult(res, channel)
+    } else {
+      doRandomAsk(chatter, message).then(handlerResult => Chat.handleMessageResult(handlerResult, channel));
+    }
   }
 
   if (ratingStart) {
