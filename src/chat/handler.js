@@ -60,6 +60,7 @@ Chat.registerCommand('!kick', require('../commands/kick'), '!кик');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
+Chat.registerReward('b1341e46-1474-43f3-bd82-9b89182fef69', require('../rewards/memes'));
 
 
 // TODO:
