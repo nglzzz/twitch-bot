@@ -108,9 +108,8 @@ class AbstractChatGPT
 
     // reload context
     if (this._context[user].length >= MAX_CONTEXT_SIZE) {
-      const first = this._context[user].shift();
-      const last = this._context[user].pop();
-      this._context[user] = [first, last];
+      const first = this._context[user][0];
+      this._context[user] = [first, ...this._context[user].slice(3)];
     }
   }
 
