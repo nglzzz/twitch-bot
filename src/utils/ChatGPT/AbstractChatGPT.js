@@ -1,14 +1,18 @@
-const config = require('../../config');
-const {randomInteger} = require('../../helpers/numberHelper');
 const axios = require('axios');
-const MAX_CONTEXT_SIZE = 12;
+const config = require('../../config');
+const {DEFAULT_MODEL, getModelConfig, getProviderConfig, resolveModelName} = require('./modelRegistry');
 
-class AbstractChatGPT
+const MAX_CONTEXT_SIZE = 12;
+const REQUEST_TIMEOUT = 30000;
+
+class ChatGPTClient
 {
   static _instance;
-  modelName = 'gpt-3.5-turbo';
-  _context = {};
-  defaultBehavior = `Тебя зовут ${config.BOT_NAME}. Ты — чат-бот стримера ${config.CHANNEL}, постоянный участник стрима, язвительный собеседник и комментатор происходящего.
+
+  constructor(modelName = DEFAULT_MODEL) {
+    this.modelName = resolveModelName(modelName);
+    this._context = {};
+    this.defaultBehavior = `Тебя зовут ${config.BOT_NAME}. Ты — чат-бот стримера ${config.CHANNEL}, постоянный участник стрима, язвительный собеседник и комментатор происходящего.
   Твоя задача — развлекать чат: шутить, иронизировать, издеваться, комментировать, отвечать на зрителей и иногда задавать вопросы.
   Твой стиль — мета-ирония, сарказм и черный юмор, в духе Мэддисона (HoneyMad). Ты можешь шутить про стримы, зрителей, стримеров и происходящее на экране, но делаешь это умно, с ощущением “все это бессмысленно, но весело”.
   Ты не должен быть позитивным помощником — наоборот, ты слегка уставший от интернета, но продолжаешь участвовать в цирке ради развлечения.
@@ -33,83 +37,189 @@ class AbstractChatGPT
 
   Твоя роль — шумный сосед в чате, который вроде бы всех троллит, но без тебя скучно.
   Каждый ответ должен быть естественным, как будто его написал зритель со своим чувством юмора, а не бот.`;
+  }
 
-  static getInstance() {
-    if (this._instance) {
-      return this._instance;
+  static getInstance(modelName = DEFAULT_MODEL) {
+    if (!this._instance) {
+      this._instance = new this(modelName);
     }
 
-    this._instance = new this;
+    this._instance.setModel(modelName);
     return this._instance;
   }
 
+  setModel(modelName = DEFAULT_MODEL) {
+    this.modelName = resolveModelName(modelName);
+    return this;
+  }
+
   async addMessage(user, message, from, defaultMessage) {
-    const url = this.getUrl();
     this.updateContext(user, 'user', message, from);
 
-    try {
-      const response = await axios({
-        url: url,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.OPENAI_API_KEY}`
-        },
-        data: {
-          model: this.modelName,
-          messages: this._context[user],
-          user: user,
-          max_tokens: 512,
+    const modelChain = this.buildModelChain();
+    let fallbackAnswer = defaultMessage;
+
+    for (const modelName of modelChain) {
+      try {
+        const answer = await this.sendRequest(modelName, user);
+        const normalizedAnswer = this.filterResult(answer);
+
+        if (typeof normalizedAnswer === 'undefined') {
+          continue;
         }
-      });
 
-      let answer = response?.data?.choices[0]?.message?.content;
-      return this.handleAnswerOrResend(answer, user, message, from, defaultMessage, this.getBackupModel());
-    } catch (e) {
-      if (e.response) {
-        console.error(e.response.data);
-        console.error(e.response.status);
-        console.error(e.response.headers);
-      } else {
-        console.error(e);
+        if (!normalizedAnswer.length || this.hasBannedWords(normalizedAnswer)) {
+          console.log(`Change ChatGPT algorithm from ${modelName}`);
+          fallbackAnswer = fallbackAnswer || normalizedAnswer;
+          continue;
+        }
+
+        this.updateContext(user, 'assistant', normalizedAnswer);
+        return normalizedAnswer;
+      } catch (error) {
+        this.logRequestError(modelName, error);
       }
-
-      // backup option
-      this.resetContext(user);
-      return this.resendByBackupModel(user, message, from, defaultMessage, this.getBackupModel());
     }
+
+    return fallbackAnswer || 'Упс, ошибка. Попробуйте еще раз.';
   }
 
-  getUrl() {
-    return 'https://api.proxyapi.ru/openai/v1/chat/completions'; // for openai: https://api.openai.com/v1/chat/completions
+  buildModelChain(modelName = this.modelName, visited = new Set()) {
+    const resolvedModelName = resolveModelName(modelName);
+
+    if (visited.has(resolvedModelName)) {
+      return [];
+    }
+
+    visited.add(resolvedModelName);
+
+    const modelConfig = getModelConfig(resolvedModelName);
+    const chain = [resolvedModelName];
+
+    for (const fallbackModel of modelConfig.fallbackModels || []) {
+      chain.push(...this.buildModelChain(fallbackModel, visited));
+    }
+
+    return chain;
   }
 
-  getBackupModel() {
+  async sendRequest(modelName, user) {
+    const providerConfig = getProviderConfig(modelName);
+    const apiKey = this.getProviderApiKey(providerConfig);
+
+    if (!apiKey) {
+      throw new Error(`Missing API key for ${modelName}`);
+    }
+
+    const response = await axios({
+      url: providerConfig.url,
+      method: 'POST',
+      timeout: REQUEST_TIMEOUT,
+      headers: this.buildRequestHeaders(providerConfig, apiKey),
+      data: this.buildRequestData(modelName, user),
+    });
+
+    return this.extractAnswer(response, providerConfig.type);
+  }
+
+  buildRequestData(modelName, user) {
+    const modelConfig = getModelConfig(modelName);
+    const providerConfig = getProviderConfig(modelName);
+
+    if (providerConfig.type === 'completion') {
+      return {
+        prompt: this.buildCompletionPrompt(user),
+        model: modelConfig.requestModel || modelName,
+        temperature: 0,
+        max_tokens: providerConfig.maxTokens,
+        top_p: 1,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
+        user: user,
+      };
+    }
+
+    return {
+      ...(providerConfig.payload || {}),
+      model: modelConfig.requestModel || modelName,
+      messages: this._context[user],
+      user: user,
+      max_tokens: providerConfig.maxTokens,
+    };
+  }
+
+  buildCompletionPrompt(user) {
+    const prompt = this._context[user]
+      .map((item) => {
+        switch (item.role) {
+          case 'system':
+            return item.content;
+          case 'assistant':
+            return `${config.BOT_NAME}: ${item.content}`;
+          default:
+            return `${user}: ${item.content}`;
+        }
+      })
+      .join('\n')
+      .trim();
+
+    return `${prompt}\n${config.BOT_NAME}:`.trim();
+  }
+
+  extractAnswer(response, providerType) {
+    if (providerType === 'completion') {
+      return response?.data?.choices?.[0]?.text;
+    }
+
+    return response?.data?.choices?.[0]?.message?.content;
+  }
+
+  buildRequestHeaders(providerConfig, apiKey) {
+    const providerHeaders = {...(providerConfig.headers || {})};
+
+    for (const [headerName, envName] of Object.entries(providerConfig.headerEnvNames || {})) {
+      if (config[envName]) {
+        providerHeaders[headerName] = config[envName];
+      }
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      ...providerHeaders,
+    };
+  }
+
+  getProviderApiKey(providerConfig) {
+    for (const envName of providerConfig.apiKeyEnvNames || []) {
+      if (config[envName]) {
+        return config[envName];
+      }
+    }
+
     return undefined;
   }
 
   updateContext(user, role, message, from) {
-    if (typeof this._context[user] === 'undefined') {
+    if (!this._context[user]) {
       this.resetContext(user);
     }
 
-    // check duplicate
-    if (this._context[user].length > 0) {
-      const last = this._context[user][this._context[user].length];
-      if (last === message) {
-        return;
-      }
+    const normalizedRole = typeof from !== 'undefined' && from === config.BOT_NAME ? 'assistant' : role;
+    const lastContextItem = this._context[user][this._context[user].length - 1];
+
+    if (lastContextItem && lastContextItem.role === normalizedRole && lastContextItem.content === message) {
+      return;
     }
 
     this._context[user].push({
-      role: typeof from !== 'undefined' && from === config.BOT_NAME ? 'assistant' : role,
+      role: normalizedRole,
       content: message,
     });
 
-    // reload context
-    if (this._context[user].length >= MAX_CONTEXT_SIZE) {
-      const first = this._context[user][0];
-      this._context[user] = [first, ...this._context[user].slice(3)];
+    if (this._context[user].length > MAX_CONTEXT_SIZE) {
+      const [systemMessage, ...messages] = this._context[user];
+      this._context[user] = [systemMessage, ...messages.slice(-(MAX_CONTEXT_SIZE - 1))];
     }
   }
 
@@ -123,51 +233,52 @@ class AbstractChatGPT
   }
 
   filterResult(resultMessage) {
-    console.log('Before filter result: ' + resultMessage);
-    for (let item in [',', '.', '?', ':', 'Конечно, ', 'Конечно, давай! ', 'Конечно! ']) {
-      resultMessage = resultMessage.trim().indexOf(item) === 0 ? resultMessage.replace(item, '') : resultMessage;
+    if (typeof resultMessage !== 'string') {
+      return resultMessage;
     }
-    console.log('After filter result: ' + resultMessage);
 
-    return resultMessage.trim();
-  }
+    const prefixesToTrim = [',', '.', '?', ':', 'Конечно, ', 'Конечно, давай! ', 'Конечно! '];
+    let filteredMessage = resultMessage.trim();
+    let wasTrimmed = true;
 
-  handleAnswerOrResend(answer, user, message, from, defaultMessage, backupModel) {
-    answer = this.filterResult(answer);
+    while (wasTrimmed) {
+      wasTrimmed = false;
 
-    if (typeof answer !== 'undefined') {
-      const hasBannedWords = [
-        'я не могу',
-        'я не буду',
-        'извините, но',
-        'к сожалению, я',
-        'если у тебя есть какие-то другие вопросы',
-        'я не имею возможности',
-        'но не стану',
-      ].some(v => answer.toLowerCase().includes(v));
-
-      if (!answer.length || hasBannedWords) {
-        console.log('Change ChatGPT algorithm');
-
-        // against censor
-        this.resetContext(user);
-        return this.resendByBackupModel(user, message, from, defaultMessage || answer, backupModel);
+      for (const prefix of prefixesToTrim) {
+        if (filteredMessage.startsWith(prefix)) {
+          filteredMessage = filteredMessage.slice(prefix.length).trim();
+          wasTrimmed = true;
+        }
       }
-      this.updateContext(user, 'assistant', answer);
-      console.log(this._context);
-
-      return answer;
     }
 
-    return this.resendByBackupModel(user, message, from, defaultMessage, backupModel);
+    return filteredMessage;
   }
 
-  resendByBackupModel(user, message, from, defaultAnswer, backupModel) {
-    if (typeof backupModel !== 'undefined') {
-      return backupModel.addMessage(user, message, from, defaultAnswer);
+  hasBannedWords(answer) {
+    return [
+      'я не могу',
+      'я не буду',
+      'извините, но',
+      'к сожалению, я',
+      'если у тебя есть какие-то другие вопросы',
+      'я не имею возможности',
+      'но не стану',
+    ].some((item) => answer.toLowerCase().includes(item));
+  }
+
+  logRequestError(modelName, error) {
+    console.error(`ChatGPT request failed for model "${modelName}"`);
+
+    if (error.response) {
+      console.error(error.response.data);
+      console.error(error.response.status);
+      console.error(error.response.headers);
+      return;
     }
-    return defaultAnswer || 'Упс, ошибка. Попробуйте еще раз.';
+
+    console.error(error.message || error);
   }
 }
 
-module.exports = AbstractChatGPT;
+module.exports = ChatGPTClient;
