@@ -58,16 +58,22 @@ const MODEL_REGISTRY = Object.freeze({
   'glm-5-turbo': {
     provider: 'zai',
     aliases: ['glm5turbo', 'glm5-turbo', 'glm_5_turbo'],
-    fallbackModels: ['glm-5.1', 'gpt-4o-mini'],
+    fallbackModels: ['glm-5.1'],
   },
   'glm-5.1': {
     provider: 'zai',
     aliases: ['glm5.1', 'glm5-1', 'glm51'],
-    fallbackModels: ['glm-5-turbo', 'gpt-4o-mini'],
+    fallbackModels: ['gpt-5-nano'],
+  },
+  'gpt-5-nano': {
+    provider: 'openaiProxy',
+    aliases: ['gpt-5.4-nano', 'gpt54nano', 'gpt5.4nano', 'gpt5.4-nano'],
+    maxTokensParam: 'max_completion_tokens',
+    fallbackModels: ['gpt-4o-mini'],
   },
   'gpt-4o-mini': {
     provider: 'openaiProxy',
-    fallbackModels: ['gpt-3.5-turbo-1106'],
+    fallbackModels: ['deepseek-chat', 'gpt-3.5-turbo-1106'],
   },
   'gpt-3.5-turbo-1106': {
     provider: 'openaiProxy',

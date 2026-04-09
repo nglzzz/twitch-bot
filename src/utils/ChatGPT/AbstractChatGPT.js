@@ -125,13 +125,15 @@ class ChatGPTClient
   buildRequestData(modelName, user) {
     const modelConfig = getModelConfig(modelName);
     const providerConfig = getProviderConfig(modelName);
+    const maxTokens = modelConfig.maxTokens || providerConfig.maxTokens;
+    const maxTokensParam = modelConfig.maxTokensParam || providerConfig.maxTokensParam || 'max_tokens';
 
     if (providerConfig.type === 'completion') {
       return {
         prompt: this.buildCompletionPrompt(user),
         model: modelConfig.requestModel || modelName,
         temperature: 0,
-        max_tokens: providerConfig.maxTokens,
+        [maxTokensParam]: maxTokens,
         top_p: 1,
         frequency_penalty: 0.0,
         presence_penalty: 0.0,
@@ -141,10 +143,11 @@ class ChatGPTClient
 
     return {
       ...(providerConfig.payload || {}),
+      ...(modelConfig.payload || {}),
       model: modelConfig.requestModel || modelName,
       messages: this._context[user],
       user: user,
-      max_tokens: providerConfig.maxTokens,
+      [maxTokensParam]: maxTokens,
     };
   }
 
