@@ -7,33 +7,21 @@ const PROVIDERS = Object.freeze({
     apiKeyEnvNames: ['OPENAI_API_KEY'],
     maxTokens: 512,
   },
+  openRouter: {
+    type: 'chat',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKeyEnvNames: ['OPENROUTER_API_KEY'],
+    maxTokens: 512,
+    headerEnvNames: {
+      'HTTP-Referer': 'OPENROUTER_HTTP_REFERER',
+      'X-Title': 'OPENROUTER_TITLE',
+    },
+  },
   deepseek: {
     type: 'chat',
     url: 'https://api.deepseek.com/chat/completions',
     apiKeyEnvNames: ['DEEPSEEK_API_KEY'],
     maxTokens: 512,
-  },
-  zai: {
-    type: 'chat',
-    url: 'https://api.z.ai/api/paas/v4/chat/completions',
-    apiKeyEnvNames: ['ZAI_API_KEY', 'GLM_API_KEY'],
-    maxTokens: 4096,
-    headers: {
-      'HTTP-Referer': 'https://cline.bot',
-      'X-Title': 'Cline',
-      'X-Cline-Version': '1.1.52',
-    },
-    headerEnvNames: {
-      'HTTP-Referer': 'ZAI_HTTP_REFERER',
-      'X-Title': 'ZAI_TITLE',
-      'X-Cline-Version': 'ZAI_CLIENT_VERSION',
-    },
-    payload: {
-      temperature: 1.0,
-      thinking: {
-        type: 'enabled',
-      },
-    },
   },
   pawan: {
     type: 'chat',
@@ -50,20 +38,17 @@ const PROVIDERS = Object.freeze({
 });
 
 const MODEL_REGISTRY = Object.freeze({
+  openrouter: {
+    provider: 'openRouter',
+    aliases: ['openrouter/free'],
+    requestModelEnvNames: ['OPENROUTER_MODEL'],
+    defaultRequestModel: 'openrouter/free',
+    fallbackModels: ['gpt-5-nano'],
+  },
   'deepseek-chat': {
     provider: 'deepseek',
     aliases: ['deepseek'],
     fallbackModels: ['gpt-4o-mini'],
-  },
-  'glm-5-turbo': {
-    provider: 'zai',
-    aliases: ['glm5turbo', 'glm5-turbo', 'glm_5_turbo'],
-    fallbackModels: ['glm-5.1'],
-  },
-  'glm-5.1': {
-    provider: 'zai',
-    aliases: ['glm5.1', 'glm5-1', 'glm51'],
-    fallbackModels: ['gpt-5-nano'],
   },
   'gpt-5-nano': {
     provider: 'openaiProxy',
