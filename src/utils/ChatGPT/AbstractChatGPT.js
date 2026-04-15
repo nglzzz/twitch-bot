@@ -50,6 +50,7 @@ class ChatGPTClient
 
   setModel(modelName = DEFAULT_MODEL) {
     this.modelName = resolveModelName(modelName);
+    this.logInfo('model.selected', {model: this.modelName});
     return this;
   }
 
@@ -59,27 +60,79 @@ class ChatGPTClient
     const modelChain = this.buildModelChain();
     let fallbackAnswer = defaultMessage;
 
-    for (const modelName of modelChain) {
+    this.logInfo('request.start', {
+      user,
+      initialModel: this.modelName,
+      modelChain,
+      messageLength: String(message || '').length,
+      contextSize: this._context[user]?.length || 0,
+    });
+
+    for (const [index, modelName] of modelChain.entries()) {
+      const requestMeta = this.getRequestMeta(modelName);
+      const startedAt = Date.now();
+
+      this.logInfo('model.attempt', {
+        user,
+        attempt: index + 1,
+        totalAttempts: modelChain.length,
+        model: requestMeta.modelName,
+        requestModel: requestMeta.requestModel,
+        provider: requestMeta.providerName,
+      });
+
       try {
-        const answer = await this.sendRequest(modelName, user);
+        const answer = await this.sendRequest(modelName, user, requestMeta);
         const normalizedAnswer = this.filterResult(answer);
+        const durationMs = Date.now() - startedAt;
 
         if (typeof normalizedAnswer === 'undefined') {
+          this.logInfo('model.fallback', {
+            user,
+            model: requestMeta.modelName,
+            requestModel: requestMeta.requestModel,
+            provider: requestMeta.providerName,
+            reason: 'empty_response',
+            durationMs,
+          });
           continue;
         }
 
         if (!normalizedAnswer.length || this.hasBannedWords(normalizedAnswer)) {
-          console.log(`Change ChatGPT algorithm from ${modelName}`);
+          this.logInfo('model.fallback', {
+            user,
+            model: requestMeta.modelName,
+            requestModel: requestMeta.requestModel,
+            provider: requestMeta.providerName,
+            reason: !normalizedAnswer.length ? 'blank_response' : 'banned_words',
+            durationMs,
+            answerLength: normalizedAnswer.length,
+          });
           fallbackAnswer = fallbackAnswer || normalizedAnswer;
           continue;
         }
 
         this.updateContext(user, 'assistant', normalizedAnswer);
+        this.logInfo('model.success', {
+          user,
+          model: requestMeta.modelName,
+          requestModel: requestMeta.requestModel,
+          provider: requestMeta.providerName,
+          durationMs,
+          answerLength: normalizedAnswer.length,
+        });
         return normalizedAnswer;
       } catch (error) {
-        this.logRequestError(modelName, error);
+        this.logRequestError(requestMeta, error, Date.now() - startedAt);
       }
     }
+
+    this.logInfo('request.exhausted', {
+      user,
+      initialModel: this.modelName,
+      modelChain,
+      hasFallbackAnswer: Boolean(fallbackAnswer),
+    });
 
     return fallbackAnswer || 'Упс, ошибка. Попробуйте еще раз.';
   }
@@ -103,8 +156,8 @@ class ChatGPTClient
     return chain;
   }
 
-  async sendRequest(modelName, user) {
-    const providerConfig = getProviderConfig(modelName);
+  async sendRequest(modelName, user, requestMeta = this.getRequestMeta(modelName)) {
+    const providerConfig = requestMeta.providerConfig;
     const apiKey = this.getProviderApiKey(providerConfig);
 
     if (!apiKey) {
@@ -116,18 +169,18 @@ class ChatGPTClient
       method: 'POST',
       timeout: REQUEST_TIMEOUT,
       headers: this.buildRequestHeaders(providerConfig, apiKey),
-      data: this.buildRequestData(modelName, user),
+      data: this.buildRequestData(modelName, user, requestMeta),
     });
 
     return this.extractAnswer(response, providerConfig.type);
   }
 
-  buildRequestData(modelName, user) {
-    const modelConfig = getModelConfig(modelName);
-    const providerConfig = getProviderConfig(modelName);
+  buildRequestData(modelName, user, requestMeta = this.getRequestMeta(modelName)) {
+    const modelConfig = requestMeta.modelConfig;
+    const providerConfig = requestMeta.providerConfig;
     const maxTokens = modelConfig.maxTokens || providerConfig.maxTokens;
     const maxTokensParam = modelConfig.maxTokensParam || providerConfig.maxTokensParam || 'max_tokens';
-    const requestModel = this.getRequestModelName(modelName, modelConfig);
+    const requestModel = requestMeta.requestModel;
 
     if (providerConfig.type === 'completion') {
       return {
@@ -160,6 +213,20 @@ class ChatGPTClient
     }
 
     return modelConfig.requestModel || modelConfig.defaultRequestModel || modelName;
+  }
+
+  getRequestMeta(modelName) {
+    const resolvedModelName = resolveModelName(modelName);
+    const modelConfig = getModelConfig(resolvedModelName);
+    const providerConfig = getProviderConfig(resolvedModelName);
+
+    return {
+      modelName: resolvedModelName,
+      modelConfig,
+      providerConfig,
+      providerName: modelConfig.provider,
+      requestModel: this.getRequestModelName(resolvedModelName, modelConfig),
+    };
   }
 
   buildCompletionPrompt(user) {
@@ -281,17 +348,35 @@ class ChatGPTClient
     ].some((item) => answer.toLowerCase().includes(item));
   }
 
-  logRequestError(modelName, error) {
-    console.error(`ChatGPT request failed for model "${modelName}"`);
+  logRequestError(requestMeta, error, durationMs) {
+    const details = {
+      model: requestMeta.modelName,
+      requestModel: requestMeta.requestModel,
+      provider: requestMeta.providerName,
+      durationMs,
+    };
 
     if (error.response) {
-      console.error(error.response.data);
-      console.error(error.response.status);
-      console.error(error.response.headers);
+      this.logError('model.error', {
+        ...details,
+        status: error.response.status,
+        response: error.response.data,
+      });
       return;
     }
 
-    console.error(error.message || error);
+    this.logError('model.error', {
+      ...details,
+      message: error.message || String(error),
+    });
+  }
+
+  logInfo(event, details = {}) {
+    console.log(`[ChatGPT] ${event} ${JSON.stringify(details)}`);
+  }
+
+  logError(event, details = {}) {
+    console.error(`[ChatGPT] ${event} ${JSON.stringify(details)}`);
   }
 }
 
