@@ -58,6 +58,9 @@ Chat.registerCommand('!чел', require('../commands/dude'), '!dude');
 Chat.registerCommand('!кинопоиск', require('../commands/kinopoisk'), '!kinopoisk');
 Chat.registerCommand('!kick', require('../commands/kick'), '!кик');
 Chat.registerCommand('!фильм', require('../commands/film'), '!film');
+Chat.registerCommand('!паспорт', require('../commands/passport'), '!passport');
+Chat.registerCommand('!fate', require('../commands/fate'), '!судьба');
+Chat.registerCommand('!суд', require('../commands/court'), '!приговор');
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
