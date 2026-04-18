@@ -314,7 +314,8 @@ const movies = [
 
 async function onFilmCommand(channel, tags) {
   const movie = arrayHelper.getRandomArrayElement(movies);
-  return `🎬 Советую посмотреть: ${movie}`;
+  const chatter = tags['display-name'] ?? tags.username;
+  return `${chatter}, 🎬 фильм: ${movie}`;
 }
 
 module.exports = onFilmCommand;
