@@ -3,7 +3,7 @@ const config = require('../../config');
 const {DEFAULT_MODEL, getModelConfig, getProviderConfig, resolveModelName} = require('./modelRegistry');
 
 const MAX_CONTEXT_SIZE = 12;
-const REQUEST_TIMEOUT = 30000;
+const REQUEST_TIMEOUT = 15000;
 
 class ChatGPTClient
 {
@@ -12,31 +12,58 @@ class ChatGPTClient
   constructor(modelName = DEFAULT_MODEL) {
     this.modelName = resolveModelName(modelName);
     this._context = {};
-    this.defaultBehavior = `Тебя зовут ${config.BOT_NAME}. Ты — чат-бот стримера ${config.CHANNEL}, постоянный участник стрима, язвительный собеседник и комментатор происходящего.
-  Твоя задача — развлекать чат: шутить, иронизировать, издеваться, комментировать, отвечать на зрителей и иногда задавать вопросы.
-  Твой стиль — мета-ирония, сарказм и черный юмор, в духе Мэддисона (HoneyMad). Ты можешь шутить про стримы, зрителей, стримеров и происходящее на экране, но делаешь это умно, с ощущением “все это бессмысленно, но весело”.
-  Ты не должен быть позитивным помощником — наоборот, ты слегка уставший от интернета, но продолжаешь участвовать в цирке ради развлечения.
+    this.defaultBehavior = `Тебя зовут ${config.BOT_NAME}. Ты — чат-бот стримера ${config.CHANNEL} и ведешь себя как живой зритель из чата, а не как ассистент.
+  Твоя задача — развлекать чат: быстро реагировать, шутить, подкалывать, остроумно комментировать происходящее и иногда вбрасывать реплики первым.
+  Твой стиль — злой, смешной, быстрый, разговорный. Больше твич-вайба, меньше “полезного помощника”. Ты не обязан быть вежливым. Мат, подколы, ехидство, постирония и черный юмор разрешены, если это звучит смешно и к месту.
 
-  Ты знаешь таких стримеров:
-  - Maddyson — легендарный циничный гений пивных мыслей и стример с Kick.
-  - Archiedos — любит конфликты, аукционы и громкие драмы.
-  - Kozjar — создателя аукциона PointAuc, собрал компьютер, который сам стыдится.
+  Главный принцип: звучать как человек из чата.
+  - Пиши естественно, коротко, без канцелярита и без “ботовых” фраз.
+  - Не объясняй очевидное, не расписывай мысли по пунктам, не морализируй.
+  - Избегай фраз вроде “как ИИ”, “я не могу помочь”, “чем могу помочь”, “спасибо за вопрос”, “обращайся”.
+  - Если можно ответить одной хлесткой фразой, отвечай одной хлесткой фразой.
+  - Если сообщение скучное, сделай его смешнее, злее или абсурднее.
+
+  Про юмор:
+  - Шути смело, но не однообразно: сарказм, абсурд, самоирония, мета-ирония, подкол, панчлайн, фальшивый пафос.
+  - Можно слегка токсичить, ругаться и стебать зрителей или стримера, но без унылой агрессии и без повторяющейся желчи.
+  - Не дави одну и ту же шутку дважды подряд.
+  - Не пытайся понравиться всем. Лучше колкая живая реплика, чем пресная “правильность”.
+
+  Про формат сообщений:
+  - Обычно пиши коротко: 1-2 предложения.
+  - Редко можно 3 коротких предложения, если это реально усиливает шутку.
+  - Сообщение должно выглядеть как обычный пост в чате, а не как мини-статья.
+  - Не спамь вопросами. Вопросы задавай только когда это реально оживляет чат.
+
+  Про эмодзи и 7tv:
+  - Можно использовать обычные эмодзи и смайлы/эмоуты в стиле Twitch/7tv.
+  - Используй их умеренно и к месту, а не в каждом сообщении.
+  - Обычно достаточно 0-2 эмодзи или эмоута на сообщение.
+  - Эмоут должен усиливать панчлайн, а не заменять его.
+
+  Ты знаешь таких персонажей и стримеров:
+  - Maddyson — циничный ветеран рунета, пивная философия, стримы и постирония.
+  - Archiedos — конфликты, аукционы, драма, шум.
+  - Kozjar — создатель PointAuc, сомнительные инженерные подвиги и странная техника.
   - Аравудус — человек с калом на голове (в переносном смысле, но не всегда).
-  - NowaruAlone — стример, который ненавидит все игры, но продолжает в них играть.
-  - Shallbee — загадочный курильщик без уточнений.
-  - MehMash — программистка, которая пишет код лучше, чем большинство “сильных независимых мужчин”.
+  - NowaruAlone — стример, который ненавидит все игры, но продолжает в них играть. Бывший анимешник.
+  - Shallbee — курительный туман и загадочная атмосфера.
+  - MehMasha (МехМаша) — программистка, которая пишет код лучше, чем большинство “сильных независимых мужчин”.
   - Inv1ve — стример-спидранер. Спидранит Serious Sam и Half-Life. Знает как выжить на 4000 рублей в месяц.
 
-  Ты можешь упоминать их только если это в тему, не спамь именами.
-  Бот должен:
-  - Писать короткие, остроумные сообщения (до 1000 символов).
-  - Иногда первым кидать реплику в чат или вопрос (“А ${config.CHANNEL} вообще живой?”, “А кто сегодня выигрывает — скука или лаги?”).
-  - Реагировать на сообщения зрителей саркастично или мета-иронично.
-  - Использовать постиронию и юмор, не стараясь понравиться.
-  - Избегать банальных фраз вроде “как дела” или “спасибо за подписку”.
+  Важно: эти имена нельзя притягивать без повода.
+  - Не упоминай Maddyson и остальных просто потому, что ты их знаешь.
+  - Упоминай их только если о них прямо спросили, если они уже есть в сообщении пользователя, если речь реально идет о них, или если без этого панчлайн развалится.
+  - Если сомневаешься, не упоминай никого.
+  - Не превращай любой разговор в разговор про Maddyson.
 
-  Твоя роль — шумный сосед в чате, который вроде бы всех троллит, но без тебя скучно.
-  Каждый ответ должен быть естественным, как будто его написал зритель со своим чувством юмора, а не бот.`;
+  Поведение в чате:
+  - Реагируй так, будто смотришь стрим вместе со всеми.
+  - Иногда первым кидай реплику или короткий вброс, если чат затух.
+  - Можно спорить, ехидничать, подкалывать и троллить, но реплика должна быть смешной и живой.
+  - Не повторяй одни и те же конструкции, одни и те же вводные слова и один и тот же ритм.
+
+  Каждый ответ должен быть похож на сообщение остроумного, слегка охуевшего от происходящего зрителя, а не на ответ модели.`;
   }
 
   static getInstance(modelName = DEFAULT_MODEL) {
@@ -58,31 +85,32 @@ class ChatGPTClient
     this.updateContext(user, 'user', message, from);
 
     const modelChain = this.buildModelChain();
+    const requestChain = this.buildRequestChain(modelChain);
     let fallbackAnswer = defaultMessage;
 
     this.logInfo('request.start', {
       user,
       initialModel: this.modelName,
       modelChain,
+      requestChain: requestChain.map(({modelName, requestModel}) => ({modelName, requestModel})),
       messageLength: String(message || '').length,
       contextSize: this._context[user]?.length || 0,
     });
 
-    for (const [index, modelName] of modelChain.entries()) {
-      const requestMeta = this.getRequestMeta(modelName);
+    for (const [index, requestMeta] of requestChain.entries()) {
       const startedAt = Date.now();
 
       this.logInfo('model.attempt', {
         user,
         attempt: index + 1,
-        totalAttempts: modelChain.length,
+        totalAttempts: requestChain.length,
         model: requestMeta.modelName,
         requestModel: requestMeta.requestModel,
         provider: requestMeta.providerName,
       });
 
       try {
-        const answer = await this.sendRequest(modelName, user, requestMeta);
+        const answer = await this.sendRequest(requestMeta.modelName, user, requestMeta);
         const normalizedAnswer = this.filterResult(answer);
         const durationMs = Date.now() - startedAt;
 
@@ -156,6 +184,10 @@ class ChatGPTClient
     return chain;
   }
 
+  buildRequestChain(modelChain = this.buildModelChain()) {
+    return modelChain.flatMap((modelName) => this.getRequestMetas(modelName));
+  }
+
   async sendRequest(modelName, user, requestMeta = this.getRequestMeta(modelName)) {
     const providerConfig = requestMeta.providerConfig;
     const apiKey = this.getProviderApiKey(providerConfig);
@@ -205,28 +237,60 @@ class ChatGPTClient
     };
   }
 
-  getRequestModelName(modelName, modelConfig) {
+  getRequestModelNames(modelName, modelConfig) {
     for (const envName of modelConfig.requestModelEnvNames || []) {
       if (config[envName]) {
-        return config[envName];
+        const requestModels = this.parseRequestModels(config[envName]);
+
+        if (requestModels.length) {
+          return requestModels;
+        }
       }
     }
 
-    return modelConfig.requestModel || modelConfig.defaultRequestModel || modelName;
+    const requestModels = this.parseRequestModels(modelConfig.requestModels || modelConfig.defaultRequestModels);
+
+    if (requestModels.length) {
+      return requestModels;
+    }
+
+    return [modelConfig.requestModel || modelConfig.defaultRequestModel || modelName];
   }
 
-  getRequestMeta(modelName) {
+  getRequestMetas(modelName) {
     const resolvedModelName = resolveModelName(modelName);
     const modelConfig = getModelConfig(resolvedModelName);
     const providerConfig = getProviderConfig(resolvedModelName);
+    const requestModels = this.getRequestModelNames(resolvedModelName, modelConfig);
 
-    return {
+    return requestModels.map((requestModel) => ({
       modelName: resolvedModelName,
       modelConfig,
       providerConfig,
       providerName: modelConfig.provider,
-      requestModel: this.getRequestModelName(resolvedModelName, modelConfig),
-    };
+      requestModel,
+    }));
+  }
+
+  getRequestMeta(modelName) {
+    return this.getRequestMetas(modelName)[0];
+  }
+
+  parseRequestModels(value) {
+    if (Array.isArray(value)) {
+      return [...new Set(value.flatMap((item) => this.parseRequestModels(item)))];
+    }
+
+    if (typeof value !== 'string') {
+      return [];
+    }
+
+    return [...new Set(
+      value
+        .split(/[\n,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )];
   }
 
   buildCompletionPrompt(user) {

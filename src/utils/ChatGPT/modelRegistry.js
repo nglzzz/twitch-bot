@@ -42,13 +42,19 @@ const MODEL_REGISTRY = Object.freeze({
     provider: 'openRouter',
     aliases: ['openrouter/free'],
     requestModelEnvNames: ['OPENROUTER_MODEL'],
-    defaultRequestModel: 'openrouter/free',
-    fallbackModels: ['gpt-5-nano'],
+    defaultRequestModels: [
+      'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+      'minimax/minimax-m2.5:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'openai/gpt-oss-120b:free',
+    ],
+    fallbackModels: ['deepseek'],
   },
-  'deepseek-chat': {
+  'deepseek': {
     provider: 'deepseek',
-    aliases: ['deepseek'],
-    fallbackModels: ['gpt-4o-mini'],
+    aliases: ['deepseek', 'deepseek-chat'],
+    defaultRequestModel: 'deepseek-v4-flash',
+    fallbackModels: ['gpt-5-nano'],
   },
   'gpt-5-nano': {
     provider: 'openaiProxy',
@@ -58,7 +64,7 @@ const MODEL_REGISTRY = Object.freeze({
   },
   'gpt-4o-mini': {
     provider: 'openaiProxy',
-    fallbackModels: ['deepseek-chat', 'gpt-3.5-turbo-1106'],
+    fallbackModels: ['deepseek', 'gpt-3.5-turbo-1106'],
   },
   'gpt-3.5-turbo-1106': {
     provider: 'openaiProxy',
