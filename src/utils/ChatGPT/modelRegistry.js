@@ -43,9 +43,9 @@ const MODEL_REGISTRY = Object.freeze({
     aliases: ['openrouter/free'],
     requestModelEnvNames: ['OPENROUTER_MODEL'],
     defaultRequestModels: [
+      'deepseek/deepseek-v4-flash:free',
       'baidu/cobuddy:free',
       'google/gemma-4-26b-a4b-it:free',
-      'google/gemma-4-31b-it:free',
       'minimax/minimax-m2.5:free',
       'nvidia/nemotron-3-super-120b-a12b:free',
       'openai/gpt-oss-120b:free',
