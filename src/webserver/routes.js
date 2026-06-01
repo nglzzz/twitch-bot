@@ -1,5 +1,6 @@
 const express = require('express');
 const routes = express.Router();
+const db = require('../app/db');
 const config = require('../config');
 const speech = require('../utils/speech');
 const {
@@ -43,6 +44,20 @@ routes.get('/api/streamer/stats', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+routes.get('/api/diagnostics/db', (req, res) => {
+  const status = typeof db.getDbStatus === 'function'
+    ? db.getDbStatus()
+    : {
+      readyState: db?.connection?.readyState ?? 0,
+      state: 'unknown',
+    };
+
+  res.json({
+    ok: status.readyState === 1,
+    mongo: status,
+  });
 });
 
 routes.get('/speak', (req, res) => {
