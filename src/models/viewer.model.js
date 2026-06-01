@@ -6,6 +6,8 @@ const viewerSchema = new db.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+viewerSchema.index({ createdAt: -1 });
+
 const viewer = db.model('viewer', viewerSchema);
 
 module.exports = viewer;

@@ -1,0 +1,171 @@
+<section class="container section-spacing stats-page-intro">
+  <div class="section-heading">
+    <div>
+      <div class="eyebrow">Подробная аналитика</div>
+      <h1>Статистика канала {{profile.name}}</h1>
+    </div>
+    <button class="button button--ghost button--small" type="button" data-refresh-page>
+      Обновить страницу
+    </button>
+  </div>
+
+  <p class="section-description">
+    Здесь собраны viewer-срезы и chat-логи, которые уже умеет хранить текущий проект.
+    Страница остаётся рабочей даже без MongoDB, но при подключенной базе показывает гораздо больше деталей.
+  </p>
+</section>
+
+<section class="container section-spacing">
+  <div class="stats-grid stats-grid--dense">
+    <article class="stat-card stat-card--primary">
+      <span class="stat-card__label">Пиковый онлайн за 24 часа</span>
+      <strong class="stat-card__value">{{viewerStats.peakViewerCount24hLabel}}</strong>
+      <p class="stat-card__description">Максимальное число зрителей по сохранённым срезам.</p>
+    </article>
+
+    <article class="stat-card stat-card--secondary">
+      <span class="stat-card__label">Средний онлайн за 24 часа</span>
+      <strong class="stat-card__value">{{viewerStats.averageViewerCount24hLabel}}</strong>
+      <p class="stat-card__description">Среднее значение по срезам viewer-лога.</p>
+    </article>
+
+    <article class="stat-card stat-card--secondary">
+      <span class="stat-card__label">Уникальных чаттеров за 24 часа</span>
+      <strong class="stat-card__value">{{chatStats.uniqueChatters24hLabel}}</strong>
+      <p class="stat-card__description">Количество пользователей, написавших хотя бы одно сообщение.</p>
+    </article>
+
+    <article class="stat-card stat-card--neutral">
+      <span class="stat-card__label">Сообщений сохранено всего</span>
+      <strong class="stat-card__value">{{chatStats.totalMessagesAllTimeLabel}}</strong>
+      <p class="stat-card__description">Общий объём истории в коллекции chatLog.</p>
+    </article>
+
+    <article class="stat-card stat-card--neutral">
+      <span class="stat-card__label">Текущая активность чата</span>
+      <strong class="stat-card__value">{{chatStats.activeChattersNowLabel}}</strong>
+      <p class="stat-card__description">Количество последних активных участников в памяти бота.</p>
+    </article>
+
+    <article class="stat-card stat-card--neutral">
+      <span class="stat-card__label">Срезов зрителей сохранено</span>
+      <strong class="stat-card__value">{{viewerStats.totalSnapshotsLabel}}</strong>
+      <p class="stat-card__description">Сколько viewer snapshot документов уже накоплено.</p>
+    </article>
+  </div>
+</section>
+
+<section class="container section-spacing community-grid">
+  <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Таблица лидеров</div>
+        <h2>Топ чаттеров</h2>
+      </div>
+      <span class="panel-card__meta">{{chatStats.source}}</span>
+    </div>
+
+    {{#if chatStats.note}}
+      <p class="notice notice--warning">{{chatStats.note}}</p>
+    {{/if}}
+
+    {{#if chatStats.hasTopChatters}}
+      <ol class="leaderboard-list leaderboard-list--large">
+        {{#each chatStats.topChatters}}
+          <li class="leaderboard-item">
+            <span class="leaderboard-item__position">#{{position}}</span>
+            <div class="leaderboard-item__content">
+              <strong>{{displayName}}</strong>
+              <span>{{messagesCountLabel}} сообщений · последнее: {{lastMessageAtLabel}}</span>
+            </div>
+          </li>
+        {{/each}}
+      </ol>
+    {{else}}
+      <p class="empty-state">Пока нет достаточного количества сообщений для построения топа.</p>
+    {{/if}}
+  </article>
+
+  <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Последняя активность</div>
+        <h2>Лента сообщений</h2>
+      </div>
+      <a href="/api/streamer/stats">JSON API</a>
+    </div>
+
+    {{#if chatStats.hasRecentMessages}}
+      <ul class="message-list">
+        {{#each chatStats.recentMessages}}
+          <li class="message-item">
+            <div class="message-item__head">
+              <strong>{{displayName}}</strong>
+              <span>{{createdAtLabel}}</span>
+            </div>
+            <p>{{text}}</p>
+          </li>
+        {{/each}}
+      </ul>
+    {{else}}
+      <p class="empty-state">Сообщений ещё нет — раздел заполнится автоматически, когда бот накопит историю.</p>
+    {{/if}}
+  </article>
+</section>
+
+<section class="container section-spacing">
+  <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Тренд аудитории</div>
+        <h2>История viewer-срезов</h2>
+      </div>
+      <span class="panel-card__meta">Последний срез: {{viewerStats.latestViewerCountLabel}}</span>
+    </div>
+
+    {{#if viewerStats.note}}
+      <p class="notice notice--warning">{{viewerStats.note}}</p>
+    {{/if}}
+
+    {{#if viewerStats.hasViewerHistory}}
+      <div class="history-list history-list--large">
+        {{#each viewerStats.viewerHistory}}
+          <div class="history-item">
+            <div class="history-item__meta">
+              <span>{{label}}</span>
+              <strong>{{viewersCountLabel}}</strong>
+            </div>
+            <div class="history-item__bar">
+              <span style="width: {{barWidth}};"></span>
+            </div>
+          </div>
+        {{/each}}
+      </div>
+    {{else}}
+      <p class="empty-state">Как только бот накопит viewer-срезы, здесь появится динамика онлайна.</p>
+    {{/if}}
+  </article>
+</section>
+
+<section class="container section-spacing api-links-grid">
+  <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Интеграции</div>
+        <h2>JSON-эндпоинты</h2>
+      </div>
+    </div>
+
+    <div class="link-grid link-grid--compact">
+      <a class="link-card" href="/api/streamer/summary" target="_blank" rel="noreferrer">
+        <strong>/api/streamer/summary</strong>
+        <span>Краткая сводка по стриму и профилю.</span>
+      </a>
+      <a class="link-card" href="/api/streamer/stats" target="_blank" rel="noreferrer">
+        <strong>/api/streamer/stats</strong>
+        <span>Подробные viewer и chat метрики.</span>
+      </a>
+    </div>
+  </article>
+</section>
+

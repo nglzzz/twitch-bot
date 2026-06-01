@@ -1,1 +1,216 @@
-<h1>Home page</h1>
+<section class="hero-section container">
+  <div class="hero-card hero-card--primary">
+	<div class="eyebrow">Мини-сайт стримера</div>
+	<h1>{{profile.name}}</h1>
+	<p class="hero-description">{{profile.description}}</p>
+	<p class="hero-description hero-description--muted">{{profile.longDescription}}</p>
+
+	<div class="hero-actions">
+	  <a class="button button--primary" href="https://www.twitch.tv/{{profile.handle}}" target="_blank" rel="noreferrer">
+		Открыть Twitch-канал
+	  </a>
+	  <a class="button button--ghost" href="/stats">
+		Смотреть статистику
+	  </a>
+	</div>
+
+	<div class="link-grid">
+	  {{#each profile.links}}
+		<a class="link-card" href="{{url}}" target="_blank" rel="noreferrer">
+		  <strong>{{label}}</strong>
+		  <span>{{description}}</span>
+		</a>
+	  {{/each}}
+	</div>
+  </div>
+
+  <aside class="hero-card hero-card--sidebar">
+	<div class="status-pill status-pill--{{stream.status}}">{{stream.statusLabel}}</div>
+	<h2 class="sidebar-title">{{stream.title}}</h2>
+	<dl class="detail-list">
+	  <div>
+		<dt>Категория</dt>
+		<dd>{{stream.gameName}}</dd>
+	  </div>
+	  <div>
+		<dt>Зрителей</dt>
+		<dd>{{stream.viewerCountLabel}}</dd>
+	  </div>
+	  <div>
+		<dt>Старт эфира</dt>
+		<dd>{{stream.startedAtLabel}}</dd>
+	  </div>
+	  <div>
+		<dt>Длительность</dt>
+		<dd>{{stream.uptimeLabel}}</dd>
+	  </div>
+	  <div>
+		<dt>Язык</dt>
+		<dd>{{stream.language}}</dd>
+	  </div>
+	</dl>
+
+	{{#if stream.thumbnailUrl}}
+	  <img class="stream-preview" src="{{stream.thumbnailUrl}}" alt="Превью текущего стрима {{profile.name}}" />
+	{{/if}}
+
+	{{#if stream.error}}
+	  <p class="notice notice--warning">{{stream.error}}</p>
+	{{/if}}
+  </aside>
+</section>
+
+<section class="container section-spacing">
+  <div class="section-heading">
+	<div>
+	  <div class="eyebrow">Ключевые метрики</div>
+	  <h2>Сводка по каналу и комьюнити</h2>
+	</div>
+	<button class="button button--ghost button--small" type="button" data-refresh-page>
+	  Обновить страницу
+	</button>
+  </div>
+
+  <div class="stats-grid">
+	{{#each summaryCards}}
+	  <article class="stat-card stat-card--{{accent}}">
+		<span class="stat-card__label">{{label}}</span>
+		<strong class="stat-card__value">{{value}}</strong>
+		<p class="stat-card__description">{{description}}</p>
+	  </article>
+	{{/each}}
+  </div>
+</section>
+
+<section class="container section-spacing embed-section">
+  <div class="section-heading">
+	<div>
+	  <div class="eyebrow">Live</div>
+	  <h2>Плеер и чат</h2>
+	</div>
+	<p class="section-description">Twitch-встраивание использует текущий hostname: <code>{{profile.embeds.parent}}</code>.</p>
+  </div>
+
+  <div class="embed-grid">
+	<article class="panel-card">
+	  <div class="panel-card__header">
+		<h3>Плеер</h3>
+		<a href="https://www.twitch.tv/{{profile.handle}}" target="_blank" rel="noreferrer">Открыть отдельно</a>
+	  </div>
+	  <div class="embed-frame embed-frame--video">
+		<iframe
+		  src="{{profile.embeds.playerUrl}}"
+		  allowfullscreen="true"
+		  loading="lazy"
+		  title="Twitch player {{profile.name}}"
+		></iframe>
+	  </div>
+	</article>
+
+	<article class="panel-card">
+	  <div class="panel-card__header">
+		<h3>Чат</h3>
+		<a href="https://www.twitch.tv/popout/{{profile.handle}}/chat" target="_blank" rel="noreferrer">Открыть отдельно</a>
+	  </div>
+	  <div class="embed-frame embed-frame--chat">
+		<iframe
+		  src="{{profile.embeds.chatUrl}}"
+		  loading="lazy"
+		  title="Twitch chat {{profile.name}}"
+		></iframe>
+	  </div>
+	</article>
+  </div>
+</section>
+
+<section class="container section-spacing community-grid">
+  <article class="panel-card">
+	<div class="panel-card__header">
+	  <div>
+		<div class="eyebrow">Комьюнити</div>
+		<h3>Последние сообщения</h3>
+	  </div>
+	  <span class="panel-card__meta">Источник: {{chatStats.source}}</span>
+	</div>
+
+	{{#if chatStats.note}}
+	  <p class="notice notice--warning">{{chatStats.note}}</p>
+	{{/if}}
+
+	{{#if chatStats.hasRecentMessages}}
+	  <ul class="message-list">
+		{{#each chatStats.recentMessages}}
+		  <li class="message-item">
+			<div class="message-item__head">
+			  <strong>{{displayName}}</strong>
+			  <span>{{createdAtLabel}}</span>
+			</div>
+			<p>{{text}}</p>
+		  </li>
+		{{/each}}
+	  </ul>
+	{{else}}
+	  <p class="empty-state">Пока нет сохранённых сообщений. Как только чат начнёт логироваться, здесь появится история.</p>
+	{{/if}}
+  </article>
+
+  <article class="panel-card">
+	<div class="panel-card__header">
+	  <div>
+		<div class="eyebrow">Активность</div>
+		<h3>Топ чаттеров за 24 часа</h3>
+	  </div>
+	  <a href="/stats">Вся статистика</a>
+	</div>
+
+	{{#if chatStats.hasTopChatters}}
+	  <ol class="leaderboard-list">
+		{{#each chatStats.topChatters}}
+		  <li class="leaderboard-item">
+			<span class="leaderboard-item__position">#{{position}}</span>
+			<div class="leaderboard-item__content">
+			  <strong>{{displayName}}</strong>
+			  <span>{{messagesCountLabel}} сообщений · {{lastMessageAtLabel}}</span>
+			</div>
+		  </li>
+		{{/each}}
+	  </ol>
+	{{else}}
+	  <p class="empty-state">Недостаточно данных, чтобы построить рейтинг активности.</p>
+	{{/if}}
+  </article>
+</section>
+
+<section class="container section-spacing">
+  <article class="panel-card">
+	<div class="panel-card__header">
+	  <div>
+		<div class="eyebrow">Viewer history</div>
+		<h3>Последние срезы аудитории</h3>
+	  </div>
+	  <span class="panel-card__meta">Сохранено срезов: {{viewerStats.totalSnapshotsLabel}}</span>
+	</div>
+
+	{{#if viewerStats.note}}
+	  <p class="notice notice--warning">{{viewerStats.note}}</p>
+	{{/if}}
+
+	{{#if viewerStats.hasViewerHistory}}
+	  <div class="history-list">
+		{{#each viewerStats.viewerHistory}}
+		  <div class="history-item">
+			<div class="history-item__meta">
+			  <span>{{label}}</span>
+			  <strong>{{viewersCountLabel}}</strong>
+			</div>
+			<div class="history-item__bar">
+			  <span style="width: {{barWidth}};"></span>
+			</div>
+		  </div>
+		{{/each}}
+	  </div>
+	{{else}}
+	  <p class="empty-state">Viewer-срезы пока отсутствуют. Бот начнёт их копить во время прямых эфиров.</p>
+	{{/if}}
+  </article>
+</section>

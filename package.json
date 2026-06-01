@@ -4,8 +4,10 @@
   "description": "Twitch Chat Bot by nglzzz",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint "
+    "start": "node index.js",
+    "test": "node ./scripts/siteDataSmoke.js",
+    "lint": "eslint .",
+    "smoke:site": "node ./scripts/siteDataSmoke.js"
   },
   "keywords": [
     "twitch",

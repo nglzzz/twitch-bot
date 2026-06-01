@@ -4,14 +4,20 @@ const { MAX_LATEST_CHATTERS } = require('../const/enums');
 const chatters = [];
 const latestChatters = [];
 const latestMessages = {};
+const recentMessages = [];
+const MAX_RECENT_MESSAGES = 30;
 
 // Save chatters to global array
 Chat.getClient().on('message', (channel, tags, message, self) => {
-  // if (latestChatters.includes(tags.username)) {
-  //   return;
-  // }
+  if (self || !tags?.username) {
+    return;
+  }
 
-  latestChatters.filter((chatter) => chatter !== tags.username);
+  const existingIndex = latestChatters.findIndex((chatter) => chatter === tags.username);
+  if (existingIndex !== -1) {
+    latestChatters.splice(existingIndex, 1);
+  }
+
   latestChatters.push(tags.username);
   if (latestChatters.length > MAX_LATEST_CHATTERS) {
     latestChatters.shift();
@@ -30,10 +36,22 @@ function storeMessage(channel, tags, messageText) {
     return;
   }
 
-  latestMessages[tags.username] = {
+  const username = tags.username;
+  const displayName = tags['display-name'] ?? username;
+  const messageData = {
     id: tags.id,
-    text: messageText
+    user: username,
+    displayName,
+    text: messageText,
+    createdAt: new Date().toISOString(),
   };
+
+  latestMessages[username] = messageData;
+  recentMessages.push(messageData);
+
+  if (recentMessages.length > MAX_RECENT_MESSAGES) {
+    recentMessages.shift();
+  }
 }
 
 function deleteLatestMessage(username) {
@@ -43,10 +61,12 @@ function deleteLatestMessage(username) {
 const getChatters = () => chatters;
 const getLatestChatters = () => latestChatters;
 const getLatestMessages = () => latestMessages;
+const getRecentMessages = () => recentMessages;
 
 module.exports = {
   getChatters: getChatters,
   getLatestChatters: getLatestChatters,
   getLatestMessages: getLatestMessages,
+  getRecentMessages,
   deleteLatestMessage,
 };
