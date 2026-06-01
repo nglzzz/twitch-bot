@@ -43,7 +43,7 @@ const MODEL_REGISTRY = Object.freeze({
     aliases: ['openrouter/free'],
     requestModelEnvNames: ['OPENROUTER_MODEL'],
     defaultRequestModels: [
-      'poolside/laguna-xs.2:free',
+      // 'poolside/laguna-xs.2:free',
       'openrouter/owl-alpha',
       'google/gemma-4-26b-a4b-it:free',
       'moonshotai/kimi-k2.6:free',
