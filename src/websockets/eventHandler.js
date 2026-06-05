@@ -24,6 +24,20 @@ const allowedAudioCommands = [
 
 websocketServer.on('connection', function (ws) {
   Chat.getClient().on('message', (channel, tags, message, self) => {
+    if (self) return;
+
+    // All chat messages
+    if (!message.startsWith('!')) {
+      ws.send(JSON.stringify({
+        type: 'chat',
+        nickname: tags['display-name'] ?? tags.username,
+        message: message,
+        isSub: !!tags.subscriber,
+        timestamp: Date.now(),
+      }));
+    }
+
+    // Highlighted subscriber messages → speech
     if (messageHelper.isHighlightMessage(tags) && messageHelper.isSubscriberMessage(tags)) {
       ws.send(JSON.stringify({
         type: 'speech',
@@ -32,6 +46,7 @@ websocketServer.on('connection', function (ws) {
       }));
     }
 
+    // Subscriber audio commands
     if (messageHelper.isSubscriberMessage(tags) && allowedAudioCommands.indexOf(`${message}`) !== -1) {
       ws.send(JSON.stringify({
         type: 'audio',

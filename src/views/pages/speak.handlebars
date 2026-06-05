@@ -1,88 +1,529 @@
+<style>
+  .speak-page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    margin: -2rem -2rem 0;
+  }
+
+  .page-speak .site-main {
+    padding: 0;
+    max-width: none;
+  }
+
+  {{#unless isOverlay}}
+  .speak-page {
+    height: auto;
+    max-height: none;
+    min-height: 80vh;
+    margin: 0;
+  }
+
+  .page-speak .site-main {
+    padding: 0 0 1rem 0;
+  }
+  {{/unless}}
+
+  /* Status bar */
+  .speak-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .speak-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    transition: background 0.3s;
+  }
+
+  .speak-status__dot--connected {
+    background: #22c55e;
+  }
+
+  /* Controls */
+  .speak-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .speak-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .speak-controls select,
+  .speak-controls input[type="range"] {
+    background: var(--surface-soft);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 0.25rem 0.4rem;
+    font-size: 0.78rem;
+  }
+
+  .speak-controls input[type="range"] {
+    width: 70px;
+    padding: 0;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--surface-soft);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .speak-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+  }
+
+  .speak-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .speak-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+  }
+
+  .speak-btn--active {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #86efac;
+  }
+
+  /* Chat messages */
+  .speak-chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    display: grid;
+    gap: 0.25rem;
+    align-content: flex-end;
+  }
+
+  .speak-msg {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    word-break: break-word;
+    animation: speak-msg-in 0.2s ease;
+  }
+
+  .speak-msg--speaking {
+    background: rgba(139, 92, 246, 0.15);
+    border-left: 2px solid var(--primary);
+  }
+
+  @keyframes speak-msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .speak-msg__nick {
+    font-weight: 600;
+    color: #c4b5fd;
+    white-space: nowrap;
+  }
+
+  .speak-msg__text {
+    color: var(--text);
+  }
+
+  .speak-msg__time {
+    font-size: 0.7rem;
+    color: rgba(148, 163, 184, 0.5);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  /* Empty state */
+  .speak-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>
+
+<div class="speak-page">
+  <div class="speak-status">
+    <span class="speak-status__dot" id="wsDot"></span>
+    <span id="wsStatus">Подключение...</span>
+    <span style="margin-left: auto" id="msgCounter">0 сообщений</span>
+  </div>
+
+  <div class="speak-controls">
+    <button class="speak-btn" id="toggleSpeech" title="Нажмите для запуска озвучки">
+      🔇 Включить озвучку
+    </button>
+
+    <button class="speak-btn speak-btn--active" id="toggleNickname" title="Озвучивать никнейм перед сообщением">
+      💬 Никнейм
+    </button>
+
+    <label>
+      Голос
+      <select id="voiceSelect"><option value="">Загрузка...</option></select>
+    </label>
+
+    <label>
+      Скорость
+      <input type="range" id="rateRange" min="0.5" max="2" step="0.1" value="1">
+    </label>
+
+    <label>
+      Громкость
+      <input type="range" id="volumeRange" min="0" max="1" step="0.1" value="1">
+    </label>
+
+    <button class="speak-btn" id="clearBtn" title="Очистить чат">
+      🗑️ Очистить
+    </button>
+  </div>
+
+  <div class="speak-chat" id="chatContainer">
+    <div class="speak-empty" id="emptyState">Ожидание сообщений...</div>
+  </div>
+</div>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function(){
-        setTimeout(() => {
-            const isSpeechSynthesisEnabled = typeof window.speechSynthesis !== 'undefined'
-                    && window.speechSynthesis.getVoices().length > 0;
+(function () {
+  const MAX_MESSAGES = 100;
+  const MAX_SPEECH_LENGTH = 300;
+  const websocketPort = '{{websocketPort}}';
 
-            const ws = new WebSocket('ws://'+ window.location.hostname +':{{websocketPort}}');
+  let speechEnabled = true;
+  let speakNickname = true;
+  let lastSpokenNick = null;
+  let selectedVoice = null;
+  let voices = [];
 
-            function leftPad(value, length) {
-                return ('0'.repeat(length) + value).slice(-length);
-            }
+  const chatContainer = document.getElementById('chatContainer');
+  const emptyState = document.getElementById('emptyState');
+  const wsDot = document.getElementById('wsDot');
+  const wsStatus = document.getElementById('wsStatus');
+  const msgCounter = document.getElementById('msgCounter');
+  const toggleSpeechBtn = document.getElementById('toggleSpeech');
+  const toggleNicknameBtn = document.getElementById('toggleNickname');
+  const voiceSelect = document.getElementById('voiceSelect');
+  const rateRange = document.getElementById('rateRange');
+  const volumeRange = document.getElementById('volumeRange');
+  const clearBtn = document.getElementById('clearBtn');
 
-            function getPitchByNickname(value) {
-                let charNumbers = leftPad(value.charCodeAt(0).toString(), 3);
-                let firstNumber = charNumbers.slice(0, 1);
-                let secondNumbers = charNumbers.slice(1, 2);
+  let messageCount = 0;
+  let speechActivated = false;  // requires user gesture to start
+  const pendingQueue = [];      // messages waiting for activation
 
-                let number = firstNumber + '.' + secondNumbers;
-                return +number;
-            }
+  // In overlay mode (OBS), auto-activate after a short delay
+  // since user cannot click to activate
+  const isOverlay = {{#if isOverlay}}true{{else}}false{{/if}};
+  if (isOverlay) {
+    setTimeout(() => {
+      activateSpeech();
+    }, 1000);
+  }
 
-            function speak(nickname, text) {
-                if (isSpeechSynthesisEnabled) {
-                    console.log('Speaking by browser');
-                    speakBySpeechSynthesis(nickname, text);
-                } else {
-                    console.log('Speaking by server');
-                    speakByServer(nickname, text);
-                }
-            }
+  // --- Voices ---
+  function loadVoices() {
+    voices = speechSynthesis.getVoices();
+    voiceSelect.innerHTML = '';
 
-            function speakBySpeechSynthesis(nickname, text) {
-                const message = new SpeechSynthesisUtterance();
-                message.lang = 'ru-RU';
-                message.text = text;
-                message.pitch = getPitchByNickname(nickname);
-                message.rate = 1;
-                window.speechSynthesis.speak(message);
-            }
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = 'По умолчанию';
+    voiceSelect.appendChild(defaultOpt);
 
-            function speakByServer(nickname, text) {
-                fetch('/speech?' + new URLSearchParams({
-                    pitch: getPitchByNickname(nickname),
-                    text: text
-                }), {
-                    method: 'GET',
-                    headers: {}
-                }).then(r => r.json()).then(data => {
-                    const Sound = (function () {
-                        const df = document.createDocumentFragment();
-                        return function Sound(src) {
-                            const snd = new Audio(src);
-                            df.appendChild(snd); // keep in fragment until finished playing
-                            snd.addEventListener('ended', function () {
-                                df.removeChild(snd);
-                            });
-                            snd.play();
-                            return snd;
-                        };
-                    }());
-                    Sound("data:audio/wav;base64," + data.audioContent);
-                });
-            }
+    const ruVoices = voices.filter(v => v.lang.startsWith('ru'));
 
-            function playAudio(audioName) {
-                let audio = new Audio(`/audio/${audioName}`);
-                audio.volume = 0.5;
-                audio.play();
-            }
+    const addGroup = (label, list) => {
+      if (!list.length) return;
+      const group = document.createElement('optgroup');
+      group.label = label;
+      list.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name;
+        group.appendChild(opt);
+      });
+      voiceSelect.appendChild(group);
+    };
 
-            ws.addEventListener('message', event => {
-                try {
-                    const jsonData = JSON.parse(event.data);
+    addGroup('Русские', ruVoices);
+    addGroup('Другие', voices.filter(v => !v.lang.startsWith('ru')));
 
-                    if ('speech' === jsonData.type) {
-                        speak(jsonData.nickname.toUpperCase(), jsonData.text);
-                    }
-                    if ('audio' === jsonData.type) {
-                      playAudio(jsonData.name);
-                    }
-                } catch (e) {
-                    console.log(`Something wend wrong with: ${e}`);
-                }
-                ws.send('Trying to play: ' + event.data);
-            });
-        }, 200);
-    });
+    // Try to pick a Russian voice by default
+    if (ruVoices.length) {
+      selectedVoice = ruVoices[0];
+      voiceSelect.value = selectedVoice.name;
+    }
+  }
+
+  speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+
+  voiceSelect.addEventListener('change', () => {
+    selectedVoice = voices.find(v => v.name === voiceSelect.value) || null;
+  });
+
+  // --- Speech ---
+  function leftPad(value, length) {
+    return ('0'.repeat(length) + value).slice(-length);
+  }
+
+  function getPitchByNickname(value) {
+    let charNumbers = leftPad(value.charCodeAt(0).toString(), 3);
+    let firstNumber = charNumbers.slice(0, 1);
+    let secondNumbers = charNumbers.slice(1, 2);
+    return +(firstNumber + '.' + secondNumbers);
+  }
+
+  function speak(text, nickname) {
+    if (!speechEnabled || !window.speechSynthesis) return;
+    if (text.length > MAX_SPEECH_LENGTH) {
+      text = text.substring(0, MAX_SPEECH_LENGTH) + '...';
+    }
+
+    const nickChanged = lastSpokenNick !== nickname.toLowerCase();
+    lastSpokenNick = nickname.toLowerCase();
+
+    if (speakNickname && nickChanged) {
+      const nickUtterance = new SpeechSynthesisUtterance(nickname);
+      nickUtterance.lang = 'ru-RU';
+      nickUtterance.pitch = getPitchByNickname(nickname);
+      nickUtterance.rate = parseFloat(rateRange.value);
+      nickUtterance.volume = parseFloat(volumeRange.value);
+      if (selectedVoice) nickUtterance.voice = selectedVoice;
+      window.speechSynthesis.speak(nickUtterance);
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ru-RU';
+    utterance.pitch = getPitchByNickname(nickname);
+    utterance.rate = parseFloat(rateRange.value);
+    utterance.volume = parseFloat(volumeRange.value);
+    if (selectedVoice) utterance.voice = selectedVoice;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // --- Activate speech (requires user gesture) ---
+  function activateSpeech() {
+    if (speechActivated) return;
+    speechActivated = true;
+
+    // Prime the speech engine with a silent utterance during user gesture
+    const silent = new SpeechSynthesisUtterance('');
+    silent.volume = 0;
+    window.speechSynthesis.speak(silent);
+
+    // Flush pending queue
+    while (pendingQueue.length > 0) {
+      const item = pendingQueue.shift();
+      speak(item.text, item.nickname);
+    }
+
+    // Update button to active state
+    toggleSpeechBtn.classList.add('speak-btn--active');
+    toggleSpeechBtn.textContent = '🔊 Озвучка';
+  }
+
+  // --- Toggle ---
+  toggleSpeechBtn.addEventListener('click', () => {
+    // First click activates speech engine
+    if (!speechActivated) {
+      activateSpeech();
+      return;
+    }
+
+    speechEnabled = !speechEnabled;
+    toggleSpeechBtn.classList.toggle('speak-btn--active', speechEnabled);
+    toggleSpeechBtn.textContent = speechEnabled ? '🔊 Озвучка' : '🔇 Озвучка';
+    if (!speechEnabled) {
+      speechSynthesis.cancel();
+    }
+  });
+
+  toggleNicknameBtn.addEventListener('click', () => {
+    speakNickname = !speakNickname;
+    toggleNicknameBtn.classList.toggle('speak-btn--active', speakNickname);
+  });
+
+  // --- Clear ---
+  clearBtn.addEventListener('click', () => {
+    chatContainer.innerHTML = '';
+    messageCount = 0;
+    pendingQueue.length = 0;
+    updateCounter();
+    emptyState.style.display = '';
+    chatContainer.appendChild(emptyState);
+    speechSynthesis.cancel();
+    lastSpokenNick = null;
+  });
+
+  // --- Messages ---
+  function updateCounter() {
+    msgCounter.textContent = messageCount + ' сообщени' + pluralize(messageCount);
+  }
+
+  function pluralize(n) {
+    const abs = Math.abs(n) % 100;
+    const last = abs % 10;
+    if (abs > 10 && abs < 20) return 'й';
+    if (last > 1 && last < 5) return 'я';
+    if (last === 1) return 'е';
+    return 'й';
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addMessage(nickname, message, timestamp, isSub, shouldSpeak = true) {
+    if (emptyState.parentNode) emptyState.style.display = 'none';
+
+    messageCount++;
+    updateCounter();
+
+    const el = document.createElement('div');
+    el.className = 'speak-msg';
+    el.dataset.nickname = nickname;
+
+    const time = formatTime(timestamp || Date.now());
+
+    el.innerHTML =
+      '<span class="speak-msg__nick">' + escapeHtml(nickname) + '</span>' +
+      '<span class="speak-msg__text">' + escapeHtml(message) + '</span>' +
+      '<span class="speak-msg__time">' + time + '</span>';
+
+    chatContainer.appendChild(el);
+
+    // Remove oldest if over limit
+    while (chatContainer.children.length > MAX_MESSAGES) {
+      chatContainer.removeChild(chatContainer.firstChild);
+    }
+
+    // Auto-scroll
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Speak
+    if (shouldSpeak && !message.startsWith('!')) {
+      if (!speechActivated) {
+        pendingQueue.push({ text: message, nickname: nickname });
+        el.classList.add('speak-msg--speaking');
+      } else {
+        speak(message, nickname);
+        el.classList.add('speak-msg--speaking');
+      }
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // --- Load recent messages ---
+  fetch('/api/chat/recent?limit=50')
+    .then(r => r.json())
+    .then(messages => {
+      if (!Array.isArray(messages) || messages.length === 0) return;
+      messages.forEach(m => {
+        addMessage(
+          m.displayName || m.user,
+          m.message,
+          m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+          false,
+          false
+        );
+      });
+    })
+    .catch(() => {});
+
+  // --- WebSocket ---
+  function playAudio(audioName) {
+    let audio = new Audio('/audio/' + audioName);
+    audio.volume = 0.5;
+    audio.play();
+  }
+
+  const ws = new WebSocket('ws://' + window.location.hostname + ':' + websocketPort);
+
+  ws.addEventListener('open', () => {
+    wsDot.classList.add('speak-status__dot--connected');
+    wsStatus.textContent = 'Подключено';
+  });
+
+  ws.addEventListener('close', () => {
+    wsDot.classList.remove('speak-status__dot--connected');
+    wsStatus.textContent = 'Отключено';
+  });
+
+  ws.addEventListener('error', () => {
+    wsDot.classList.remove('speak-status__dot--connected');
+    wsStatus.textContent = 'Ошибка соединения';
+  });
+
+  ws.addEventListener('message', event => {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'chat') {
+        addMessage(data.nickname, data.message, data.timestamp, data.isSub);
+      }
+
+      if (data.type === 'speech') {
+        if (!speechActivated) {
+          pendingQueue.push({ text: data.text, nickname: data.nickname });
+        } else {
+          speak(data.text, data.nickname);
+        }
+      }
+
+      if (data.type === 'audio') {
+        playAudio(data.name);
+      }
+    } catch (e) {
+      console.error('speak ws error:', e);
+    }
+  });
+})();
 </script>

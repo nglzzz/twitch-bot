@@ -61,12 +61,15 @@ routes.get('/api/diagnostics/db', (req, res) => {
 });
 
 routes.get('/speak', (req, res) => {
+  const isOverlay = req.query.overlay === '1';
   res.set('Content-Security-Policy', 'default-src \'self\' \'unsafe-inline\' data:; connect-src *; font-src * data:; media-src * blob: data:');
   res.set('X-Frame-Options', 'ALLOWALL');
   res.render('pages/speak', {
     pageTitle: 'NGLZZZ — озвучка сообщений',
-    pageDescription: 'Страница озвучки подсвеченных сообщений и звуковых эффектов.',
+    pageDescription: 'Страница озвучки сообщений чата и звуковых эффектов.',
     currentPage: 'speak',
+    layout: isOverlay ? 'overlay' : 'main',
+    isOverlay: isOverlay,
     generatedAtLabel: new Intl.DateTimeFormat('ru-RU', {
       dateStyle: 'medium',
       timeStyle: 'short',
@@ -78,6 +81,24 @@ routes.get('/speak', (req, res) => {
     ],
     websocketPort: config.DOCKER_WEBSOCKET_PORT || config.WEBSOCKET_PORT
   });
+});
+
+routes.get('/api/chat/recent', async (req, res, next) => {
+  try {
+    if (db?.connection?.readyState !== 1) {
+      return res.json([]);
+    }
+    const chatLogModel = require('../models/chatLog.model');
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const messages = await chatLogModel
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json(messages.reverse());
+  } catch (error) {
+    next(error);
+  }
 });
 
 routes.get('/speech', (req, res) => {
