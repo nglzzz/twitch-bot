@@ -45,8 +45,10 @@ const MODEL_REGISTRY = Object.freeze({
     defaultRequestModels: [
       // 'poolside/laguna-xs.2:free',
       'openrouter/owl-alpha',
+      'z-ai/glm-4.5-air:free',
       'google/gemma-4-26b-a4b-it:free',
       'moonshotai/kimi-k2.6:free',
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
       'nvidia/nemotron-3-super-120b-a12b:free',
       'openai/gpt-oss-120b:free',
     ],
