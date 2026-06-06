@@ -101,12 +101,23 @@ routes.get('/api/chat/recent', async (req, res, next) => {
   }
 });
 
-routes.get('/speech', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
+routes.get('/speech', async (req, res, next) => {
+  try {
+    const text = String(req.query.text || '').trim();
+    if (!text) {
+      return res.status(400).json({ error: 'text is required' });
+    }
 
-  speech.useGoogleSpeech((data) => {
-    res.end(JSON.stringify(data));
-  }, req.query.text, req.query.pitch);
+    const data = await speech.synthesizeSpeech(text, {
+      pitch: req.query.pitch,
+      rate: req.query.rate,
+      voice: req.query.voice,
+    });
+
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = routes;

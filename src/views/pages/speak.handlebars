@@ -228,13 +228,20 @@
 (function () {
   const MAX_MESSAGES = 100;
   const MAX_SPEECH_LENGTH = 300;
+  const SPEECH_FRAGMENT_MAX = 180;
   const websocketPort = '{{websocketPort}}';
+  const GOOGLE_VOICES = [
+    { name: 'ru-RU-Standard-A', label: 'Google Standard A' },
+    { name: 'ru-RU-Standard-B', label: 'Google Standard B' },
+    { name: 'ru-RU-Standard-C', label: 'Google Standard C' },
+    { name: 'ru-RU-Standard-D', label: 'Google Standard D' },
+    { name: 'ru-RU-Standard-E', label: 'Google Standard E' }
+  ];
 
   let speechEnabled = true;
   let speakNickname = true;
   let lastSpokenNick = null;
-  let selectedVoice = null;
-  let voices = [];
+  let selectedVoice = 'ru-RU-Standard-E';
 
   const chatContainer = document.getElementById('chatContainer');
   const emptyState = document.getElementById('emptyState');
@@ -249,11 +256,15 @@
   const clearBtn = document.getElementById('clearBtn');
 
   let messageCount = 0;
-  let speechActivated = false;  // requires user gesture to start
-  const pendingQueue = [];      // messages waiting for activation
+  let speechActivated = false;
+  const pendingQueue = [];
+  const speechQueue = [];
+  let isSpeaking = false;
+  let currentItem = null;
+  let audioContext = null;
+  let currentSource = null;
+  let queueVersion = 0;
 
-  // In overlay mode (OBS), auto-activate after a short delay
-  // since user cannot click to activate
   const isOverlay = {{#if isOverlay}}true{{else}}false{{/if}};
   if (isOverlay) {
     setTimeout(() => {
@@ -263,44 +274,20 @@
 
   // --- Voices ---
   function loadVoices() {
-    voices = speechSynthesis.getVoices();
     voiceSelect.innerHTML = '';
-
-    const defaultOpt = document.createElement('option');
-    defaultOpt.value = '';
-    defaultOpt.textContent = 'По умолчанию';
-    voiceSelect.appendChild(defaultOpt);
-
-    const ruVoices = voices.filter(v => v.lang.startsWith('ru'));
-
-    const addGroup = (label, list) => {
-      if (!list.length) return;
-      const group = document.createElement('optgroup');
-      group.label = label;
-      list.forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v.name;
-        opt.textContent = v.name;
-        group.appendChild(opt);
-      });
-      voiceSelect.appendChild(group);
-    };
-
-    addGroup('Русские', ruVoices);
-    addGroup('Другие', voices.filter(v => !v.lang.startsWith('ru')));
-
-    // Try to pick a Russian voice by default
-    if (ruVoices.length) {
-      selectedVoice = ruVoices[0];
-      voiceSelect.value = selectedVoice.name;
-    }
+    GOOGLE_VOICES.forEach(voice => {
+      const opt = document.createElement('option');
+      opt.value = voice.name;
+      opt.textContent = voice.label;
+      voiceSelect.appendChild(opt);
+    });
+    voiceSelect.value = selectedVoice;
   }
 
-  speechSynthesis.onvoiceschanged = loadVoices;
   loadVoices();
 
   voiceSelect.addEventListener('change', () => {
-    selectedVoice = voices.find(v => v.name === voiceSelect.value) || null;
+    selectedVoice = voiceSelect.value || 'ru-RU-Standard-E';
   });
 
   // --- Speech ---
@@ -315,32 +302,165 @@
     return +(firstNumber + '.' + secondNumbers);
   }
 
+  function hasAudioContext() {
+    return Boolean(window.AudioContext || window.webkitAudioContext);
+  }
+
+  function getAudioContext() {
+    if (!audioContext) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API is not supported');
+      }
+      audioContext = new AudioContextClass();
+    }
+    return audioContext;
+  }
+
+  async function unlockAudio() {
+    const context = getAudioContext();
+    if (context.state === 'suspended') {
+      await context.resume();
+    }
+
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = 0;
+    source.buffer = context.createBuffer(1, 1, context.sampleRate);
+    source.connect(gain).connect(context.destination);
+    source.start(0);
+  }
+
+  function base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  function splitSpeechText(text) {
+    if (text.length <= SPEECH_FRAGMENT_MAX) return [text];
+
+    const parts = [];
+    const words = text.split(/\s+/);
+    let buffer = '';
+
+    words.forEach(word => {
+      if (buffer && buffer.length + word.length + 1 > SPEECH_FRAGMENT_MAX) {
+        parts.push(buffer);
+        buffer = word;
+        return;
+      }
+      buffer += (buffer ? ' ' : '') + word;
+    });
+
+    if (buffer) parts.push(buffer);
+    return parts;
+  }
+
+  async function fetchSpeechBuffer(text, item) {
+    const params = new URLSearchParams({
+      text: text,
+      pitch: String(item.pitch),
+      rate: String(item.rate),
+      voice: item.voice
+    });
+    const response = await fetch('/speech?' + params.toString());
+    if (!response.ok) {
+      throw new Error('Speech request failed: ' + response.status);
+    }
+    const data = await response.json();
+    if (!data.audioContent) {
+      throw new Error('Speech response has no audioContent');
+    }
+    const buffer = await getAudioContext().decodeAudioData(base64ToArrayBuffer(data.audioContent));
+    return {
+      buffer: buffer,
+      playbackRate: data.playbackRate || 1
+    };
+  }
+
+  function playBuffer(buffer, volume, playbackRate, token) {
+    return new Promise(resolve => {
+      const context = getAudioContext();
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate;
+      gain.gain.value = volume;
+      source.connect(gain).connect(context.destination);
+
+      source.onended = () => {
+        if (currentSource === source) currentSource = null;
+        resolve();
+      };
+
+      currentSource = source;
+      if (token !== queueVersion) {
+        currentSource = null;
+        resolve();
+        return;
+      }
+      source.start(0);
+    });
+  }
+
   function speak(text, nickname) {
-    if (!speechEnabled || !window.speechSynthesis) return;
+    if (!speechEnabled || !hasAudioContext()) return;
     if (text.length > MAX_SPEECH_LENGTH) {
       text = text.substring(0, MAX_SPEECH_LENGTH) + '...';
     }
 
+    const texts = [];
     const nickChanged = lastSpokenNick !== nickname.toLowerCase();
     lastSpokenNick = nickname.toLowerCase();
 
     if (speakNickname && nickChanged) {
-      const nickUtterance = new SpeechSynthesisUtterance(nickname);
-      nickUtterance.lang = 'ru-RU';
-      nickUtterance.pitch = getPitchByNickname(nickname);
-      nickUtterance.rate = parseFloat(rateRange.value);
-      nickUtterance.volume = parseFloat(volumeRange.value);
-      if (selectedVoice) nickUtterance.voice = selectedVoice;
-      window.speechSynthesis.speak(nickUtterance);
+      texts.push(nickname);
     }
+    texts.push(...splitSpeechText(text));
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ru-RU';
-    utterance.pitch = getPitchByNickname(nickname);
-    utterance.rate = parseFloat(rateRange.value);
-    utterance.volume = parseFloat(volumeRange.value);
-    if (selectedVoice) utterance.voice = selectedVoice;
-    window.speechSynthesis.speak(utterance);
+    speechQueue.push({
+      texts: texts,
+      rate: parseFloat(rateRange.value),
+      volume: parseFloat(volumeRange.value),
+      voice: selectedVoice,
+      pitch: getPitchByNickname(nickname)
+    });
+
+    processQueue();
+  }
+
+  async function processQueue() {
+    if (isSpeaking || speechQueue.length === 0) return;
+    if (!speechEnabled || !speechActivated) return;
+
+    isSpeaking = true;
+    const token = queueVersion;
+
+    try {
+      while (speechEnabled && speechActivated && token === queueVersion && speechQueue.length > 0) {
+        const item = speechQueue.shift();
+        currentItem = item;
+
+        for (const text of item.texts) {
+          if (!speechEnabled || token !== queueVersion) return;
+          try {
+            const speechAudio = await fetchSpeechBuffer(text, item);
+            if (!speechEnabled || token !== queueVersion) return;
+            await playBuffer(speechAudio.buffer, item.volume, speechAudio.playbackRate, token);
+          } catch (error) {
+            console.error('speech audio error:', error);
+          }
+        }
+      }
+    } finally {
+      isSpeaking = false;
+      currentItem = null;
+    }
   }
 
   // --- Activate speech (requires user gesture) ---
@@ -348,25 +468,21 @@
     if (speechActivated) return;
     speechActivated = true;
 
-    // Prime the speech engine with a silent utterance during user gesture
-    const silent = new SpeechSynthesisUtterance('');
-    silent.volume = 0;
-    window.speechSynthesis.speak(silent);
+    unlockAudio().catch(error => {
+      console.error('audio unlock error:', error);
+    });
 
-    // Flush pending queue
     while (pendingQueue.length > 0) {
       const item = pendingQueue.shift();
       speak(item.text, item.nickname);
     }
 
-    // Update button to active state
     toggleSpeechBtn.classList.add('speak-btn--active');
     toggleSpeechBtn.textContent = '🔊 Озвучка';
   }
 
   // --- Toggle ---
   toggleSpeechBtn.addEventListener('click', () => {
-    // First click activates speech engine
     if (!speechActivated) {
       activateSpeech();
       return;
@@ -376,7 +492,16 @@
     toggleSpeechBtn.classList.toggle('speak-btn--active', speechEnabled);
     toggleSpeechBtn.textContent = speechEnabled ? '🔊 Озвучка' : '🔇 Озвучка';
     if (!speechEnabled) {
-      speechSynthesis.cancel();
+      queueVersion++;
+      speechQueue.length = 0;
+      currentItem = null;
+      isSpeaking = false;
+      if (currentSource) {
+        currentSource.stop();
+        currentSource = null;
+      }
+    } else {
+      processQueue();
     }
   });
 
@@ -390,10 +515,17 @@
     chatContainer.innerHTML = '';
     messageCount = 0;
     pendingQueue.length = 0;
+    speechQueue.length = 0;
+    currentItem = null;
+    isSpeaking = false;
+    queueVersion++;
+    if (currentSource) {
+      currentSource.stop();
+      currentSource = null;
+    }
     updateCounter();
     emptyState.style.display = '';
     chatContainer.appendChild(emptyState);
-    speechSynthesis.cancel();
     lastSpokenNick = null;
   });
 
