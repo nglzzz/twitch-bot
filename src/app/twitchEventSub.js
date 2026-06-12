@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const axios = require('axios');
 const config = require('../config');
 const Chat = require('./chat');
+const { updateRedemptionStatus } = require('../twitchApi/rewardRedemptions');
 
 const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIBE_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -157,15 +158,46 @@ function handleRedemption(event) {
   if (!handler) return;
 
   const userName = event.user_name;
+  const redemptionId = event.id;
+  const broadcasterId = config.BROADCASTER_ID;
+
   console.log(`[EventSub] Reward redeemed: "${event.reward.title}" by ${userName}`);
 
-  handler().then(resultMessage => {
-    if (resultMessage) {
-      Chat.handleMessageResult(resultMessage, '#' + config.CHANNEL);
-    }
-  }).catch(error => {
-    console.error('[EventSub] Reward handler error:', error);
-  });
+  handler()
+    .then(async resultMessage => {
+      // Handler succeeded — mark redemption as FULFILLED
+      try {
+        await updateRedemptionStatus({
+          broadcasterId,
+          rewardId,
+          redemptionId,
+          status: 'FULFILLED'
+        });
+      } catch (patchError) {
+        // Reward already executed successfully, only log the status update failure
+        console.error('[EventSub] Reward succeeded but failed to mark as FULFILLED:', patchError.message);
+      }
+
+      if (resultMessage) {
+        Chat.handleMessageResult(resultMessage, '#' + config.CHANNEL);
+      }
+    })
+    .catch(async error => {
+      // Handler failed — cancel redemption to refund channel points
+      console.error(`[EventSub] Reward handler failed for "${event.reward.title}" by ${userName}:`, error.message);
+
+      try {
+        await updateRedemptionStatus({
+          broadcasterId,
+          rewardId,
+          redemptionId,
+          status: 'CANCELED'
+        });
+        console.log(`[EventSub] Redemption ${redemptionId} canceled, points refunded to ${userName}`);
+      } catch (cancelError) {
+        console.error('[EventSub] Failed to cancel redemption:', cancelError.message);
+      }
+    });
 }
 
 /**

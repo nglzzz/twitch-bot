@@ -68,19 +68,52 @@ Chat.registerReward('b1341e46-1474-43f3-bd82-9b89182fef69', require('../rewards/
 
 // EventSub Rewards (for rewards without message text, which IRC can't detect)
 const EventSub = require('../app/twitchEventSub');
-if (config.TWITCH_REWARD_BURN_MEMER_ID) {
-  console.log('Reward is registred: ' + config.TWITCH_REWARD_BURN_MEMER_ID);
-  EventSub.registerReward(config.TWITCH_REWARD_BURN_MEMER_ID, require('../rewards/burnMemer'));
-}
-if (config.TWITCH_REWARD_RANDOM_MEME_ID) {
-  console.log('Reward is registered: ' + config.TWITCH_REWARD_RANDOM_MEME_ID);
-  EventSub.registerReward(config.TWITCH_REWARD_RANDOM_MEME_ID, require('../rewards/randomMeme'));
-}
-if (config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID) {
-  console.log('Reward is registered: ' + config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID);
-  EventSub.registerReward(config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID, require('../rewards/randomAudioMeme'));
-}
-EventSub.connect();
+const { ensureRewardsExist } = require('../twitchApi/rewardRedemptions');
+
+const REQUIRED_REWARDS = [
+  {
+    title: 'Спалить мемера',
+    cost: 500,
+    prompt: 'Узнать кто прислал последний мем',
+    envVar: 'TWITCH_REWARD_BURN_MEMER_ID',
+    handler: require('../rewards/burnMemer')
+  },
+  {
+    title: 'Случайный мем',
+    cost: 600,
+    prompt: 'Отправляет случайный мем через MemeAlerts',
+    envVar: 'TWITCH_REWARD_RANDOM_MEME_ID',
+    handler: require('../rewards/randomMeme')
+  },
+  {
+    title: 'Случайный аудио-мем',
+    cost: 650,
+    prompt: 'Отправляет случайный аудио-мем через MemeAlerts',
+    envVar: 'TWITCH_REWARD_RANDOM_AUDIO_MEME_ID',
+    handler: require('../rewards/randomAudioMeme')
+  }
+];
+
+(async () => {
+  try {
+    const rewardIds = await ensureRewardsExist(REQUIRED_REWARDS);
+
+    for (const req of REQUIRED_REWARDS) {
+      const rewardId = rewardIds[req.envVar];
+      if (rewardId) {
+        console.log(`[Rewards] Registered handler for "${req.title}" (ID: ${rewardId})`);
+        EventSub.registerReward(rewardId, req.handler);
+      } else {
+        console.warn(`[Rewards] Skipping "${req.title}": no reward ID available`);
+      }
+    }
+
+    EventSub.connect();
+  } catch (error) {
+    console.error('[Rewards] Failed to initialize rewards:', error.message);
+    EventSub.connect();
+  }
+})();
 
 
 // TODO:

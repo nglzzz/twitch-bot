@@ -4,7 +4,6 @@ const config = require('../config');
 const MEMEALERTS_HOST = config.MEMEALERTS_HOST || 'memealerts.com';
 
 async function onBurnMemerReward() {
-  console.log('Fetching last meme');
   try {
     const response = await axios.post(
       'https://' + MEMEALERTS_HOST + '/api/event',
@@ -32,13 +31,13 @@ async function onBurnMemerReward() {
     );
 
     if (!lastMeme) {
-      return 'Не нашёл последнего мемера 😔';
+      throw new Error('Last memer not found');
     }
 
     return `🔥🔥🔥 Последний мем прислал: ${lastMeme.userAlias}. Мем: ${lastMeme.stickerName}`;
   } catch (error) {
     console.error('Ошибка при получении последнего мемера:', error.message);
-    return 'Ошибка при поиске мемера 😔';
+    throw error;
   }
 }
 

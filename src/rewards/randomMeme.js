@@ -52,6 +52,7 @@ async function fetchCatalogue(url, body, referer) {
     }
   } catch (error) {
     console.error('Error fetching catalogue from ' + url + ':', error.message);
+    throw error;
   }
 
   return memes;
@@ -122,7 +123,7 @@ function createHandler(isSoundOnly) {
       }
 
       if (allMemes.length === 0) {
-        return 'Не удалось загрузить каталог мемов 😔';
+        throw new Error('Meme catalogue is empty');
       }
 
       // Pick a random meme
@@ -137,12 +138,11 @@ function createHandler(isSoundOnly) {
       if (result && result.result === 0) {
         return `${successPrefix}: ${chosenMeme.name}`;
       } else {
-        console.error(`${logPrefix} Unexpected send result:`, JSON.stringify(result));
-        return 'Ошибка при отправке мема 😔';
+        throw new Error(`Unexpected MemeAlerts send result: ${JSON.stringify(result)}`);
       }
     } catch (error) {
       console.error(`${logPrefix} Error:`, error.message);
-      return errorMsg;
+      throw error;
     }
   };
 }
