@@ -6,6 +6,8 @@ const { getLatestChatters } = require('./chatters');
 const getChannelViewers = require('../twitchApi/viewers');
 const viewerModel = require('../models/viewer.model');
 const { isChannelLive } = require('../twitchApi/channelInfo');
+const { startTracking, linkViewerSnapshotToStream } = require('../services/streamTracker.service');
+const { startPolling } = require('../services/memeAlerts.service');
 
 const copyPastTimer = setInterval(async () => {
   let latestChatter = '';
@@ -56,11 +58,23 @@ const saveViewersTimer = setInterval(async () => {
       viewers: viewers,
     });
 
+    try {
+      await linkViewerSnapshotToStream(viewerDb);
+    } catch (_) {
+      // Ignore — snapshot will be saved without stream link
+    }
+
     viewerDb.save();
   } catch (e) {
     console.log(e);
   }
 }, 1000 * 60 * 5); // every 5 minutes
+
+// Start stream tracking (checks every 5 minutes)
+startTracking(5 * 60 * 1000);
+
+// Start meme alerts polling (every 2 minutes by default)
+startPolling();
 
 module.exports = {
   copyPastTimer: copyPastTimer,

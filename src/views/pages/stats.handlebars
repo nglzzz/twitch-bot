@@ -10,53 +10,209 @@
   </div>
 
   <p class="section-description">
-    Здесь собраны viewer-срезы и chat-логи, которые уже умеет хранить текущий проект.
-    Страница остаётся рабочей даже без MongoDB, но при подключенной базе показывает гораздо больше деталей.
+    Расширенная статистика стримов, чата и мемов. Данные обновляются автоматически.
   </p>
 </section>
 
+{{! ── Filters ── }}
 <section class="container section-spacing">
+  <form class="stats-filters" method="get" action="/stats">
+    <div class="stats-filters__group">
+      <label class="stats-filters__label" for="filter-stream">Стрим</label>
+      <select class="stats-filters__select" name="stream" id="filter-stream">
+        <option value="">Все стримы</option>
+        {{#each streamSessions.streams}}
+          <option value="{{id}}" {{#if (eq ../filters.streamId (toString id))}}selected{{/if}}>
+            {{dateLabel}} — {{title}}
+          </option>
+        {{/each}}
+      </select>
+    </div>
+
+    <div class="stats-filters__group">
+      <label class="stats-filters__label" for="filter-chatter">Чаттер</label>
+      <input
+        class="stats-filters__input"
+        type="text"
+        name="chatter"
+        id="filter-chatter"
+        placeholder="Введите ник..."
+        value="{{filters.chatter}}"
+      >
+    </div>
+
+    <button class="button button--primary button--small" type="submit">Применить</button>
+
+    {{#if filters.streamId}}
+      <a href="/stats" class="button button--ghost button--small">Сбросить</a>
+    {{/if}}
+  </form>
+</section>
+
+{{! ── Tab navigation ── }}
+<section class="container section-spacing">
+  <div class="stats-tabs" data-stats-tabs>
+    <button class="stats-tabs__btn is-active" data-tab="overview">Обзор</button>
+    <button class="stats-tabs__btn" data-tab="streams">Стримы</button>
+    <button class="stats-tabs__btn" data-tab="chatters">Чаттеры</button>
+    <button class="stats-tabs__btn" data-tab="memes">Мемы</button>
+    <button class="stats-tabs__btn" data-tab="viewers">Зрители</button>
+  </div>
+</section>
+
+{{! ── Tab: Overview ── }}
+<section class="container section-spacing stats-tab-content is-active" data-tab-content="overview">
   <div class="stats-grid stats-grid--dense">
     <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">Пиковый онлайн за 24 часа</span>
-      <strong class="stat-card__value">{{viewerStats.peakViewerCount24hLabel}}</strong>
-      <p class="stat-card__description">Максимальное число зрителей по сохранённым срезам.</p>
+      <span class="stat-card__label">Всего стримов</span>
+      <strong class="stat-card__value">{{overallStats.totalStreamsLabel}}</strong>
+      <p class="stat-card__description">Записанных стрим-сессий в базе.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Средний онлайн за 24 часа</span>
-      <strong class="stat-card__value">{{viewerStats.averageViewerCount24hLabel}}</strong>
-      <p class="stat-card__description">Среднее значение по срезам viewer-лога.</p>
-    </article>
-
-    <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Уникальных чаттеров за 24 часа</span>
-      <strong class="stat-card__value">{{chatStats.uniqueChatters24hLabel}}</strong>
-      <p class="stat-card__description">Количество пользователей, написавших хотя бы одно сообщение.</p>
-    </article>
-
-    <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Сообщений сохранено всего</span>
-      <strong class="stat-card__value">{{chatStats.totalMessagesAllTimeLabel}}</strong>
+      <span class="stat-card__label">Всего сообщений</span>
+      <strong class="stat-card__value">{{overallStats.totalMessagesLabel}}</strong>
       <p class="stat-card__description">Общий объём истории в коллекции chatLog.</p>
     </article>
 
-    <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Текущая активность чата</span>
-      <strong class="stat-card__value">{{chatStats.activeChattersNowLabel}}</strong>
-      <p class="stat-card__description">Количество последних активных участников в памяти бота.</p>
+    <article class="stat-card stat-card--secondary">
+      <span class="stat-card__label">Уникальных чаттеров</span>
+      <strong class="stat-card__value">{{overallStats.totalUniqueChattersLabel}}</strong>
+      <p class="stat-card__description">Пользователей, написавших хотя бы одно сообщение.</p>
+    </article>
+
+    <article class="stat-card stat-card--primary">
+      <span class="stat-card__label">Всего мемов</span>
+      <strong class="stat-card__value">{{overallStats.totalMemesLabel}}</strong>
+      <p class="stat-card__description">Отправлено стикеров через MemeAlerts.</p>
     </article>
 
     <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Срезов зрителей сохранено</span>
-      <strong class="stat-card__value">{{viewerStats.totalSnapshotsLabel}}</strong>
-      <p class="stat-card__description">Сколько viewer snapshot документов уже накоплено.</p>
+      <span class="stat-card__label">Пиковый онлайн за всё время</span>
+      <strong class="stat-card__value">{{overallStats.peakViewersAllTimeLabel}}</strong>
+      <p class="stat-card__description">Максимальное число зрителей на стриме.</p>
+    </article>
+
+    <article class="stat-card stat-card--neutral">
+      <span class="stat-card__label">Средняя длительность стрима</span>
+      <strong class="stat-card__value">{{overallStats.avgStreamDuration}}</strong>
+      <p class="stat-card__description">Среднее время эфира по завершённым стримам.</p>
     </article>
   </div>
 </section>
 
-<section class="container section-spacing community-grid">
+{{! ── Tab: Streams ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="streams">
   <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">История эфиров</div>
+        <h2>Последние стримы</h2>
+      </div>
+    </div>
+
+    {{#if streamSessions.hasStreams}}
+      <div class="stats-table-wrap">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Название</th>
+              <th>Категория</th>
+              <th>Статус</th>
+              <th>Длительность</th>
+              <th>Макс. онлайн</th>
+              <th>Средний онлайн</th>
+              <th>Сообщений</th>
+              <th>Чаттеров</th>
+              <th>Мемов</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each streamSessions.streams}}
+              <tr>
+                <td><a href="/stats?stream={{id}}">{{dateLabel}}</a></td>
+                <td>{{title}}</td>
+                <td>{{gameName}}</td>
+                <td>
+                  {{#eq status 'live'}}
+                    <span class="status-badge status-badge--live">Live</span>
+                  {{else}}
+                    <span class="status-badge status-badge--ended">Завершён</span>
+                  {{/eq}}
+                </td>
+                <td>{{durationLabel}}</td>
+                <td>{{maxViewersLabel}}</td>
+                <td>{{avgViewersLabel}}</td>
+                <td>{{messagesCountLabel}}</td>
+                <td>{{uniqueChattersLabel}}</td>
+                <td>{{memesCountLabel}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <p class="empty-state">Стрим-сессии появятся после первого записанного эфира.</p>
+    {{/if}}
+  </article>
+</section>
+
+{{! ── Tab: Chatters ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="chatters">
+  {{#if chatterStats}}
+    <div class="chatter-profile">
+      <article class="panel-card">
+        <div class="panel-card__header">
+          <div>
+            <div class="eyebrow">Профиль чаттера</div>
+            <h2>{{chatterStats.displayName}}</h2>
+          </div>
+        </div>
+
+        <dl class="detail-list chatter-profile__stats">
+          <div>
+            <dt>Всего сообщений</dt>
+            <dd>{{chatterStats.totalMessagesLabel}}</dd>
+          </div>
+          <div>
+            <dt>Первое сообщение</dt>
+            <dd>{{chatterStats.firstMessageAtLabel}}</dd>
+          </div>
+          <div>
+            <dt>Последнее сообщение</dt>
+            <dd>{{chatterStats.lastMessageAtLabel}}</dd>
+          </div>
+          <div>
+            <dt>Стримов с участием</dt>
+            <dd>{{chatterStats.streamsCountLabel}}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="panel-card">
+        <div class="panel-card__header">
+          <div>
+            <div class="eyebrow">Последние сообщения</div>
+            <h3>{{chatterStats.displayName}}</h3>
+          </div>
+        </div>
+
+        <ul class="message-list">
+          {{#each chatterStats.recentMessages}}
+            <li class="message-item">
+              <div class="message-item__head">
+                <span>{{createdAtLabel}}</span>
+              </div>
+              <p>{{text}}</p>
+            </li>
+          {{/each}}
+        </ul>
+      </article>
+    </div>
+  {{/if}}
+
+  <article class="panel-card" style="margin-top: 1rem;">
     <div class="panel-card__header">
       <div>
         <div class="eyebrow">Таблица лидеров</div>
@@ -75,7 +231,7 @@
           <li class="leaderboard-item">
             <span class="leaderboard-item__position">#{{position}}</span>
             <div class="leaderboard-item__content">
-              <strong>{{displayName}}</strong>
+              <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
               <span>{{messagesCountLabel}} сообщений · последнее: {{lastMessageAtLabel}}</span>
             </div>
           </li>
@@ -85,36 +241,116 @@
       <p class="empty-state">Пока нет достаточного количества сообщений для построения топа.</p>
     {{/if}}
   </article>
+</section>
 
-  <article class="panel-card">
-    <div class="panel-card__header">
-      <div>
-        <div class="eyebrow">Последняя активность</div>
-        <h2>Лента сообщений</h2>
+{{! ── Tab: Memes ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="memes">
+  <div class="meme-grid">
+    <article class="panel-card">
+      <div class="panel-card__header">
+        <div>
+          <div class="eyebrow">Топ мемеров</div>
+          <h2>Самые активные</h2>
+        </div>
       </div>
-      <a href="/api/streamer/stats">JSON API</a>
-    </div>
 
-    {{#if chatStats.hasRecentMessages}}
+      {{#if memeStats.hasTopMemers}}
+        <ol class="leaderboard-list">
+          {{#each memeStats.topMemers}}
+            <li class="leaderboard-item">
+              <span class="leaderboard-item__position">#{{position}}</span>
+              <div class="leaderboard-item__content">
+                <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
+                <span>{{memesCountLabel}} мемов · последний: {{lastMemeAtLabel}}</span>
+              </div>
+            </li>
+          {{/each}}
+        </ol>
+      {{else}}
+        <p class="empty-state">Мемы ещё не были записаны. Данные появятся после первого опроса MemeAlerts.</p>
+      {{/if}}
+    </article>
+
+    <article class="panel-card">
+      <div class="panel-card__header">
+        <div>
+          <div class="eyebrow">Популярные мемы</div>
+          <h2>Самые используемые</h2>
+        </div>
+      </div>
+
+      {{#if memeStats.hasTopMemes}}
+        <ol class="leaderboard-list">
+          {{#each memeStats.topMemes}}
+            <li class="leaderboard-item">
+              <span class="leaderboard-item__position">#{{position}}</span>
+              <div class="leaderboard-item__content">
+                <strong>{{stickerName}}</strong>
+                <span>{{usageCountLabel}} раз · последний: {{lastUsedAtLabel}}</span>
+              </div>
+            </li>
+          {{/each}}
+        </ol>
+      {{else}}
+        <p class="empty-state">Данные по мемам появятся после накопления статистики.</p>
+      {{/if}}
+    </article>
+  </div>
+
+  {{#if memeStats.hasRecentMemes}}
+    <article class="panel-card" style="margin-top: 1rem;">
+      <div class="panel-card__header">
+        <div>
+          <div class="eyebrow">Последние мемы</div>
+          <h2>Лента мемов</h2>
+        </div>
+        <span class="panel-card__meta">Всего: {{memeStats.totalMemesLabel}}</span>
+      </div>
+
       <ul class="message-list">
-        {{#each chatStats.recentMessages}}
+        {{#each memeStats.recentMemes}}
           <li class="message-item">
             <div class="message-item__head">
-              <strong>{{displayName}}</strong>
-              <span>{{createdAtLabel}}</span>
+              <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
+              <span>{{sentAtLabel}}</span>
             </div>
-            <p>{{text}}</p>
+            <p>🎨 {{stickerName}}</p>
           </li>
         {{/each}}
       </ul>
-    {{else}}
-      <p class="empty-state">Сообщений ещё нет — раздел заполнится автоматически, когда бот накопит историю.</p>
-    {{/if}}
-  </article>
+    </article>
+  {{/if}}
 </section>
 
-<section class="container section-spacing">
-  <article class="panel-card">
+{{! ── Tab: Viewers ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="viewers">
+  <div class="stats-grid stats-grid--dense">
+    <article class="stat-card stat-card--primary">
+      <span class="stat-card__label">Пиковый онлайн за 24 часа</span>
+      <strong class="stat-card__value">{{viewerStats.peakViewerCount24hLabel}}</strong>
+      <p class="stat-card__description">Максимальное число зрителей по сохранённым срезам.</p>
+    </article>
+
+    <article class="stat-card stat-card--secondary">
+      <span class="stat-card__label">Средний онлайн за 24 часа</span>
+      <strong class="stat-card__value">{{viewerStats.averageViewerCount24hLabel}}</strong>
+      <p class="stat-card__description">Среднее значение по срезам viewer-лога.</p>
+    </article>
+
+    <article class="stat-card stat-card--secondary">
+      <span class="stat-card__label">Уникальных зрителей за 24 часа</span>
+      <strong class="stat-card__value">{{viewerStats.uniqueViewers24hLabel}}</strong>
+      <p class="stat-card__description">Считается по viewer-срезам.</p>
+    </article>
+
+    <article class="stat-card stat-card--neutral">
+      <span class="stat-card__label">Срезов сохранено</span>
+      <strong class="stat-card__value">{{viewerStats.totalSnapshotsLabel}}</strong>
+      <p class="stat-card__description">Сколько viewer snapshot документов накоплено.</p>
+    </article>
+  </div>
+
+  <article class="panel-card" style="margin-top: 1rem;">
     <div class="panel-card__header">
       <div>
         <div class="eyebrow">Тренд аудитории</div>
@@ -147,6 +383,7 @@
   </article>
 </section>
 
+{{! ── JSON API links ── }}
 <section class="container section-spacing api-links-grid">
   <article class="panel-card">
     <div class="panel-card__header">
@@ -165,7 +402,34 @@
         <strong>/api/streamer/stats</strong>
         <span>Подробные viewer и chat метрики.</span>
       </a>
+      <a class="link-card" href="/api/streamer/stats?stream=latest" target="_blank" rel="noreferrer">
+        <strong>/api/streamer/stats?stream=...</strong>
+        <span>Статистика по конкретному стриму.</span>
+      </a>
+      <a class="link-card" href="/api/streamer/chatters/nglzzz" target="_blank" rel="noreferrer">
+        <strong>/api/streamer/chatters/:user</strong>
+        <span>Статистика конкретного чаттера.</span>
+      </a>
     </div>
   </article>
 </section>
 
+<script>
+(function () {
+  var tabs = document.querySelectorAll('[data-stats-tabs] [data-tab]');
+  var contents = document.querySelectorAll('[data-tab-content]');
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.getAttribute('data-tab');
+
+      tabs.forEach(function (b) { b.classList.remove('is-active'); });
+      contents.forEach(function (c) { c.classList.remove('is-active'); });
+
+      btn.classList.add('is-active');
+      var panel = document.querySelector('[data-tab-content="' + target + '"]');
+      if (panel) panel.classList.add('is-active');
+    });
+  });
+})();
+</script>

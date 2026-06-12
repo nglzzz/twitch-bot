@@ -601,3 +601,186 @@ code {
   }
 }
 
+/* === Stats filters === */
+.stats-filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.stats-filters__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stats-filters__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.stats-filters__select,
+.stats-filters__input {
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  font: inherit;
+  min-width: 180px;
+}
+
+.stats-filters__select:focus,
+.stats-filters__input:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+/* === Stats table === */
+.stats-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 0.5rem;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  white-space: nowrap;
+}
+
+.stats-table th {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.stats-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.stats-table tbody tr:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.stats-table a {
+  color: #c4b5fd;
+  text-decoration: underline;
+  text-decoration-color: rgba(196, 181, 253, 0.3);
+}
+
+.stats-table a:hover {
+  color: var(--primary);
+}
+
+/* === Meme grid === */
+.meme-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+/* === Chatter profile === */
+.chatter-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.chatter-profile__stats {
+  display: grid;
+  gap: 0.7rem;
+}
+
+/* === Stream status badge === */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-badge--live {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.status-badge--ended {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+/* === Tabs === */
+.stats-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.stats-tabs__btn {
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.stats-tabs__btn:hover {
+  color: var(--text);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.stats-tabs__btn.is-active {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.stats-tab-content {
+  display: none;
+}
+
+.stats-tab-content.is-active {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .meme-grid,
+  .chatter-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stats-filters__select,
+  .stats-filters__input {
+    min-width: auto;
+  }
+}
+

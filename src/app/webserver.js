@@ -9,7 +9,20 @@ const app = express();
 const port = config.WEB_PORT || 8080;
 const host = '0.0.0.0';
 
-app.engine('handlebars', handlebars({ defaultLayout: 'main' }));
+app.engine('handlebars', handlebars({
+  defaultLayout: 'main',
+  helpers: {
+    eq: function (a, b) {
+      return a === b;
+    },
+    toString: function (value) {
+      if (value && typeof value.toString === 'function' && value.constructor.name === 'ObjectId') {
+        return value.toString();
+      }
+      return String(value != null ? value : '');
+    },
+  },
+}));
 app.set('views', './src/views');
 app.set('view engine', 'handlebars');
 app.set('trust proxy', true);

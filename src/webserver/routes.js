@@ -8,6 +8,7 @@ const {
   buildStatsPageData,
   getSummaryApiData,
   getStatsApiData,
+  loadChatterStats,
 } = require('../services/streamerSite.service');
 
 function getPublicHost(req) {
@@ -24,7 +25,11 @@ routes.get('/', async (req, res, next) => {
 
 routes.get('/stats', async (req, res, next) => {
   try {
-    res.render('pages/stats', await buildStatsPageData(getPublicHost(req)));
+    const filters = {
+      streamId: req.query.stream || null,
+      chatter: req.query.chatter || null,
+    };
+    res.render('pages/stats', await buildStatsPageData(getPublicHost(req), filters));
   } catch (error) {
     next(error);
   }
@@ -40,7 +45,24 @@ routes.get('/api/streamer/summary', async (req, res, next) => {
 
 routes.get('/api/streamer/stats', async (req, res, next) => {
   try {
-    res.json(await getStatsApiData(getPublicHost(req)));
+    const filters = {
+      streamId: req.query.stream || null,
+    };
+    res.json(await getStatsApiData(getPublicHost(req), filters));
+  } catch (error) {
+    next(error);
+  }
+});
+
+routes.get('/api/streamer/chatters/:user', async (req, res, next) => {
+  try {
+    const stats = await loadChatterStats(req.params.user);
+
+    if (!stats) {
+      return res.status(404).json({ error: 'Chatter not found' });
+    }
+
+    res.json(stats);
   } catch (error) {
     next(error);
   }
