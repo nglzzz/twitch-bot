@@ -72,6 +72,14 @@ if (config.TWITCH_REWARD_BURN_MEMER_ID) {
   console.log('Reward is registred: ' + config.TWITCH_REWARD_BURN_MEMER_ID);
   EventSub.registerReward(config.TWITCH_REWARD_BURN_MEMER_ID, require('../rewards/burnMemer'));
 }
+if (config.TWITCH_REWARD_RANDOM_MEME_ID) {
+  console.log('Reward is registered: ' + config.TWITCH_REWARD_RANDOM_MEME_ID);
+  EventSub.registerReward(config.TWITCH_REWARD_RANDOM_MEME_ID, require('../rewards/randomMeme'));
+}
+if (config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID) {
+  console.log('Reward is registered: ' + config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID);
+  EventSub.registerReward(config.TWITCH_REWARD_RANDOM_AUDIO_MEME_ID, require('../rewards/randomAudioMeme'));
+}
 EventSub.connect();
 
 
