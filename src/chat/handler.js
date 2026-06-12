@@ -66,6 +66,14 @@ Chat.registerCommand('!суд', require('../commands/court'), '!приговор
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
 Chat.registerReward('b1341e46-1474-43f3-bd82-9b89182fef69', require('../rewards/memes'));
 
+// EventSub Rewards (for rewards without message text, which IRC can't detect)
+const EventSub = require('../app/twitchEventSub');
+if (config.TWITCH_REWARD_BURN_MEMER_ID) {
+  console.log('Reward is registred: ' + config.TWITCH_REWARD_BURN_MEMER_ID);
+  EventSub.registerReward(config.TWITCH_REWARD_BURN_MEMER_ID, require('../rewards/burnMemer'));
+}
+EventSub.connect();
+
 
 // TODO:
 // !wiki <что ищем>
