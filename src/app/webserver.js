@@ -15,6 +15,15 @@ app.engine('handlebars', handlebars({
     eq: function (a, b) {
       return a === b;
     },
+    ne: function (a, b) {
+      return a !== b;
+    },
+    lt: function (a, b) {
+      return a < b;
+    },
+    or: function () {
+      return Array.prototype.slice.call(arguments, 0, -1).some(Boolean);
+    },
     toString: function (value) {
       if (value && typeof value.toString === 'function' && value.constructor.name === 'ObjectId') {
         return value.toString();

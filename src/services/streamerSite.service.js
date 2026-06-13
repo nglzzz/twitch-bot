@@ -152,45 +152,68 @@ function buildSocialLinks() {
   return [
     {
       label: 'Twitch',
+      key: 'twitch',
       url: `https://www.twitch.tv/${DEFAULT_CHANNEL}`,
       description: 'Основной канал и лайв-эфиры',
     },
     {
       label: 'Boosty',
+      key: 'boosty',
       url: 'https://boosty.to/nglzzz',
-      description: 'Поддержка и эксклюзивный контент',
-    },
-    {
-      label: 'Telegram',
-      url: 'https://t.me/nglzzzTV',
-      description: 'Новости и анонсы стримов',
-    },
-    {
-      label: 'Telegram Chat',
-      url: 'https://t.me/nglzzzChat',
-      description: 'Комьюнити-чат зрителей',
-    },
-    {
-      label: 'Discord',
-      url: 'https://discord.gg/uKCbdCGwTb',
-      description: 'Голосовой и текстовый сервер',
+      description: 'Эксклюзивный контент и подписки',
     },
     {
       label: 'YouTube',
+      key: 'youtube',
       url: 'https://www.youtube.com/@nglzzz',
-      description: 'Основной YouTube-канал',
+      description: 'Видео и нарезки',
+    },
+    {
+      label: 'Telegram',
+      key: 'telegram',
+      url: 'https://t.me/nglzzzTV',
+      description: 'Новости и анонсы',
+    },
+    {
+      label: 'Telegram Chat',
+      key: 'telegram',
+      url: 'https://t.me/nglzzzChat',
+      description: 'Чат комьюнити',
+    },
+    {
+      label: 'Discord',
+      key: 'discord',
+      url: 'https://discord.gg/uKCbdCGwTb',
+      description: 'Голосовой сервер',
     },
     {
       label: 'TikTok',
+      key: 'tiktok',
       url: 'https://www.tiktok.com/@gore_streamer?lang=ru-RU',
-      description: 'Короткие видео и моменты',
+      description: 'Короткие видео',
     },
     {
       label: 'DonationAlerts',
+      key: 'donate',
       url: 'https://www.donationalerts.com/c/nglzzz',
-      description: 'Поддержка стримера',
+      description: 'Разовая поддержка',
     },
   ];
+}
+
+function buildSupportLinks() {
+  return {
+    primary: {
+      label: 'Boosty',
+      url: 'https://boosty.to/nglzzz',
+      description: 'Подпишись на Boosty — получи доступ к эксклюзивным постам, закрытому контенту и роли в чате',
+    },
+    secondary: {
+      label: 'DonationAlerts',
+      url: 'https://www.donationalerts.com/c/nglzzz',
+      description: 'Хочешь задобрить стримера? Закинь донат на мечту!',
+    },
+  };
 }
 
 async function loadStreamData() {
@@ -348,7 +371,7 @@ async function loadChatStats(streamSessionId) {
         : chatLogModel.estimatedDocumentCount(),
       chatLogModel.distinct('user', { ...streamFilter, createdAt: { $gte: since } }),
       chatLogModel.aggregate([
-        { $match: { ...streamFilter, createdAt: { $gte: since } } },
+        { $match: { ...streamFilter } },
         { $sort: { createdAt: -1 } },
         {
           $group: {
@@ -646,9 +669,9 @@ async function loadChatterStats(chatterName) {
   }
 
   try {
-    const user = String(chatterName).toLowerCase();
+    const user = String(chatterName).toLowerCase().trim();
 
-    const [messages, stats] = await Promise.all([
+    const [messages, stats, memeAgg, hourlyActivity, dailyActivity, rankAgg, viewerSnapshots] = await Promise.all([
       chatLogModel
         .find({ user })
         .sort({ createdAt: -1 })
@@ -667,14 +690,136 @@ async function loadChatterStats(chatterName) {
           },
         },
       ]),
+      MemeLog.aggregate([
+        { $match: { user } },
+        {
+          $group: {
+            _id: null,
+            totalMemes: { $sum: 1 },
+            firstMemeAt: { $min: '$sentAt' },
+            lastMemeAt: { $max: '$sentAt' },
+            stickers: { $push: '$stickerName' },
+          },
+        },
+      ]),
+      chatLogModel.aggregate([
+        { $match: { user } },
+        {
+          $group: {
+            _id: { $hour: '$createdAt' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      chatLogModel.aggregate([
+        { $match: { user } },
+        {
+          $group: {
+            _id: { $dayOfWeek: '$createdAt' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      chatLogModel.aggregate([
+        { $group: { _id: '$user', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      // Find viewer snapshots where this user was present (each snapshot = 5 min interval)
+      viewerModel
+        .find({ viewers: user })
+        .sort({ createdAt: 1 })
+        .lean(),
     ]);
 
     if (!stats || stats.length === 0) {
-      return null;
+      return { notFound: true, searchedUser: user };
     }
 
     const stat = stats[0];
     const uniqueStreams = (stat.streams || []).filter(Boolean);
+    const rank = rankAgg.findIndex(entry => entry._id === user) + 1;
+
+    // Estimate watch time from viewer snapshots (each snapshot = 5 min interval)
+    let watchTimeMinutes = 0;
+    let watchTimeLabel = '—';
+    let viewerSnapshotCount = 0;
+    let firstSeenAsViewerAt = null;
+    let lastSeenAsViewerAt = null;
+
+    if (viewerSnapshots && viewerSnapshots.length > 0) {
+      viewerSnapshotCount = viewerSnapshots.length;
+      watchTimeMinutes = viewerSnapshotCount * 5;
+      firstSeenAsViewerAt = viewerSnapshots[0].createdAt;
+      lastSeenAsViewerAt = viewerSnapshots[viewerSnapshots.length - 1].createdAt;
+
+      if (watchTimeMinutes >= 60) {
+        const hours = Math.floor(watchTimeMinutes / 60);
+        const mins = watchTimeMinutes % 60;
+        watchTimeLabel = mins > 0 ? `${hours} ч ${mins} мин` : `${hours} ч`;
+      } else {
+        watchTimeLabel = `${watchTimeMinutes} мин`;
+      }
+    }
+
+    // Build hourly activity array (0-23)
+    const hourlyMap = new Array(24).fill(0);
+    hourlyActivity.forEach(h => { hourlyMap[h._id] = h.count; });
+    const peakHour = hourlyMap.indexOf(Math.max(...hourlyMap));
+    const maxHourlyCount = Math.max(...hourlyMap);
+
+    // Build daily activity array (1-7, MongoDB dayOfWeek: 1=Sunday)
+    const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const dailyMap = new Array(7).fill(0);
+    dailyActivity.forEach(d => { dailyMap[d._id - 1] = d.count; });
+    const peakDayIndex = dailyMap.indexOf(Math.max(...dailyMap));
+    const maxDailyCount = Math.max(...dailyMap);
+
+    // Process meme stats
+    let memeData = null;
+    if (memeAgg.length > 0) {
+      const memeCounts = new Map();
+      (memeAgg[0].stickers || []).forEach(name => {
+        if (name) memeCounts.set(name, (memeCounts.get(name) || 0) + 1);
+      });
+      const topUserMemes = Array.from(memeCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({ stickerName: name, count, countLabel: formatNumber(count) }));
+
+      memeData = {
+        totalMemes: memeAgg[0].totalMemes,
+        totalMemesLabel: formatNumber(memeAgg[0].totalMemes),
+        firstMemeAtLabel: formatDateTime(memeAgg[0].firstMemeAt),
+        lastMemeAtLabel: formatDateTime(memeAgg[0].lastMemeAt),
+        topMemes: topUserMemes,
+        hasTopMemes: topUserMemes.length > 0,
+      };
+    }
+
+    // Determine activity level
+    const total = stat.totalMessages;
+    let activityLevel, activityLevelClass;
+    if (total >= 1000) { activityLevel = 'Легенда чата'; activityLevelClass = 'legend'; }
+    else if (total >= 500) { activityLevel = 'Ветеран'; activityLevelClass = 'veteran'; }
+    else if (total >= 100) { activityLevel = 'Активный'; activityLevelClass = 'active'; }
+    else if (total >= 20) { activityLevel = 'Постоялец'; activityLevelClass = 'regular'; }
+    else { activityLevel = 'Новичок'; activityLevelClass = 'newbie'; }
+
+    // Activity heatmap bars (normalize hourly)
+    const hourlyBars = hourlyMap.map(count => ({
+      hour: null,
+      count,
+      barHeight: maxHourlyCount > 0 ? Math.max(4, Math.round((count / maxHourlyCount) * 100)) : 0,
+    }));
+
+    // Daily bars
+    const dailyBars = dayNames.map((name, i) => ({
+      dayName: name,
+      count: dailyMap[i],
+      barWidth: maxDailyCount > 0 ? Math.max(4, Math.round((dailyMap[i] / maxDailyCount) * 100)) : 0,
+    }));
 
     return {
       user: stat._id,
@@ -687,7 +832,33 @@ async function loadChatterStats(chatterName) {
       lastMessageAtLabel: formatDateTime(stat.lastMessageAt),
       streamsCount: uniqueStreams.length,
       streamsCountLabel: formatNumber(uniqueStreams.length),
+      watchTimeMinutes,
+      watchTimeLabel,
+      viewerSnapshotCount,
+      viewerSnapshotCountLabel: formatNumber(viewerSnapshotCount),
+      firstSeenAsViewerAt,
+      firstSeenAsViewerAtLabel: firstSeenAsViewerAt ? formatDateTime(firstSeenAsViewerAt) : null,
+      lastSeenAsViewerAt,
+      lastSeenAsViewerAtLabel: lastSeenAsViewerAt ? formatDateTime(lastSeenAsViewerAt) : null,
+      avgMessagesPerStream: uniqueStreams.length > 0
+        ? Math.round(stat.totalMessages / uniqueStreams.length)
+        : stat.totalMessages,
+      avgMessagesPerStreamLabel: uniqueStreams.length > 0
+        ? formatNumber(Math.round(stat.totalMessages / uniqueStreams.length))
+        : formatNumber(stat.totalMessages),
+      rank: rank > 0 ? rank : null,
+      rankLabel: rank > 0 ? `#${rank}` : '—',
+      activityLevel,
+      activityLevelClass,
+      peakHourLabel: peakHour >= 0 && maxHourlyCount > 0
+        ? `${String(peakHour).padStart(2, '0')}:00`
+        : null,
+      peakDayLabel: maxDailyCount > 0 ? dayNames[peakDayIndex] : null,
+      hourlyBars,
+      dailyBars,
+      memeStats: memeData,
       recentMessages: messages.map(mapRecentMessage),
+      hasRecentMessages: messages.length > 0,
     };
   } catch (error) {
     console.error('Error loading chatter stats:', error.message);
@@ -794,30 +965,32 @@ function buildNavigation(currentPage) {
 function buildSummaryCards(stream, viewerStats, chatStats) {
   return [
     {
-      label: 'Статус',
+      label: 'Статус стрима',
       value: stream.statusLabel,
       accent: stream.status === 'online' ? 'success' : 'neutral',
-      description: stream.gameName !== '—' ? `Категория: ${stream.gameName}` : 'Категория обновляется автоматически',
+      description: stream.status === 'online' && stream.gameName !== '—'
+        ? `Сейчас в эфире: ${stream.gameName}`
+        : 'Следи за анонсами в Telegram',
     },
     {
       label: 'Зрителей сейчас',
       value: stream.status === 'online' ? stream.viewerCountLabel : viewerStats.latestViewerCountLabel,
       accent: 'primary',
       description: stream.status === 'online'
-        ? 'Данные берутся из Twitch API в момент загрузки страницы'
-        : 'Если стрим офлайн, показывается последний сохранённый срез аудитории',
+        ? 'Смотери прямо сейчас на Twitch'
+        : 'Последний онлайн на стриме',
     },
     {
       label: 'Сообщений за 24 часа',
       value: chatStats.totalMessages24hLabel,
       accent: 'secondary',
-      description: 'Чем дольше работает логирование, тем полезнее становится раздел статистики',
+      description: 'Насколько живой наш чат',
     },
     {
       label: 'Уникальных зрителей за 24 часа',
       value: viewerStats.uniqueViewers24hLabel,
       accent: 'secondary',
-      description: 'Считается по viewer-срезам, которые бот собирает во время эфира',
+      description: 'Сколько человек заглянуло на стрим',
     },
   ];
 }
@@ -828,9 +1001,10 @@ function buildProfile(hostname) {
   return {
     name: DEFAULT_CHANNEL.toUpperCase(),
     handle: DEFAULT_CHANNEL,
-    description: 'Мини-сайт о стримере на базе существующего Twitch-бота: с плеером, встроенным чатом и живой статистикой сообщества.',
-    longDescription: 'Сайт использует текущую Node.js + Docker инфраструктуру проекта и умеет подтягивать live-данные Twitch, viewer-срезы из MongoDB и историю сообщений из чата.',
+    tagline: 'Стример, который делает стримы интересными',
+    description: 'Добро пожаловать на официальный сайт NGLZZZ! Здесь ты найдёшь удобный плеер с чатом, свежие новости, топ комьюнити и способы поддержки канала.',
     links: buildSocialLinks(),
+    supportLinks: buildSupportLinks(),
     embeds,
   };
 }

@@ -43,7 +43,7 @@
 
     <button class="button button--primary button--small" type="submit">Применить</button>
 
-    {{#if filters.streamId}}
+    {{#if (or filters.streamId filters.chatter)}}
       <a href="/stats" class="button button--ghost button--small">Сбросить</a>
     {{/if}}
   </form>
@@ -52,16 +52,16 @@
 {{! ── Tab navigation ── }}
 <section class="container section-spacing">
   <div class="stats-tabs" data-stats-tabs>
-    <button class="stats-tabs__btn is-active" data-tab="overview">Обзор</button>
+    <button class="stats-tabs__btn{{#unless filters.chatter}} is-active{{/unless}}" data-tab="overview">Обзор</button>
     <button class="stats-tabs__btn" data-tab="streams">Стримы</button>
-    <button class="stats-tabs__btn" data-tab="chatters">Чаттеры</button>
+    <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">Чаттеры</button>
     <button class="stats-tabs__btn" data-tab="memes">Мемы</button>
     <button class="stats-tabs__btn" data-tab="viewers">Зрители</button>
   </div>
 </section>
 
 {{! ── Tab: Overview ── }}
-<section class="container section-spacing stats-tab-content is-active" data-tab-content="overview">
+<section class="container section-spacing stats-tab-content{{#unless filters.chatter}} is-active{{/unless}}" data-tab-content="overview">
   <div class="stats-grid stats-grid--dense">
     <article class="stat-card stat-card--primary">
       <span class="stat-card__label">Всего стримов</span>
@@ -159,57 +159,182 @@
 </section>
 
 {{! ── Tab: Chatters ── }}
-<section class="container section-spacing stats-tab-content" data-tab-content="chatters">
+<section class="container section-spacing stats-tab-content{{#if filters.chatter}} is-active{{/if}}" data-tab-content="chatters">
   {{#if chatterStats}}
-    <div class="chatter-profile">
+    {{#if chatterStats.notFound}}
       <article class="panel-card">
         <div class="panel-card__header">
           <div>
             <div class="eyebrow">Профиль чаттера</div>
-            <h2>{{chatterStats.displayName}}</h2>
+            <h2>Чаттер не найден</h2>
           </div>
         </div>
-
-        <dl class="detail-list chatter-profile__stats">
-          <div>
-            <dt>Всего сообщений</dt>
-            <dd>{{chatterStats.totalMessagesLabel}}</dd>
-          </div>
-          <div>
-            <dt>Первое сообщение</dt>
-            <dd>{{chatterStats.firstMessageAtLabel}}</dd>
-          </div>
-          <div>
-            <dt>Последнее сообщение</dt>
-            <dd>{{chatterStats.lastMessageAtLabel}}</dd>
-          </div>
-          <div>
-            <dt>Стримов с участием</dt>
-            <dd>{{chatterStats.streamsCountLabel}}</dd>
-          </div>
-        </dl>
+        <p class="empty-state">Пользователь <strong>{{chatterStats.searchedUser}}</strong> ещё не написал ни одного сообщения. Проверь правильность написания ника или попробуй найти его в таблице лидеров ниже.</p>
       </article>
-
-      <article class="panel-card">
-        <div class="panel-card__header">
-          <div>
-            <div class="eyebrow">Последние сообщения</div>
-            <h3>{{chatterStats.displayName}}</h3>
+    {{else}}
+      <div class="chatter-profile">
+        <article class="panel-card">
+          <div class="panel-card__header">
+            <div>
+              <div class="eyebrow">Профиль чаттера</div>
+              <h2>{{chatterStats.displayName}}</h2>
+              <span class="activity-badge activity-badge--{{chatterStats.activityLevelClass}}">{{chatterStats.activityLevel}}</span>
+            </div>
+            <div class="chatter-rank">
+              <span class="chatter-rank__label">Место</span>
+              <strong class="chatter-rank__value">{{chatterStats.rankLabel}}</strong>
+            </div>
           </div>
-        </div>
 
-        <ul class="message-list">
-          {{#each chatterStats.recentMessages}}
-            <li class="message-item">
-              <div class="message-item__head">
-                <span>{{createdAtLabel}}</span>
+          <dl class="detail-list chatter-profile__stats">
+            <div>
+              <dt>Всего сообщений</dt>
+              <dd>{{chatterStats.totalMessagesLabel}}</dd>
+            </div>
+            <div>
+              <dt>Первое сообщение</dt>
+              <dd>{{chatterStats.firstMessageAtLabel}}</dd>
+            </div>
+            <div>
+              <dt>Последнее сообщение</dt>
+              <dd>{{chatterStats.lastMessageAtLabel}}</dd>
+            </div>
+            <div>
+              <dt>Стримов с участием</dt>
+              <dd>{{chatterStats.streamsCountLabel}}</dd>
+            </div>
+            <div>
+              <dt>Примерное время просмотра</dt>
+              <dd>{{chatterStats.watchTimeLabel}}</dd>
+            </div>
+            <div>
+              <dt>Срезов просмотра</dt>
+              <dd>{{chatterStats.viewerSnapshotCountLabel}}</dd>
+            </div>
+            {{#if chatterStats.firstSeenAsViewerAtLabel}}
+            <div>
+              <dt>Впервые замечен</dt>
+              <dd>{{chatterStats.firstSeenAsViewerAtLabel}}</dd>
+            </div>
+            {{/if}}
+            {{#if chatterStats.lastSeenAsViewerAtLabel}}
+            <div>
+              <dt>Последний раз замечен</dt>
+              <dd>{{chatterStats.lastSeenAsViewerAtLabel}}</dd>
+            </div>
+            {{/if}}
+            <div>
+              <dt>В среднем на стрим</dt>
+              <dd>{{chatterStats.avgMessagesPerStreamLabel}}</dd>
+            </div>
+            {{#if chatterStats.peakHourLabel}}
+            <div>
+              <dt>Пиковый час</dt>
+              <dd>{{chatterStats.peakHourLabel}}</dd>
+            </div>
+            {{/if}}
+            {{#if chatterStats.peakDayLabel}}
+            <div>
+              <dt>Самый активный день</dt>
+              <dd>{{chatterStats.peakDayLabel}}</dd>
+            </div>
+            {{/if}}
+          </dl>
+
+          {{! Activity charts }}
+          <div style="margin-top: 1.5rem;">
+            <div class="eyebrow" style="margin-bottom: 0.75rem;">Активность по часам</div>
+            <div class="hourly-chart">
+              {{#each chatterStats.hourlyBars}}
+                <div class="hourly-chart__bar" style="height: {{barHeight}}%;" title="{{count}} сообщ."></div>
+              {{/each}}
+            </div>
+            <div class="hourly-chart__labels">
+              <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <div class="eyebrow" style="margin-bottom: 0.75rem;">Активность по дням недели</div>
+            <div class="daily-chart">
+              {{#each chatterStats.dailyBars}}
+                <div class="daily-chart__item">
+                  <div class="daily-chart__bar-wrap">
+                    <div class="daily-chart__bar" style="height: {{barWidth}}%;" title="{{count}} сообщ."></div>
+                  </div>
+                  <span class="daily-chart__label">{{dayName}}</span>
+                </div>
+              {{/each}}
+            </div>
+          </div>
+        </article>
+
+        <article class="panel-card">
+          <div class="panel-card__header">
+            <div>
+              <div class="eyebrow">Последние сообщения</div>
+              <h3>{{chatterStats.displayName}}</h3>
+            </div>
+          </div>
+
+          {{#if chatterStats.hasRecentMessages}}
+            <div class="chatter-messages-scroll">
+              <ul class="message-list">
+                {{#each chatterStats.recentMessages}}
+                  <li class="message-item">
+                    <div class="message-item__head">
+                      <span>{{createdAtLabel}}</span>
+                    </div>
+                    <p>{{text}}</p>
+                  </li>
+                {{/each}}
+              </ul>
+            </div>
+          {{else}}
+            <p class="empty-state">Сообщения не найдены.</p>
+          {{/if}}
+
+          {{#if chatterStats.memeStats}}
+            <div style="margin-top: 1.25rem;">
+              <div class="panel-card__header" style="margin-bottom: 0.75rem;">
+                <div>
+                  <div class="eyebrow">Мемы</div>
+                </div>
+                <span class="panel-card__meta">{{chatterStats.memeStats.totalMemesLabel}} всего</span>
               </div>
-              <p>{{text}}</p>
-            </li>
-          {{/each}}
-        </ul>
-      </article>
-    </div>
+              <dl class="detail-list">
+                <div>
+                  <dt>Всего мемов</dt>
+                  <dd>{{chatterStats.memeStats.totalMemesLabel}}</dd>
+                </div>
+                <div>
+                  <dt>Первый мем</dt>
+                  <dd>{{chatterStats.memeStats.firstMemeAtLabel}}</dd>
+                </div>
+                <div>
+                  <dt>Последний мем</dt>
+                  <dd>{{chatterStats.memeStats.lastMemeAtLabel}}</dd>
+                </div>
+              </dl>
+
+              {{#if chatterStats.memeStats.hasTopMemes}}
+                <ol class="leaderboard-list" style="margin-top: 0.75rem;">
+                  {{#each chatterStats.memeStats.topMemes}}
+                    <li class="leaderboard-item">
+                      <span class="leaderboard-item__position">#{{position}}</span>
+                      <div class="leaderboard-item__content">
+                        <strong>🎨 {{stickerName}}</strong>
+                        <span>{{countLabel}} раз</span>
+                      </div>
+                    </li>
+                  {{/each}}
+                </ol>
+              {{/if}}
+            </div>
+          {{/if}}
+        </article>
+      </div>
+    {{/if}}
   {{/if}}
 
   <article class="panel-card" style="margin-top: 1rem;">
