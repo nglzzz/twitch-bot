@@ -1,3 +1,4 @@
+{{! ── Hero ── }}
 <section class="hero">
   <div class="hero__bg"></div>
   <div class="container hero__inner">
@@ -46,6 +47,9 @@
             {{/if}}
             {{#if (ne stream.uptimeLabel '—')}}
               <div><dt>⏱ Длительность</dt><dd>{{stream.uptimeLabel}}</dd></div>
+            {{/if}}
+            {{#if (ne stream.viewerCountLabel '—')}}
+              <div><dt>👁 Зрителей</dt><dd>{{stream.viewerCountLabel}}</dd></div>
             {{/if}}
           </dl>
         </div>
@@ -121,7 +125,29 @@
     {{#each profile.links}}
       <a class="social-card social-card--{{key}}" href="{{url}}" target="_blank" rel="noreferrer">
         <div class="social-card__top">
-          <span class="social-card__icon social-icon social-icon--{{key}}">{{label}}</span>
+          <span class="social-card__icon social-icon social-icon--{{key}}" aria-hidden="true">
+            {{#if (eq key 'twitch')}}
+              <img src="https://cdn.simpleicons.org/twitch/9146FF" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'boosty')}}
+              <img src="https://cdn.simpleicons.org/boosty/F15F2C" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'youtube')}}
+              <img src="https://cdn.simpleicons.org/youtube/FF0000" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'telegram')}}
+              <img src="https://cdn.simpleicons.org/telegram/26A5E4" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'discord')}}
+              <img src="https://cdn.simpleicons.org/discord/5865F2" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'tiktok')}}
+              <img src="https://cdn.simpleicons.org/tiktok/FFFFFF" alt="" loading="lazy" />
+            {{/if}}
+            {{#if (eq key 'donate')}}
+              <img src="/assets/img/donationalerts.svg" alt="" loading="lazy" />
+            {{/if}}
+          </span>
         </div>
         <strong>{{label}}</strong>
         <span>{{description}}</span>
@@ -131,11 +157,14 @@
 </section>
 
 {{! ── Community ── }}
-<section class="container section-block community-block">
+<section class="container section-block">
+  <div class="section-head">
+    <h2 class="section-title">💬 Комьюнити</h2>
+  </div>
   <div class="community-grid">
     <div class="panel">
       <div class="panel__head">
-        <h3>💬 Последние сообщения чата</h3>
+        <h3>Последние сообщения чата</h3>
       </div>
       {{#if chatStats.hasRecentMessages}}
         <ul class="msg-list">

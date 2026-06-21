@@ -1,3 +1,4 @@
+{{! ── Page intro ── }}
 <section class="container section-spacing stats-page-intro">
   <div class="section-heading">
     <div>
@@ -5,7 +6,7 @@
       <h1>Статистика канала {{profile.name}}</h1>
     </div>
     <button class="button button--ghost button--small" type="button" data-refresh-page>
-      Обновить страницу
+      ↻ Обновить
     </button>
   </div>
 
@@ -52,11 +53,11 @@
 {{! ── Tab navigation ── }}
 <section class="container section-spacing">
   <div class="stats-tabs" data-stats-tabs>
-    <button class="stats-tabs__btn{{#unless filters.chatter}} is-active{{/unless}}" data-tab="overview">Обзор</button>
-    <button class="stats-tabs__btn" data-tab="streams">Стримы</button>
-    <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">Чаттеры</button>
-    <button class="stats-tabs__btn" data-tab="memes">Мемы</button>
-    <button class="stats-tabs__btn" data-tab="viewers">Зрители</button>
+    <button class="stats-tabs__btn{{#unless filters.chatter}} is-active{{/unless}}" data-tab="overview">📊 Обзор</button>
+    <button class="stats-tabs__btn" data-tab="streams">🎬 Стримы</button>
+    <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">💬 Чаттеры</button>
+    <button class="stats-tabs__btn" data-tab="memes">🎨 Мемы</button>
+    <button class="stats-tabs__btn" data-tab="viewers">👁 Зрители</button>
   </div>
 </section>
 
@@ -64,37 +65,37 @@
 <section class="container section-spacing stats-tab-content{{#unless filters.chatter}} is-active{{/unless}}" data-tab-content="overview">
   <div class="stats-grid stats-grid--dense">
     <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">Всего стримов</span>
+      <span class="stat-card__label">🎬 Всего стримов</span>
       <strong class="stat-card__value">{{overallStats.totalStreamsLabel}}</strong>
       <p class="stat-card__description">Записанных стрим-сессий в базе.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Всего сообщений</span>
+      <span class="stat-card__label">💬 Всего сообщений</span>
       <strong class="stat-card__value">{{overallStats.totalMessagesLabel}}</strong>
       <p class="stat-card__description">Общий объём истории в коллекции chatLog.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Уникальных чаттеров</span>
+      <span class="stat-card__label">👥 Уникальных чаттеров</span>
       <strong class="stat-card__value">{{overallStats.totalUniqueChattersLabel}}</strong>
       <p class="stat-card__description">Пользователей, написавших хотя бы одно сообщение.</p>
     </article>
 
     <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">Всего мемов</span>
+      <span class="stat-card__label">🎨 Всего мемов</span>
       <strong class="stat-card__value">{{overallStats.totalMemesLabel}}</strong>
       <p class="stat-card__description">Отправлено стикеров через MemeAlerts.</p>
     </article>
 
     <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Пиковый онлайн за всё время</span>
+      <span class="stat-card__label">🔥 Пиковый онлайн за всё время</span>
       <strong class="stat-card__value">{{overallStats.peakViewersAllTimeLabel}}</strong>
       <p class="stat-card__description">Максимальное число зрителей на стриме.</p>
     </article>
 
     <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Средняя длительность стрима</span>
+      <span class="stat-card__label">⏱ Средняя длительность стрима</span>
       <strong class="stat-card__value">{{overallStats.avgStreamDuration}}</strong>
       <p class="stat-card__description">Среднее время эфира по завершённым стримам.</p>
     </article>
@@ -242,8 +243,8 @@
           </dl>
 
           {{! Activity charts }}
-          <div style="margin-top: 1.5rem;">
-            <div class="eyebrow" style="margin-bottom: 0.75rem;">Активность по часам</div>
+          <div class="chart-section">
+            <div class="eyebrow chart-section__title">Активность по часам</div>
             <div class="hourly-chart">
               {{#each chatterStats.hourlyBars}}
                 <div class="hourly-chart__bar" style="height: {{barHeight}}%;" title="{{count}} сообщ."></div>
@@ -254,8 +255,8 @@
             </div>
           </div>
 
-          <div style="margin-top: 1.25rem;">
-            <div class="eyebrow" style="margin-bottom: 0.75rem;">Активность по дням недели</div>
+          <div class="chart-section">
+            <div class="eyebrow chart-section__title">Активность по дням недели</div>
             <div class="daily-chart">
               {{#each chatterStats.dailyBars}}
                 <div class="daily-chart__item">
@@ -295,8 +296,8 @@
           {{/if}}
 
           {{#if chatterStats.memeStats}}
-            <div style="margin-top: 1.25rem;">
-              <div class="panel-card__header" style="margin-bottom: 0.75rem;">
+            <div class="meme-section">
+              <div class="panel-card__header">
                 <div>
                   <div class="eyebrow">Мемы</div>
                 </div>
@@ -318,7 +319,7 @@
               </dl>
 
               {{#if chatterStats.memeStats.hasTopMemes}}
-                <ol class="leaderboard-list" style="margin-top: 0.75rem;">
+                <ol class="leaderboard-list meme-section__list">
                   {{#each chatterStats.memeStats.topMemes}}
                     <li class="leaderboard-item">
                       <span class="leaderboard-item__position">#{{position}}</span>
@@ -337,7 +338,7 @@
     {{/if}}
   {{/if}}
 
-  <article class="panel-card" style="margin-top: 1rem;">
+  <article class="panel-card leaderboard-section">
     <div class="panel-card__header">
       <div>
         <div class="eyebrow">Таблица лидеров</div>
@@ -410,7 +411,7 @@
             <li class="leaderboard-item">
               <span class="leaderboard-item__position">#{{position}}</span>
               <div class="leaderboard-item__content">
-                <strong>{{stickerName}}</strong>
+                <strong>🎨 {{stickerName}}</strong>
                 <span>{{usageCountLabel}} раз · последний: {{lastUsedAtLabel}}</span>
               </div>
             </li>
@@ -423,7 +424,7 @@
   </div>
 
   {{#if memeStats.hasRecentMemes}}
-    <article class="panel-card" style="margin-top: 1rem;">
+    <article class="panel-card leaderboard-section">
       <div class="panel-card__header">
         <div>
           <div class="eyebrow">Последние мемы</div>
@@ -451,31 +452,31 @@
 <section class="container section-spacing stats-tab-content" data-tab-content="viewers">
   <div class="stats-grid stats-grid--dense">
     <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">Пиковый онлайн за 24 часа</span>
+      <span class="stat-card__label">🔥 Пиковый онлайн за 24 часа</span>
       <strong class="stat-card__value">{{viewerStats.peakViewerCount24hLabel}}</strong>
       <p class="stat-card__description">Максимальное число зрителей по сохранённым срезам.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Средний онлайн за 24 часа</span>
+      <span class="stat-card__label">📊 Средний онлайн за 24 часа</span>
       <strong class="stat-card__value">{{viewerStats.averageViewerCount24hLabel}}</strong>
       <p class="stat-card__description">Среднее значение по срезам viewer-лога.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">Уникальных зрителей за 24 часа</span>
+      <span class="stat-card__label">👥 Уникальных зрителей за 24 часа</span>
       <strong class="stat-card__value">{{viewerStats.uniqueViewers24hLabel}}</strong>
       <p class="stat-card__description">Считается по viewer-срезам.</p>
     </article>
 
     <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">Срезов сохранено</span>
+      <span class="stat-card__label">💾 Срезов сохранено</span>
       <strong class="stat-card__value">{{viewerStats.totalSnapshotsLabel}}</strong>
       <p class="stat-card__description">Сколько viewer snapshot документов накоплено.</p>
     </article>
   </div>
 
-  <article class="panel-card" style="margin-top: 1rem;">
+  <article class="panel-card leaderboard-section">
     <div class="panel-card__header">
       <div>
         <div class="eyebrow">Тренд аудитории</div>
