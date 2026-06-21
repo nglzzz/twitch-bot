@@ -136,6 +136,9 @@ function createHandler(isSoundOnly) {
       const result = await sendMeme(chosenMeme.id, isSoundOnly);
 
       if (result && result.result === 0) {
+        if (isSoundOnly) {
+          return '';
+        }
         return `${successPrefix}: ${chosenMeme.name}`;
       } else {
         throw new Error(`Unexpected MemeAlerts send result: ${JSON.stringify(result)}`);
