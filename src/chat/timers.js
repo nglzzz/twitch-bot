@@ -23,7 +23,14 @@ const copyPastTimer = setInterval(async () => {
     return;
   }
 
-  const isLive = await isChannelLive();
+  let isLive;
+  try {
+    isLive = await isChannelLive();
+  } catch (error) {
+    console.error('[Timers] Error checking stream status for copypast:', error.code || error.message);
+    return;
+  }
+
   if (!isLive) {
     console.log('Channel is not live');
     return;
@@ -45,8 +52,8 @@ const saveViewersTimer = setInterval(async () => {
       if (!isLive) {
         return;
       }
-    } catch (e) {
-      console.log(e);
+    } catch (error) {
+      console.error('[Timers] Error checking stream status for viewers:', error.code || error.message);
       return;
     }
 
@@ -65,8 +72,8 @@ const saveViewersTimer = setInterval(async () => {
     }
 
     viewerDb.save();
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    console.error('[Timers] Error in saveViewersTimer:', error.code || error.message);
   }
 }, 1000 * 60 * 5); // every 5 minutes
 

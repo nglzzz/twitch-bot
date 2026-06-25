@@ -37,7 +37,8 @@ async function fetchCatalogue(url, body, referer) {
   try {
     while (true) {
       const response = await axios.post(url, { ...body, limit, skip }, {
-        headers: getHeaders(referer)
+        headers: getHeaders(referer),
+        timeout: 15000
       });
 
       const items = Array.isArray(response.data) ? response.data : (response.data.data || []);
@@ -75,7 +76,8 @@ async function sendMeme(stickerId, isSoundOnly) {
       deviceType: 'desktop'
     },
     {
-      headers: getHeaders('https://memealerts.com/' + (config.CHANNEL || 'nglzzz'))
+      headers: getHeaders('https://memealerts.com/' + (config.CHANNEL || 'nglzzz')),
+      timeout: 15000
     }
   );
 

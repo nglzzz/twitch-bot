@@ -21,6 +21,54 @@ function isDbReady() {
   return db?.connection?.readyState === 1;
 }
 
+function isValidObjectId(id) {
+  return db?.Types?.ObjectId?.isValid(id) ?? false;
+}
+
+/**
+ * Resolve a raw stream filter value into a usable streamSessionId.
+ * - "latest" (case-insensitive) resolves to the most recent StreamSession._id
+ * - Valid ObjectId strings are returned as-is
+ * - Anything else returns null (no filter)
+ */
+async function resolveStreamSessionId(rawId) {
+  if (!rawId) {
+    return null;
+  }
+
+  const value = String(rawId).trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (value.toLowerCase() === 'latest') {
+    if (!isDbReady()) {
+      return null;
+    }
+
+    try {
+      const latest = await StreamSession
+        .findOne({})
+        .sort({ startedAt: -1 })
+        .select('_id')
+        .lean();
+
+      return latest ? latest._id : null;
+    } catch (error) {
+      console.error('Error resolving latest stream session:', error.message);
+      return null;
+    }
+  }
+
+  if (isValidObjectId(value)) {
+    return value;
+  }
+
+  console.warn(`Invalid streamSessionId ignored: "${value}"`);
+  return null;
+}
+
 function formatNumber(value) {
   if (value === null || value === undefined || value === '') {
     return '—';
@@ -1040,7 +1088,7 @@ async function buildHomePageData(hostname) {
 }
 
 async function buildStatsPageData(hostname, filters) {
-  const streamSessionId = filters?.streamId || null;
+  const streamSessionId = await resolveStreamSessionId(filters?.streamId);
   const chatterName = filters?.chatter || null;
 
   const [shared, streamSessions, memeStats, overallStats, chatterStats] = await Promise.all([
@@ -1093,7 +1141,7 @@ async function getSummaryApiData(hostname) {
 }
 
 async function getStatsApiData(hostname, filters) {
-  const streamSessionId = filters?.streamId || null;
+  const streamSessionId = await resolveStreamSessionId(filters?.streamId);
 
   const [shared, streamSessions, memeStats, overallStats] = await Promise.all([
     buildSharedSiteData(hostname),

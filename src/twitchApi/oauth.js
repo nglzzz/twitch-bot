@@ -29,8 +29,12 @@ const getOAuthToken = async (force = false) => {
     const responseData = response.data;
 
     latestToken = new oAuthModel(responseData.access_token, responseData.expires_in);
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    if (error.response) {
+      console.error('[OAuth] Error fetching token:', error.response.status, error.response.data || '');
+    } else {
+      console.error('[OAuth] Error fetching token:', error.code || error.message);
+    }
 
     const fileData = getTokenFromFile();
     if (fileData) {
@@ -49,8 +53,8 @@ function getTokenFromFile() {
 
   try {
     return fs.readFileSync(filePath, 'utf8').toString();
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    console.error('[OAuth] Error reading token file:', error.code || error.message);
     return null;
   }
 }

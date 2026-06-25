@@ -13,11 +13,11 @@ const getChannelViewers = async () => {
         'Authorization': `Bearer ${config.TWITCH_ACCESS_TOKEN}`,
       },
     });
-  } catch (e) {
-    if (e.response) {
-      console.log(e.response.data);
+  } catch (error) {
+    if (error.response) {
+      console.error('[TwitchAPI] Error fetching viewers:', error.response.status, error.response.data || '');
     } else {
-      console.log(e);
+      console.error('[TwitchAPI] Error fetching viewers:', error.code || error.message);
     }
     return [];
   }

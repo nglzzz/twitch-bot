@@ -155,7 +155,10 @@ function handleRedemption(event) {
   const rewardId = event.reward.id;
   const handler = REWARD_HANDLERS[rewardId];
 
-  if (!handler) return;
+  if (!handler) {
+    console.warn(`[EventSub] Ignored redemption for reward "${event.reward.title}" (ID: ${rewardId}): no handler registered`);
+    return Promise.resolve();
+  }
 
   const userName = event.user_name;
   const redemptionId = event.id;
@@ -163,7 +166,7 @@ function handleRedemption(event) {
 
   console.log(`[EventSub] Reward redeemed: "${event.reward.title}" by ${userName}`);
 
-  handler()
+  return handler()
     .then(async resultMessage => {
       // Handler succeeded — mark redemption as FULFILLED
       try {
