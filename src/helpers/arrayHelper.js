@@ -23,11 +23,14 @@ const getBotList = () => {
     'wizebot',
     'jeetbot',
     'twirapp',
+    'boombai_bot',
+    'ratecommunity',
   ];
 }
 
 const removeBotsFromList = (list) => {
-  return removeItemsFromArray(list, getBotList());
+  const bots = getBotList().map(b => b.toLowerCase());
+  return list.filter((item) => !bots.includes(item.toLowerCase()));
 }
 
 module.exports = {
