@@ -14,6 +14,14 @@ let sessionId = null;
 let reconnectUrl = null;
 let reconnecting = false;
 
+// Keepalive watchdog — Twitch sends keepalive every ~10 seconds.
+// If no message arrives within this timeout the connection is
+// considered dead and we force a reconnect.
+const KEEPALIVE_TIMEOUT_MS = 30000;
+const RECONNECT_DELAY_MS = 5000;
+let keepaliveTimer = null;
+let reconnectTimer = null;
+
 /**
  * Register a reward handler for a specific reward ID
  * @param {string} rewardId - Twitch Custom Reward ID
@@ -82,6 +90,62 @@ async function subscribeAll() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Keepalive watchdog & timer helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Reset the keepalive watchdog timer.
+ * Called on every incoming message (keepalive, notification, etc.).
+ * If the timer fires it means no message was received within the timeout
+ * period, so the connection is likely silently dead.
+ */
+function resetKeepaliveTimer() {
+  if (keepaliveTimer) {
+    clearTimeout(keepaliveTimer);
+  }
+  keepaliveTimer = setTimeout(() => {
+    console.warn(`[EventSub] No message received within ${KEEPALIVE_TIMEOUT_MS}ms — connection appears dead, forcing reconnect`);
+    // terminate() triggers the 'close' event which handles reconnection
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.terminate();
+    } else {
+      // Connection not open — reconnect directly
+      reconnecting = false;
+      reconnectUrl = null;
+      scheduleReconnect();
+    }
+  }, KEEPALIVE_TIMEOUT_MS);
+}
+
+/**
+ * Clear the keepalive watchdog timer
+ */
+function clearKeepaliveTimer() {
+  if (keepaliveTimer) {
+    clearTimeout(keepaliveTimer);
+    keepaliveTimer = null;
+  }
+}
+
+/**
+ * Schedule a reconnection attempt after RECONNECT_DELAY_MS.
+ * Safe to call multiple times — only one timer is active.
+ */
+function scheduleReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+  }
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, RECONNECT_DELAY_MS);
+}
+
+// ---------------------------------------------------------------------------
+// Message handling
+// ---------------------------------------------------------------------------
+
 /**
  * Handle incoming EventSub messages
  */
@@ -89,6 +153,9 @@ function handleMessage(data) {
   const { metadata, payload } = data;
 
   if (!metadata || !payload) return;
+
+  // Every message resets the keepalive watchdog
+  resetKeepaliveTimer();
 
   switch (metadata.message_type) {
     case 'session_welcome': {
@@ -99,7 +166,7 @@ function handleMessage(data) {
     }
 
     case 'session_keepalive': {
-      // keepalive, nothing to do
+      // Keepalive — watchdog already reset above
       break;
     }
 
@@ -131,8 +198,6 @@ function handleMessage(data) {
  */
 function handleNotification(payload) {
   const { subscription, event } = payload;
-  console.log('handle notification: ');
-  console.log(payload);
 
   if (!subscription || !event) return;
 
@@ -203,6 +268,10 @@ function handleRedemption(event) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Connection management
+// ---------------------------------------------------------------------------
+
 /**
  * Handle reconnect — connect to new URL before old connection closes
  */
@@ -239,15 +308,23 @@ function connect(url) {
 function _doConnect(url) {
   url = url || EVENTSUB_URL;
 
+  // Clean up any existing connection
   if (ws) {
     try {
       ws.removeAllListeners();
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.terminate();
       }
     } catch (e) {
       // ignore
     }
+  }
+
+  // Clear stale timers from previous connection
+  clearKeepaliveTimer();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
 
   console.log('[EventSub] Connecting to', url);
@@ -257,6 +334,8 @@ function _doConnect(url) {
   ws.on('open', () => {
     console.log('[EventSub] WebSocket connected');
     reconnecting = false;
+    reconnectUrl = null;
+    resetKeepaliveTimer();
   });
 
   ws.on('message', (raw) => {
@@ -268,14 +347,30 @@ function _doConnect(url) {
     }
   });
 
+  // Twitch sends WebSocket-level ping frames; treat them as keepalive
+  ws.on('ping', () => {
+    resetKeepaliveTimer();
+  });
+
+  ws.on('pong', () => {
+    resetKeepaliveTimer();
+  });
+
   ws.on('close', (code, reason) => {
     console.log(`[EventSub] WebSocket closed: ${code} ${reason}`);
+    clearKeepaliveTimer();
     sessionId = null;
 
-    // reconnect after delay unless reconnecting via session_reconnect
-    if (!reconnecting) {
-      setTimeout(() => connect(), 5000);
-    }
+    // Always schedule a reconnect on close.
+    //
+    // The reconnecting flag is only set during a session_reconnect flow to
+    // prevent handleReconnect() from spawning duplicate connections. Even if
+    // a session_reconnect's new connection fails, we must still reconnect to
+    // the main EventSub URL.
+    reconnecting = false;
+    reconnectUrl = null;
+
+    scheduleReconnect();
   });
 
   ws.on('error', (error) => {
