@@ -152,16 +152,29 @@ function scheduleReconnect() {
 function handleMessage(data) {
   const { metadata, payload } = data;
 
-  if (!metadata || !payload) return;
+  if (!metadata) return;
 
-  // Every message resets the keepalive watchdog
+  // Every message resets the keepalive watchdog — must happen before any
+  // early return so the watchdog always tracks connection liveness
   resetKeepaliveTimer();
+
+  if (!payload) return;
 
   switch (metadata.message_type) {
     case 'session_welcome': {
       sessionId = payload.session.id;
       console.log('[EventSub] Session established, ID:', sessionId);
-      subscribeAll();
+
+      // During a Twitch-initiated session_reconnect, subscriptions are
+      // automatically migrated to the new connection — do NOT re-subscribe.
+      // Only subscribe on a fresh (non-reconnect) connection.
+      if (reconnecting) {
+        console.log('[EventSub] Reconnect complete — subscriptions migrated automatically');
+        reconnecting = false;
+        reconnectUrl = null;
+      } else {
+        subscribeAll();
+      }
       break;
     }
 
@@ -333,9 +346,9 @@ function _doConnect(url) {
 
   ws.on('open', () => {
     console.log('[EventSub] WebSocket connected');
-    reconnecting = false;
-    reconnectUrl = null;
     resetKeepaliveTimer();
+    // Note: reconnecting flag is reset in session_welcome handler,
+    // not here — we need it to distinguish reconnect from fresh connect.
   });
 
   ws.on('message', (raw) => {
