@@ -9,18 +9,41 @@ const SUBSCRIBE_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
 
 const REWARD_HANDLERS = {};
 
+// Active WebSocket connection — the one currently eligible to receive
+// notifications and whose session_id is used for subscriptions.
 let ws = null;
+
+// Pending Twitch reconnect socket.  Created in response to a
+// session_reconnect message.  Promoted to ``ws`` once its
+// session_welcome is received, at which point the old connection is
+// closed.  This two-socket approach is required because Twitch only
+// migrates subscriptions while the old connection is still alive.
+let reconnectSocket = null;
+
 let sessionId = null;
 let reconnectUrl = null;
-let reconnecting = false;
+
+// Set to true when the active connection dies while a Twitch reconnect
+// socket is pending.  If the old connection closes before the new
+// session_welcome arrives, Twitch may NOT have migrated subscriptions —
+// so we must explicitly re-subscribe rather than assuming migration.
+let activeSocketClosedDuringReconnect = false;
 
 // Keepalive watchdog — Twitch sends keepalive every ~10 seconds.
 // If no message arrives within this timeout the connection is
 // considered dead and we force a reconnect.
 const KEEPALIVE_TIMEOUT_MS = 30000;
 const RECONNECT_DELAY_MS = 5000;
+// Max time to wait for session_welcome on a Twitch reconnect socket.
+// If it doesn't arrive, abandon the reconnect and do a fresh connect.
+const TWITCH_RECONNECT_TIMEOUT_MS = 15000;
 let keepaliveTimer = null;
 let reconnectTimer = null;
+let reconnectTimeoutTimer = null;
+
+// ---------------------------------------------------------------------------
+// Reward handler registry
+// ---------------------------------------------------------------------------
 
 /**
  * Register a reward handler for a specific reward ID
@@ -31,6 +54,10 @@ function registerReward(rewardId, handler) {
   REWARD_HANDLERS[rewardId] = handler;
   console.log(`[EventSub] Registered reward handler for: ${rewardId}`);
 }
+
+// ---------------------------------------------------------------------------
+// Subscription helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Subscribe to a Twitch EventSub event type
@@ -49,7 +76,7 @@ async function subscribe(type, version, condition) {
   }
 
   try {
-    await axios.post(SUBSCRIBE_URL, {
+    const response = await axios.post(SUBSCRIBE_URL, {
       type,
       version,
       condition,
@@ -64,7 +91,8 @@ async function subscribe(type, version, condition) {
         'Content-Type': 'application/json'
       }
     });
-    console.log(`[EventSub] Subscribed to ${type}`);
+    const sub = response.data && response.data.data && response.data.data[0];
+    console.log(`[EventSub] Subscribed to ${type}: id=${sub ? sub.id : '?'}, status=${sub ? sub.status : '?'}`);
   } catch (error) {
     if (error.response) {
       console.error(`[EventSub] Subscription failed for ${type}:`, error.response.status, JSON.stringify(error.response.data));
@@ -106,12 +134,17 @@ function resetKeepaliveTimer() {
   }
   keepaliveTimer = setTimeout(() => {
     console.warn(`[EventSub] No message received within ${KEEPALIVE_TIMEOUT_MS}ms — connection appears dead, forcing reconnect`);
-    // terminate() triggers the 'close' event which handles reconnection
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      // terminate() triggers the 'close' event which handles reconnection
       ws.terminate();
+    } else if (reconnectSocket && (reconnectSocket.readyState === WebSocket.OPEN || reconnectSocket.readyState === WebSocket.CONNECTING)) {
+      // Active connection already gone but reconnect socket is stuck
+      console.warn('[EventSub] Reconnect socket appears stuck — terminating');
+      reconnectSocket.terminate();
     } else {
-      // Connection not open — reconnect directly
-      reconnecting = false;
+      // No active connection — clean up and reconnect directly
+      _closeSocket(reconnectSocket);
+      reconnectSocket = null;
       reconnectUrl = null;
       scheduleReconnect();
     }
@@ -142,14 +175,48 @@ function scheduleReconnect() {
   }, RECONNECT_DELAY_MS);
 }
 
+/**
+ * Start a timeout for the Twitch reconnect socket to receive
+ * session_welcome.  If it doesn't arrive in time, abandon the reconnect
+ * attempt and perform a fresh connect to re-establish subscriptions.
+ */
+function _startReconnectTimeout() {
+  _clearReconnectTimeout();
+  reconnectTimeoutTimer = setTimeout(() => {
+    reconnectTimeoutTimer = null;
+    console.warn(`[EventSub] Twitch reconnect did not complete within ${TWITCH_RECONNECT_TIMEOUT_MS}ms — abandoning, doing fresh connect`);
+    activeSocketClosedDuringReconnect = true;
+    // Terminate the reconnect socket (its close handler will deal with cleanup)
+    if (reconnectSocket) {
+      const stuck = reconnectSocket;
+      reconnectSocket = null;
+      _closeSocket(stuck);
+    }
+    // Force a fresh connect
+    connect();
+  }, TWITCH_RECONNECT_TIMEOUT_MS);
+}
+
+/**
+ * Clear the Twitch reconnect timeout timer.
+ */
+function _clearReconnectTimeout() {
+  if (reconnectTimeoutTimer) {
+    clearTimeout(reconnectTimeoutTimer);
+    reconnectTimeoutTimer = null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Message handling
 // ---------------------------------------------------------------------------
 
 /**
- * Handle incoming EventSub messages
+ * Handle incoming EventSub messages.
+ * @param {WebSocket} socket - the socket this message arrived on
+ * @param {object} data - parsed JSON message
  */
-function handleMessage(data) {
+function handleMessage(socket, data) {
   const { metadata, payload } = data;
 
   if (!metadata) return;
@@ -162,19 +229,7 @@ function handleMessage(data) {
 
   switch (metadata.message_type) {
     case 'session_welcome': {
-      sessionId = payload.session.id;
-      console.log('[EventSub] Session established, ID:', sessionId);
-
-      // During a Twitch-initiated session_reconnect, subscriptions are
-      // automatically migrated to the new connection — do NOT re-subscribe.
-      // Only subscribe on a fresh (non-reconnect) connection.
-      if (reconnecting) {
-        console.log('[EventSub] Reconnect complete — subscriptions migrated automatically');
-        reconnecting = false;
-        reconnectUrl = null;
-      } else {
-        subscribeAll();
-      }
+      handleSessionWelcome(socket, payload);
       break;
     }
 
@@ -189,20 +244,130 @@ function handleMessage(data) {
     }
 
     case 'session_reconnect': {
-      reconnectUrl = payload.session.reconnect_url;
-      console.log('[EventSub] Reconnect requested, new URL:', reconnectUrl);
-      handleReconnect();
+      handleSessionReconnect(payload);
       break;
     }
 
     case 'revocation': {
-      console.warn('[EventSub] Subscription revoked:', JSON.stringify(payload));
+      handleRevocation(payload);
       break;
     }
 
     default: {
       console.log('[EventSub] Unknown message type:', metadata.message_type);
     }
+  }
+}
+
+/**
+ * Handle session_welcome — either a fresh connection or a Twitch
+ * reconnect migration.
+ */
+function handleSessionWelcome(socket, payload) {
+  // Guard against stale session_welcome from a socket that is no longer
+  // the one we're tracking (e.g. after _doFreshConnect replaced it).
+  if (socket._isTwitchReconnect && socket !== reconnectSocket) {
+    console.warn('[EventSub] Ignoring session_welcome from stale reconnect socket');
+    return;
+  }
+  if (!socket._isTwitchReconnect && socket !== ws) {
+    console.warn('[EventSub] Ignoring session_welcome from stale fresh socket');
+    return;
+  }
+
+  sessionId = payload.session && payload.session.id;
+  socket._welcomeReceived = true;
+
+  // Reconnect timeout no longer needed — welcome arrived
+  _clearReconnectTimeout();
+
+  if (socket._isTwitchReconnect) {
+    if (activeSocketClosedDuringReconnect) {
+      // The old active connection died before this welcome arrived,
+      // so Twitch may NOT have migrated subscriptions.  Treat this as
+      // a fresh session and explicitly re-subscribe.
+      console.warn('[EventSub] Reconnect session established, ID:', sessionId, '— but old connection was already closed, re-subscribing explicitly');
+      activeSocketClosedDuringReconnect = false;
+      ws = socket;
+      reconnectSocket = null;
+      reconnectUrl = null;
+      resetKeepaliveTimer();
+      subscribeAll();
+    } else {
+      // Normal Twitch reconnect: subscriptions migrated automatically.
+      console.log('[EventSub] Reconnect session established, ID:', sessionId, '— subscriptions migrated automatically');
+
+      // Close the old active connection (listeners already removed by
+      // _closeSocket so its close handler will not fire).
+      if (ws && ws !== socket) {
+        _closeSocket(ws);
+      }
+
+      // Promote reconnect socket to active
+      ws = socket;
+      reconnectSocket = null;
+      reconnectUrl = null;
+      resetKeepaliveTimer();
+    }
+  } else {
+    // Fresh connection — subscribe to all needed events
+    console.log('[EventSub] Fresh session established, ID:', sessionId);
+    activeSocketClosedDuringReconnect = false;
+    ws = socket;
+    subscribeAll();
+  }
+}
+
+/**
+ * Handle Twitch session_reconnect — open a new WebSocket to the
+ * reconnect URL WITHOUT closing the current connection.
+ */
+function handleSessionReconnect(payload) {
+  const newUrl = payload.session && payload.session.reconnect_url;
+  console.log('[EventSub] Twitch reconnect requested, new URL:', newUrl);
+
+  if (reconnectSocket) {
+    console.warn('[EventSub] Reconnect already in progress — ignoring new request');
+    return;
+  }
+
+  if (!newUrl) {
+    console.warn('[EventSub] No reconnect URL provided — will rely on keepalive watchdog');
+    return;
+  }
+
+  reconnectUrl = newUrl;
+
+  // Create the reconnect socket — the old ``ws`` stays alive until
+  // session_welcome is received on the new socket (see handleSessionWelcome).
+  reconnectSocket = _createSocket(reconnectUrl, { isTwitchReconnect: true });
+
+  // Start a safety timeout — if session_welcome doesn't arrive in time,
+  // we abandon the reconnect and do a fresh connect to re-subscribe.
+  _startReconnectTimeout();
+}
+
+/**
+ * Handle revocation — Twitch has revoked one of our subscriptions.
+ * Force a fresh reconnect to re-establish all subscriptions.
+ */
+function handleRevocation(payload) {
+  console.warn('[EventSub] Subscription revoked:', JSON.stringify(payload));
+
+  // Clean up any pending reconnect
+  _clearReconnectTimeout();
+  reconnectUrl = null;
+  _closeSocket(reconnectSocket);
+  reconnectSocket = null;
+
+  // Force close the active connection to trigger a fresh reconnect
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    ws.terminate();
+  } else {
+    ws = null;
+    sessionId = null;
+    clearKeepaliveTimer();
+    scheduleReconnect();
   }
 }
 
@@ -230,19 +395,25 @@ function handleNotification(payload) {
  * Handle channel points redemption event
  */
 function handleRedemption(event) {
-  const rewardId = event.reward.id;
-  const handler = REWARD_HANDLERS[rewardId];
+  const rewardId = event.reward ? event.reward.id : undefined;
+  const handler = rewardId ? REWARD_HANDLERS[rewardId] : null;
 
   if (!handler) {
-    console.warn(`[EventSub] Ignored redemption for reward "${event.reward.title}" (ID: ${rewardId}): no handler registered`);
+    const registeredIds = Object.keys(REWARD_HANDLERS);
+    const rewardTitle = event.reward ? event.reward.title : '?';
+    console.warn(
+      `[EventSub] Ignored redemption for reward "${rewardTitle}" (ID: ${rewardId}): no handler registered. ` +
+      `Registered IDs: [${registeredIds.join(', ')}]`
+    );
     return Promise.resolve();
   }
 
   const userName = event.user_name;
   const redemptionId = event.id;
   const broadcasterId = config.BROADCASTER_ID;
+  const rewardTitle = event.reward ? event.reward.title : '?';
 
-  console.log(`[EventSub] Reward redeemed: "${event.reward.title}" by ${userName}`);
+  console.log(`[EventSub] Reward redeemed: "${rewardTitle}" by ${userName}`);
 
   return handler()
     .then(async resultMessage => {
@@ -265,7 +436,7 @@ function handleRedemption(event) {
     })
     .catch(async error => {
       // Handler failed — cancel redemption to refund channel points
-      console.error(`[EventSub] Reward handler failed for "${event.reward.title}" by ${userName}:`, error.message);
+      console.error(`[EventSub] Reward handler failed for "${rewardTitle}" by ${userName}:`, error.message);
 
       try {
         await updateRedemptionStatus({
@@ -286,17 +457,134 @@ function handleRedemption(event) {
 // ---------------------------------------------------------------------------
 
 /**
- * Handle reconnect — connect to new URL before old connection closes
+ * Silently close a WebSocket — remove all listeners first so that the
+ * 'close' event does not trigger reconnect logic.
  */
-function handleReconnect() {
-  if (reconnecting) return;
-  reconnecting = true;
-
-  connect(reconnectUrl);
+function _closeSocket(socket) {
+  if (!socket) return;
+  try {
+    socket.removeAllListeners();
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.terminate();
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 /**
- * Connect to EventSub WebSocket
+ * Create a new WebSocket connection and attach all event handlers.
+ *
+ * @param {string} url - WebSocket URL to connect to
+ * @param {object} [options]
+ * @param {boolean} [options.isTwitchReconnect=false] - if true, this is a
+ *        Twitch-initiated reconnect socket; subscriptions will be migrated
+ *        and subscribeAll() should NOT be called on session_welcome.
+ * @returns {WebSocket}
+ */
+function _createSocket(url, options) {
+  options = options || {};
+  const isTwitchReconnect = options.isTwitchReconnect === true;
+
+  console.log('[EventSub] Connecting to', url, isTwitchReconnect ? '(Twitch reconnect)' : '(fresh)');
+
+  const socket = new WebSocket(url);
+  socket._isTwitchReconnect = isTwitchReconnect;
+  socket._welcomeReceived = false;
+
+  socket.on('open', () => {
+    console.log('[EventSub] WebSocket connected', isTwitchReconnect ? '(reconnect socket)' : '');
+    resetKeepaliveTimer();
+  });
+
+  socket.on('message', (raw) => {
+    try {
+      const data = JSON.parse(raw.toString());
+      handleMessage(socket, data);
+    } catch (e) {
+      console.error('[EventSub] Failed to parse message:', e.message);
+    }
+  });
+
+  // Twitch sends WebSocket-level ping frames; treat them as keepalive
+  socket.on('ping', () => {
+    resetKeepaliveTimer();
+  });
+
+  socket.on('pong', () => {
+    resetKeepaliveTimer();
+  });
+
+  socket.on('close', (code, reason) => {
+    const reasonStr = reason ? reason.toString() : '';
+    console.log(`[EventSub] WebSocket closed: ${code} ${reasonStr}`.trim());
+
+    // ------------------------------------------------------------------
+    // Case 1: the pending reconnect socket closed
+    // ------------------------------------------------------------------
+    if (socket === reconnectSocket) {
+      reconnectSocket = null;
+      _clearReconnectTimeout();
+
+      if (!socket._welcomeReceived) {
+        console.warn('[EventSub] Reconnect socket closed before session_welcome');
+        // If the active connection is also dead, we need a fresh reconnect
+        if (!ws) {
+          reconnectUrl = null;
+          clearKeepaliveTimer();
+          scheduleReconnect();
+        }
+      }
+      // If welcome was received, the socket was already promoted to ws and
+      // reconnectSocket was cleared — this close is from the old reference.
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // Case 2: the active connection closed
+    // ------------------------------------------------------------------
+    if (socket === ws) {
+      ws = null;
+      sessionId = null;
+      clearKeepaliveTimer();
+
+      // If a Twitch reconnect is in progress, wait for it rather than
+      // starting a competing fresh connection.
+      if (reconnectSocket) {
+        console.log('[EventSub] Active connection closed but Twitch reconnect in progress — waiting for reconnect socket');
+        // Mark that the old connection died before welcome arrived —
+        // if the new socket's welcome comes, we must re-subscribe explicitly.
+        activeSocketClosedDuringReconnect = true;
+        return;
+      }
+
+      reconnectUrl = null;
+      scheduleReconnect();
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // Case 3: old or unknown socket — ignore
+    // ------------------------------------------------------------------
+    // This happens when the old connection (replaced during a successful
+    // reconnect) finally closes after we already removed its listeners.
+    console.log('[EventSub] Close event from non-active socket — ignoring');
+  });
+
+  socket.on('error', (error) => {
+    console.error('[EventSub] WebSocket error:', error.message);
+  });
+
+  // Start the keepalive watchdog immediately so that a socket stuck in
+  // CONNECTING will eventually be cleaned up.
+  resetKeepaliveTimer();
+
+  return socket;
+}
+
+/**
+ * Connect to EventSub WebSocket (fresh connection).
+ * After session_welcome, subscribeAll() will be called automatically.
  */
 function connect(url) {
   if (!config.TWITCH_ACCESS_TOKEN) {
@@ -312,83 +600,34 @@ function connect(url) {
     return;
   }
 
-  _doConnect(url);
+  _doFreshConnect(url);
 }
 
 /**
- * Internal connect implementation
+ * Internal: perform a fresh connection, cleaning up any existing sockets.
  */
-function _doConnect(url) {
+function _doFreshConnect(url) {
   url = url || EVENTSUB_URL;
 
-  // Clean up any existing connection
-  if (ws) {
-    try {
-      ws.removeAllListeners();
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.terminate();
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
+  // Clean up ALL existing connections (active + pending reconnect)
+  _closeSocket(ws);
+  _closeSocket(reconnectSocket);
+  ws = null;
+  reconnectSocket = null;
+  reconnectUrl = null;
 
   // Clear stale timers from previous connection
   clearKeepaliveTimer();
+  _clearReconnectTimeout();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
 
-  console.log('[EventSub] Connecting to', url);
+  // Reset reconnect state
+  activeSocketClosedDuringReconnect = false;
 
-  ws = new WebSocket(url);
-
-  ws.on('open', () => {
-    console.log('[EventSub] WebSocket connected');
-    resetKeepaliveTimer();
-    // Note: reconnecting flag is reset in session_welcome handler,
-    // not here — we need it to distinguish reconnect from fresh connect.
-  });
-
-  ws.on('message', (raw) => {
-    try {
-      const data = JSON.parse(raw.toString());
-      handleMessage(data);
-    } catch (e) {
-      console.error('[EventSub] Failed to parse message:', e.message);
-    }
-  });
-
-  // Twitch sends WebSocket-level ping frames; treat them as keepalive
-  ws.on('ping', () => {
-    resetKeepaliveTimer();
-  });
-
-  ws.on('pong', () => {
-    resetKeepaliveTimer();
-  });
-
-  ws.on('close', (code, reason) => {
-    console.log(`[EventSub] WebSocket closed: ${code} ${reason}`);
-    clearKeepaliveTimer();
-    sessionId = null;
-
-    // Always schedule a reconnect on close.
-    //
-    // The reconnecting flag is only set during a session_reconnect flow to
-    // prevent handleReconnect() from spawning duplicate connections. Even if
-    // a session_reconnect's new connection fails, we must still reconnect to
-    // the main EventSub URL.
-    reconnecting = false;
-    reconnectUrl = null;
-
-    scheduleReconnect();
-  });
-
-  ws.on('error', (error) => {
-    console.error('[EventSub] WebSocket error:', error.message);
-  });
+  ws = _createSocket(url, { isTwitchReconnect: false });
 }
 
 module.exports = { registerReward, connect };
