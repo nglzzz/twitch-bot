@@ -63,43 +63,112 @@
 
 {{! ── Tab: Overview ── }}
 <section class="container section-spacing stats-tab-content{{#unless filters.chatter}} is-active{{/unless}}" data-tab-content="overview">
-  <div class="stats-grid stats-grid--dense">
-    <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">🎬 Всего стримов</span>
-      <strong class="stat-card__value">{{overallStats.totalStreamsLabel}}</strong>
-      <p class="stat-card__description">Записанных стрим-сессий в базе.</p>
+  {{#if streamOverview}}
+    <article class="panel-card stream-overview">
+      <div class="panel-card__header">
+        <div>
+          <div class="eyebrow">Статистика стрима</div>
+          <h2>{{streamOverview.title}}</h2>
+        </div>
+        {{#eq streamOverview.status 'live'}}
+          <span class="status-badge status-badge--live">Live</span>
+        {{else}}
+          <span class="status-badge status-badge--ended">Завершён</span>
+        {{/eq}}
+      </div>
+
+      <dl class="detail-list stream-overview__meta">
+        <div>
+          <dt>Категория</dt>
+          <dd>{{streamOverview.gameName}}</dd>
+        </div>
+        <div>
+          <dt>Период эфира</dt>
+          <dd>{{streamOverview.periodLabel}}</dd>
+        </div>
+        <div>
+          <dt>Длительность</dt>
+          <dd>{{streamOverview.durationLabel}}</dd>
+        </div>
+      </dl>
     </article>
 
-    <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">💬 Всего сообщений</span>
-      <strong class="stat-card__value">{{overallStats.totalMessagesLabel}}</strong>
-      <p class="stat-card__description">Общий объём истории в коллекции chatLog.</p>
-    </article>
+    <div class="stats-grid stats-grid--dense">
+      <article class="stat-card stat-card--secondary">
+        <span class="stat-card__label">💬 Сообщений</span>
+        <strong class="stat-card__value">{{streamOverview.messagesCountLabel}}</strong>
+        <p class="stat-card__description">Сообщений, записанных за этот стрим.</p>
+      </article>
 
-    <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">👥 Уникальных чаттеров</span>
-      <strong class="stat-card__value">{{overallStats.totalUniqueChattersLabel}}</strong>
-      <p class="stat-card__description">Пользователей, написавших хотя бы одно сообщение.</p>
-    </article>
+      <article class="stat-card stat-card--secondary">
+        <span class="stat-card__label">👥 Уникальных чаттеров</span>
+        <strong class="stat-card__value">{{streamOverview.uniqueChattersLabel}}</strong>
+        <p class="stat-card__description">Пользователей, написавших в чат на этом стриме.</p>
+      </article>
 
-    <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">🎨 Всего мемов</span>
-      <strong class="stat-card__value">{{overallStats.totalMemesLabel}}</strong>
-      <p class="stat-card__description">Отправлено стикеров через MemeAlerts.</p>
-    </article>
+      <article class="stat-card stat-card--primary">
+        <span class="stat-card__label">🎨 Мемов</span>
+        <strong class="stat-card__value">{{streamOverview.memesCountLabel}}</strong>
+        <p class="stat-card__description">Стикеров MemeAlerts на этом стриме.</p>
+      </article>
 
-    <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">🔥 Пиковый онлайн за всё время</span>
-      <strong class="stat-card__value">{{overallStats.peakViewersAllTimeLabel}}</strong>
-      <p class="stat-card__description">Максимальное число зрителей на стриме.</p>
-    </article>
+      <article class="stat-card stat-card--neutral">
+        <span class="stat-card__label">🔥 Пиковый онлайн</span>
+        <strong class="stat-card__value">{{streamOverview.maxViewersLabel}}</strong>
+        <p class="stat-card__description">Максимум зрителей на этом стриме.</p>
+      </article>
 
-    <article class="stat-card stat-card--neutral">
-      <span class="stat-card__label">⏱ Средняя длительность стрима</span>
-      <strong class="stat-card__value">{{overallStats.avgStreamDuration}}</strong>
-      <p class="stat-card__description">Среднее время эфира по завершённым стримам.</p>
-    </article>
-  </div>
+      <article class="stat-card stat-card--neutral">
+        <span class="stat-card__label">📊 Средний онлайн</span>
+        <strong class="stat-card__value">{{streamOverview.avgViewersLabel}}</strong>
+        <p class="stat-card__description">Среднее по viewer-срезам этого стрима.</p>
+      </article>
+
+      <article class="stat-card stat-card--neutral">
+        <span class="stat-card__label">👁 Уникальных зрителей</span>
+        <strong class="stat-card__value">{{streamOverview.uniqueViewersLabel}}</strong>
+        <p class="stat-card__description">Зрителей, отмеченных в viewer-срезах стрима.</p>
+      </article>
+    </div>
+  {{else}}
+    <div class="stats-grid stats-grid--dense">
+      <article class="stat-card stat-card--primary">
+        <span class="stat-card__label">🎬 Всего стримов</span>
+        <strong class="stat-card__value">{{overallStats.totalStreamsLabel}}</strong>
+        <p class="stat-card__description">Записанных стрим-сессий в базе.</p>
+      </article>
+
+      <article class="stat-card stat-card--secondary">
+        <span class="stat-card__label">💬 Всего сообщений</span>
+        <strong class="stat-card__value">{{overallStats.totalMessagesLabel}}</strong>
+        <p class="stat-card__description">Общий объём истории в коллекции chatLog.</p>
+      </article>
+
+      <article class="stat-card stat-card--secondary">
+        <span class="stat-card__label">👥 Уникальных чаттеров</span>
+        <strong class="stat-card__value">{{overallStats.totalUniqueChattersLabel}}</strong>
+        <p class="stat-card__description">Пользователей, написавших хотя бы одно сообщение.</p>
+      </article>
+
+      <article class="stat-card stat-card--primary">
+        <span class="stat-card__label">🎨 Всего мемов</span>
+        <strong class="stat-card__value">{{overallStats.totalMemesLabel}}</strong>
+        <p class="stat-card__description">Отправлено стикеров через MemeAlerts.</p>
+      </article>
+
+      <article class="stat-card stat-card--neutral">
+        <span class="stat-card__label">🔥 Пиковый онлайн за всё время</span>
+        <strong class="stat-card__value">{{overallStats.peakViewersAllTimeLabel}}</strong>
+        <p class="stat-card__description">Максимальное число зрителей на стриме.</p>
+      </article>
+
+      <article class="stat-card stat-card--neutral">
+        <span class="stat-card__label">⏱ Средняя длительность стрима</span>
+        <strong class="stat-card__value">{{overallStats.avgStreamDuration}}</strong>
+        <p class="stat-card__description">Среднее время эфира по завершённым стримам.</p>
+      </article>
+    </div>
+  {{/if}}
 </section>
 
 {{! ── Tab: Streams ── }}

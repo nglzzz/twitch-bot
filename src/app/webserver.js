@@ -12,14 +12,23 @@ const host = '0.0.0.0';
 app.engine('handlebars', handlebars({
   defaultLayout: 'main',
   helpers: {
-    eq: function (a, b) {
-      return a === b;
+    eq: function (a, b, options) {
+      const result = a === b;
+      return options && typeof options.fn === 'function'
+        ? (result ? options.fn(this) : options.inverse(this))
+        : result;
     },
-    ne: function (a, b) {
-      return a !== b;
+    ne: function (a, b, options) {
+      const result = a !== b;
+      return options && typeof options.fn === 'function'
+        ? (result ? options.fn(this) : options.inverse(this))
+        : result;
     },
-    lt: function (a, b) {
-      return a < b;
+    lt: function (a, b, options) {
+      const result = a < b;
+      return options && typeof options.fn === 'function'
+        ? (result ? options.fn(this) : options.inverse(this))
+        : result;
     },
     or: function () {
       return Array.prototype.slice.call(arguments, 0, -1).some(Boolean);

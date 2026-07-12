@@ -448,6 +448,17 @@ async function loadChatStats(streamSessionId) {
     const since = new Date(Date.now() - DAY_IN_MS);
     const streamFilter = streamSessionId ? { streamSessionId } : {};
 
+    // Топ чаттеров считаем по стрим-сессии: при явном выборе — по выбранной,
+    // на главной — по последнему стриму. Между стримами может пройти больше
+    // суток, поэтому скользящее 24-часовое окно здесь не подходит.
+    const latestSession = streamSessionId
+      ? null
+      : await StreamSession.findOne({}).sort({ startedAt: -1 }).select('_id').lean();
+    const topChattersStreamId = streamSessionId || latestSession?._id || null;
+    const topChattersFilter = topChattersStreamId
+      ? { streamSessionId: topChattersStreamId }
+      : { createdAt: { $gte: since } };
+
     const [recentMessages, totalMessages24h, totalMessagesAllTime, uniqueChatters24h, topChatters] = await Promise.all([
       chatLogModel.find(streamFilter).sort({ createdAt: -1 }).limit(RECENT_MESSAGES_LIMIT).lean(),
       chatLogModel.countDocuments({ ...streamFilter, createdAt: { $gte: since } }),
@@ -456,7 +467,7 @@ async function loadChatStats(streamSessionId) {
         : chatLogModel.estimatedDocumentCount(),
       chatLogModel.distinct('user', { ...streamFilter, createdAt: { $gte: since } }),
       chatLogModel.aggregate([
-        { $match: { ...streamFilter } },
+        { $match: topChattersFilter },
         { $sort: { createdAt: -1 } },
         {
           $group: {
@@ -952,6 +963,46 @@ async function loadChatterStats(chatterName) {
   }
 }
 
+async function loadStreamOverview(streamSessionId) {
+  if (!streamSessionId || !isDbReady() || !isValidObjectId(streamSessionId)) {
+    return null;
+  }
+
+  try {
+    const stream = await StreamSession.findById(streamSessionId).lean();
+
+    if (!stream) {
+      return null;
+    }
+
+    return {
+      id: stream._id,
+      title: stream.title || 'Без названия',
+      gameName: stream.gameName || '—',
+      status: stream.status,
+      startedAt: stream.startedAt,
+      endedAt: stream.endedAt,
+      periodLabel: formatStreamPeriod(stream.startedAt, stream.endedAt),
+      durationLabel: formatDuration(stream.startedAt, stream.endedAt),
+      maxViewers: stream.maxViewers || 0,
+      maxViewersLabel: formatNumber(stream.maxViewers),
+      avgViewers: stream.avgViewers || 0,
+      avgViewersLabel: formatNumber(stream.avgViewers),
+      uniqueViewers: stream.uniqueViewers || 0,
+      uniqueViewersLabel: formatNumber(stream.uniqueViewers),
+      messagesCount: stream.messagesCount || 0,
+      messagesCountLabel: formatNumber(stream.messagesCount),
+      uniqueChatters: stream.uniqueChatters || 0,
+      uniqueChattersLabel: formatNumber(stream.uniqueChatters),
+      memesCount: stream.memesCount || 0,
+      memesCountLabel: formatNumber(stream.memesCount),
+    };
+  } catch (error) {
+    console.error('Error loading stream overview:', error.message);
+    return null;
+  }
+}
+
 async function loadOverallStats() {
   if (!isDbReady()) {
     return {
@@ -1129,12 +1180,13 @@ async function buildStatsPageData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
   const chatterName = filters?.chatter || null;
 
-  const [shared, streamSessions, memeStats, overallStats, chatterStats] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, chatterStats, streamOverview] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
     loadOverallStats(),
     chatterName ? loadChatterStats(chatterName) : Promise.resolve(null),
+    loadStreamOverview(streamSessionId),
   ]);
 
   // If filtering by stream, reload viewer/chat stats with filter
@@ -1160,6 +1212,7 @@ async function buildStatsPageData(hostname, filters) {
     memeStats,
     overallStats,
     chatterStats,
+    streamOverview,
     filters: {
       streamId: streamSessionId || '',
       chatter: chatterName || '',
@@ -1181,11 +1234,12 @@ async function getSummaryApiData(hostname) {
 async function getStatsApiData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
 
-  const [shared, streamSessions, memeStats, overallStats] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, streamOverview] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
     loadOverallStats(),
+    loadStreamOverview(streamSessionId),
   ]);
 
   return {
@@ -1196,6 +1250,7 @@ async function getStatsApiData(hostname, filters) {
     streamSessions,
     memeStats,
     overallStats,
+    streamOverview,
   };
 }
 
