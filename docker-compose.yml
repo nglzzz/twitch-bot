@@ -6,6 +6,9 @@ services:
       dockerfile: docker/app/Dockerfile
     restart: unless-stopped
     container_name: nglzzz_twitch_bot.app
+    environment:
+      # Таймзона процесса внутри контейнера (иначе Docker по умолчанию = UTC).
+      TZ: ${TZ:-Europe/Minsk}
     env_file: .env
     volumes:
       - .:/app

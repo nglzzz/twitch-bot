@@ -95,6 +95,7 @@ routes.get('/speak', (req, res) => {
     generatedAtLabel: new Intl.DateTimeFormat('ru-RU', {
       dateStyle: 'medium',
       timeStyle: 'short',
+      timeZone: config.TIMEZONE,
     }).format(new Date()),
     navigation: [
       { label: 'Главная', href: '/', isActive: false },

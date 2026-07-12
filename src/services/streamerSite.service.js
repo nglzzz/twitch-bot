@@ -16,6 +16,7 @@ const TOP_MEMERS_LIMIT = 10;
 const TOP_MEMES_LIMIT = 10;
 const CHATTER_STATS_LIMIT = 20;
 const DEFAULT_CHANNEL = (config.CHANNEL || 'nglzzz').toLowerCase();
+const TIMEZONE = config.TIMEZONE || 'Europe/Minsk';
 
 function isDbReady() {
   return db?.connection?.readyState === 1;
@@ -85,6 +86,7 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat('ru-RU', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: TIMEZONE,
   }).format(new Date(value));
 }
 
@@ -98,6 +100,7 @@ function formatShortDateTime(value) {
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: TIMEZONE,
   }).format(new Date(value));
 }
 
@@ -130,6 +133,7 @@ function formatTime(value) {
   return new Intl.DateTimeFormat('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: TIMEZONE,
   }).format(new Date(value));
 }
 
@@ -142,6 +146,7 @@ function formatDate(value) {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    timeZone: TIMEZONE,
   }).format(new Date(value));
 }
 
