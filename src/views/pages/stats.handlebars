@@ -24,7 +24,7 @@
         <option value="">Все стримы</option>
         {{#each streamSessions.streams}}
           <option value="{{id}}" {{#if (eq ../filters.streamId (toString id))}}selected{{/if}}>
-            {{dateLabel}} — {{title}}
+            {{periodLabel}} — {{title}}
           </option>
         {{/each}}
       </select>
@@ -132,7 +132,7 @@
           <tbody>
             {{#each streamSessions.streams}}
               <tr>
-                <td><a href="/stats?stream={{id}}">{{dateLabel}}</a></td>
+                <td><a href="/stats?stream={{id}}">{{periodLabel}}</a></td>
                 <td>{{title}}</td>
                 <td>{{gameName}}</td>
                 <td>

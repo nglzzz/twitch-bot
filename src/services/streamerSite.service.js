@@ -101,6 +101,38 @@ function formatShortDateTime(value) {
   }).format(new Date(value));
 }
 
+function formatStreamPeriod(startedAt, endedAt) {
+  if (!startedAt) {
+    return '—';
+  }
+
+  const start = formatShortDateTime(startedAt);
+
+  if (!endedAt) {
+    return `${start} → идёт сейчас`;
+  }
+
+  const startDay = new Date(startedAt);
+  const endDay = new Date(endedAt);
+  const crossesMidnight =
+    startDay.toDateString() !== endDay.toDateString();
+
+  const end = crossesMidnight ? formatShortDateTime(endedAt) : formatTime(endedAt);
+
+  return `${start} → ${end}`;
+}
+
+function formatTime(value) {
+  if (!value) {
+    return '—';
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
 function formatDate(value) {
   if (!value) {
     return '—';
@@ -602,6 +634,7 @@ async function loadStreamSessions() {
       memesCount: s.memesCount || 0,
       memesCountLabel: formatNumber(s.memesCount),
       dateLabel: formatDate(s.startedAt),
+      periodLabel: formatStreamPeriod(s.startedAt, s.endedAt),
     }));
 
     return {
