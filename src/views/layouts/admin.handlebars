@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{pageTitle}}</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body class="site-body admin-body">
+    <div class="admin-shell{{#unless adminUser}} admin-shell--login{{/unless}}">
+      {{#if adminUser}}
+        <aside class="admin-sidebar">
+          <a class="site-logo" href="/admin"><span>NGLZZZ</span></a>
+          <nav class="admin-nav" aria-label="Админ-навигация">
+            {{#each navigation}}<a class="admin-nav__link {{#if isActive}}is-active{{/if}}" href="{{href}}">{{label}}</a>{{/each}}
+          </nav>
+          <div class="admin-sidebar__footer">
+            <span>{{adminUser.displayName}}</span>
+            <form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="{{csrfToken}}" /><button class="admin-link-button" type="submit">Выйти</button></form>
+          </div>
+        </aside>
+      {{/if}}
+      <main class="admin-main">{{{body}}}</main>
+    </div>
+  </body>
+</html>

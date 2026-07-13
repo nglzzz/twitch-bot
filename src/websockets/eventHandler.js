@@ -1,6 +1,8 @@
 const websocketServer = require('../app/websocket');
 const Chat = require('../app/chat');
 const messageHelper = require('../helpers/messageHelper');
+const { loadCatalog, getCachedCatalog } = require('../services/emoteCatalog.service');
+const { publishChatMessage } = require('../services/overlayChat.service');
 const allowedAudioCommands = [
   '!badabum',
   '!fatality',
@@ -23,35 +25,47 @@ const allowedAudioCommands = [
 ];
 
 websocketServer.on('connection', function (ws) {
-  Chat.getClient().on('message', (channel, tags, message, self) => {
-    if (self) return;
+  const emotes = getCachedCatalog();
+  if (emotes.length > 0) {
+    ws.send(JSON.stringify({ type: 'emotes', emotes }));
+  }
+});
 
-    // All chat messages
-    if (!message.startsWith('!')) {
-      ws.send(JSON.stringify({
-        type: 'chat',
-        nickname: tags['display-name'] ?? tags.username,
-        message: message,
-        isSub: !!tags.subscriber,
-        timestamp: Date.now(),
-      }));
-    }
+Chat.getClient().on('message', (channel, tags, message, self) => {
+  if (self) return;
 
-    // Highlighted subscriber messages → speech
-    if (messageHelper.isHighlightMessage(tags) && messageHelper.isSubscriberMessage(tags)) {
-      ws.send(JSON.stringify({
-        type: 'speech',
-        nickname: tags.username,
-        text: message
-      }));
-    }
+  const channelId = tags['room-id'];
+  if (channelId) {
+    loadCatalog(channelId)
+      .then((emotes) => websocketServer.broadcast({ type: 'emotes', emotes }))
+      .catch((error) => console.warn('[Emotes] Could not load catalog:', error.message));
+  }
 
-    // Subscriber audio commands
-    if (messageHelper.isSubscriberMessage(tags) && allowedAudioCommands.indexOf(`${message}`) !== -1) {
-      ws.send(JSON.stringify({
-        type: 'audio',
-        name: `${message.substring(1)}.mp3`,
-      }));
-    }
-  });
+  // All chat messages
+  if (!message.startsWith('!')) {
+    publishChatMessage({
+      nickname: tags['display-name'] ?? tags.username,
+      message,
+      isSub: !!tags.subscriber,
+      platform: 'twitch',
+      timestamp: Date.now(),
+    });
+  }
+
+  // Highlighted subscriber messages → speech
+  if (messageHelper.isHighlightMessage(tags) && messageHelper.isSubscriberMessage(tags)) {
+    websocketServer.broadcast({
+      type: 'speech',
+      nickname: tags.username,
+      text: message,
+    });
+  }
+
+  // Subscriber audio commands
+  if (messageHelper.isSubscriberMessage(tags) && allowedAudioCommands.indexOf(`${message}`) !== -1) {
+    websocketServer.broadcast({
+      type: 'audio',
+      name: `${message.substring(1)}.mp3`,
+    });
+  }
 });

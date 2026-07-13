@@ -2,7 +2,7 @@ const Chat = require('../app/chat');
 const {randomInteger} = require('../helpers/numberHelper');
 const doRandomAsk = require('../utils/botAsking');
 const arrayHelper = require('../helpers/arrayHelper');
-const copyPastList = require('../utils/copypasts');
+const copyPastList = require('../data/copypasts');
 const config = require('../config');
 
 Chat.registerCommand('!help', require('../commands/help'), '!хелп');

@@ -11,7 +11,7 @@
   </div>
 
   <p class="section-description">
-    Расширенная статистика стримов, чата и мемов. Данные обновляются автоматически.
+    Расширенная статистика стримов, чата, мемов и донатов. Данные обновляются автоматически.
   </p>
 </section>
 
@@ -112,6 +112,12 @@
         <p class="stat-card__description">Стикеров MemeAlerts на этом стриме.</p>
       </article>
 
+      <article class="stat-card stat-card--primary">
+        <span class="stat-card__label">💸 Донатов</span>
+        <strong class="stat-card__value">{{streamOverview.donationsAmountLabel}}</strong>
+        <p class="stat-card__description">{{streamOverview.donationsCountLabel}} получено за этот стрим.</p>
+      </article>
+
       <article class="stat-card stat-card--neutral">
         <span class="stat-card__label">🔥 Пиковый онлайн</span>
         <strong class="stat-card__value">{{streamOverview.maxViewersLabel}}</strong>
@@ -154,6 +160,12 @@
         <span class="stat-card__label">🎨 Всего мемов</span>
         <strong class="stat-card__value">{{overallStats.totalMemesLabel}}</strong>
         <p class="stat-card__description">Отправлено стикеров через MemeAlerts.</p>
+      </article>
+
+      <article class="stat-card stat-card--primary">
+        <span class="stat-card__label">💸 Всего донатов</span>
+        <strong class="stat-card__value">{{overallStats.totalDonationsAmountLabel}}</strong>
+        <p class="stat-card__description">{{overallStats.totalDonationsLabel}} донатов за всё время.</p>
       </article>
 
       <article class="stat-card stat-card--neutral">
@@ -521,19 +533,19 @@
 <section class="container section-spacing stats-tab-content" data-tab-content="viewers">
   <div class="stats-grid stats-grid--dense">
     <article class="stat-card stat-card--primary">
-      <span class="stat-card__label">🔥 Пиковый онлайн за 24 часа</span>
+      <span class="stat-card__label">{{#if filters.streamId}}🔥 Пиковый онлайн на стриме{{else}}🔥 Пиковый онлайн за 24 часа{{/if}}</span>
       <strong class="stat-card__value">{{viewerStats.peakViewerCount24hLabel}}</strong>
       <p class="stat-card__description">Максимальное число зрителей по сохранённым срезам.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">📊 Средний онлайн за 24 часа</span>
+      <span class="stat-card__label">{{#if filters.streamId}}📊 Средний онлайн на стриме{{else}}📊 Средний онлайн за 24 часа{{/if}}</span>
       <strong class="stat-card__value">{{viewerStats.averageViewerCount24hLabel}}</strong>
       <p class="stat-card__description">Среднее значение по срезам viewer-лога.</p>
     </article>
 
     <article class="stat-card stat-card--secondary">
-      <span class="stat-card__label">👥 Уникальных зрителей за 24 часа</span>
+      <span class="stat-card__label">{{#if filters.streamId}}👥 Уникальных зрителей на стриме{{else}}👥 Уникальных зрителей за 24 часа{{/if}}</span>
       <strong class="stat-card__value">{{viewerStats.uniqueViewers24hLabel}}</strong>
       <p class="stat-card__description">Считается по viewer-срезам.</p>
     </article>

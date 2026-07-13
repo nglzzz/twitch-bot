@@ -4,6 +4,7 @@ const chatLogModel = require('../models/chatLog.model');
 const viewerModel = require('../models/viewer.model');
 const StreamSession = require('../models/streamSession.model');
 const MemeLog = require('../models/memeLog.model');
+const Donation = require('../models/donation.model');
 const { getLatestChatters, getRecentMessages } = require('../chat/chatters');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
 
@@ -24,6 +25,24 @@ function isDbReady() {
 
 function isValidObjectId(id) {
   return db?.Types?.ObjectId?.isValid(id) ?? false;
+}
+
+/**
+ * Convert a value to a mongoose ObjectId, or null if invalid.
+ * Required because Model.aggregate() does NOT cast strings to ObjectId
+ * (unlike find/countDocuments), so $match on streamSessionId silently
+ * matches nothing when given a raw string.
+ */
+function toObjectId(value) {
+  if (!value || !isValidObjectId(value)) {
+    return null;
+  }
+
+  try {
+    return db.Types.ObjectId(value);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -446,23 +465,24 @@ async function loadChatStats(streamSessionId) {
 
   try {
     const since = new Date(Date.now() - DAY_IN_MS);
-    const streamFilter = streamSessionId ? { streamSessionId } : {};
+    const streamObjectId = toObjectId(streamSessionId);
+    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
 
     // Топ чаттеров считаем по стрим-сессии: при явном выборе — по выбранной,
     // на главной — по последнему стриму. Между стримами может пройти больше
     // суток, поэтому скользящее 24-часовое окно здесь не подходит.
-    const latestSession = streamSessionId
+    const latestSession = streamObjectId
       ? null
       : await StreamSession.findOne({}).sort({ startedAt: -1 }).select('_id').lean();
-    const topChattersStreamId = streamSessionId || latestSession?._id || null;
-    const topChattersFilter = topChattersStreamId
-      ? { streamSessionId: topChattersStreamId }
+    const topChattersObjectId = streamObjectId || toObjectId(latestSession?._id);
+    const topChattersFilter = topChattersObjectId
+      ? { streamSessionId: topChattersObjectId }
       : { createdAt: { $gte: since } };
 
     const [recentMessages, totalMessages24h, totalMessagesAllTime, uniqueChatters24h, topChatters] = await Promise.all([
       chatLogModel.find(streamFilter).sort({ createdAt: -1 }).limit(RECENT_MESSAGES_LIMIT).lean(),
       chatLogModel.countDocuments({ ...streamFilter, createdAt: { $gte: since } }),
-      streamSessionId
+      streamObjectId
         ? chatLogModel.countDocuments(streamFilter)
         : chatLogModel.estimatedDocumentCount(),
       chatLogModel.distinct('user', { ...streamFilter, createdAt: { $gte: since } }),
@@ -542,13 +562,13 @@ async function loadViewerStats(streamSessionId) {
 
   try {
     const since = new Date(Date.now() - DAY_IN_MS);
-    const streamFilter = streamSessionId ? { streamSessionId } : {};
-    const timeFilter = streamSessionId ? streamFilter : { createdAt: { $gte: since } };
+    const streamObjectId = toObjectId(streamSessionId);
+    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
 
     const [snapshots, totalSnapshots] = await Promise.all([
-      viewerModel.find({ ...streamFilter, ...(!streamSessionId ? { createdAt: { $gte: since } } : {}) })
-        .sort({ createdAt: -1 })
-        .limit(288)
+      viewerModel.find({ ...streamFilter, ...(!streamObjectId ? { createdAt: { $gte: since } } : {}) })
+        .sort({ createdAt: 1 })
+        .limit(streamObjectId ? 0 : 288)
         .lean(),
       viewerModel.countDocuments(streamFilter),
     ]);
@@ -558,22 +578,27 @@ async function loadViewerStats(streamSessionId) {
         ...fallback,
         source: 'database',
         dbAvailable: true,
+        filteredByStream: Boolean(streamObjectId),
         totalSnapshots,
         totalSnapshotsLabel: formatNumber(totalSnapshots),
       };
     }
 
-    const orderedSnapshots = snapshots.slice().reverse();
+    // Snapshots are sorted ascending by createdAt, so the last one is the most recent.
+    const latestSnapshot = snapshots[snapshots.length - 1];
     const viewerCounts = snapshots.map((snapshot) => (snapshot.viewers || []).length);
     const uniqueViewers = new Set(
       snapshots.flatMap((snapshot) => (snapshot.viewers || []).map((viewer) => String(viewer).toLowerCase()))
     );
-    const latestSnapshot = snapshots[0];
     const maxViewerCount = Math.max(...viewerCounts);
     const averageViewerCount = Math.round(
       viewerCounts.reduce((sum, count) => sum + count, 0) / viewerCounts.length
     );
-    const historySource = orderedSnapshots.slice(-VIEWER_HISTORY_LIMIT);
+    // For a single stream show the whole timeline from its start; for the
+    // 24h overview show only the most recent slices (chronological order).
+    const historySource = streamObjectId
+      ? snapshots.slice(0, VIEWER_HISTORY_LIMIT)
+      : snapshots.slice(-VIEWER_HISTORY_LIMIT);
     const historyMax = Math.max(...historySource.map((snapshot) => (snapshot.viewers || []).length), 1);
 
     const viewerHistory = historySource.map((snapshot) => {
@@ -591,6 +616,7 @@ async function loadViewerStats(streamSessionId) {
     return {
       source: 'database',
       dbAvailable: true,
+      filteredByStream: Boolean(streamObjectId),
       latestViewerCount: (latestSnapshot.viewers || []).length,
       latestViewerCountLabel: formatNumber((latestSnapshot.viewers || []).length),
       peakViewerCount24h: maxViewerCount,
@@ -681,7 +707,8 @@ async function loadMemeStats(streamSessionId) {
   }
 
   try {
-    const streamFilter = streamSessionId ? { streamSessionId } : {};
+    const streamObjectId = toObjectId(streamSessionId);
+    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
 
     const [totalMemes, topMemers, topMemes, recentMemes] = await Promise.all([
       MemeLog.countDocuments(streamFilter),
@@ -969,7 +996,13 @@ async function loadStreamOverview(streamSessionId) {
   }
 
   try {
-    const stream = await StreamSession.findById(streamSessionId).lean();
+    const [stream, donationStats] = await Promise.all([
+      StreamSession.findById(streamSessionId).lean(),
+      Donation.aggregate([
+        { $match: { streamSessionId: toObjectId(streamSessionId), status: 'sent' } },
+        { $group: { _id: null, donationsCount: { $sum: 1 }, donationsAmount: { $sum: '$amount' } } },
+      ]),
+    ]);
 
     if (!stream) {
       return null;
@@ -996,6 +1029,10 @@ async function loadStreamOverview(streamSessionId) {
       uniqueChattersLabel: formatNumber(stream.uniqueChatters),
       memesCount: stream.memesCount || 0,
       memesCountLabel: formatNumber(stream.memesCount),
+      donationsCount: donationStats[0]?.donationsCount || 0,
+      donationsCountLabel: formatNumber(donationStats[0]?.donationsCount || 0),
+      donationsAmount: donationStats[0]?.donationsAmount || 0,
+      donationsAmountLabel: `${formatNumber(donationStats[0]?.donationsAmount || 0)} ₽`,
     };
   } catch (error) {
     console.error('Error loading stream overview:', error.message);
@@ -1015,6 +1052,10 @@ async function loadOverallStats() {
       totalUniqueChattersLabel: '—',
       totalMemes: 0,
       totalMemesLabel: '—',
+      totalDonations: 0,
+      totalDonationsLabel: '—',
+      totalDonationsAmount: 0,
+      totalDonationsAmountLabel: '—',
       peakViewersAllTime: 0,
       peakViewersAllTimeLabel: '—',
       avgStreamDuration: '—',
@@ -1022,7 +1063,7 @@ async function loadOverallStats() {
   }
 
   try {
-    const [totalStreams, totalMessages, totalMemes, uniqueChattersAgg, peakStream] = await Promise.all([
+    const [totalStreams, totalMessages, totalMemes, uniqueChattersAgg, peakStream, donationStats] = await Promise.all([
       StreamSession.countDocuments({}),
       chatLogModel.estimatedDocumentCount(),
       MemeLog.countDocuments({}),
@@ -1034,6 +1075,10 @@ async function loadOverallStats() {
         .findOne({})
         .sort({ maxViewers: -1 })
         .lean(),
+      Donation.aggregate([
+        { $match: { status: 'sent' } },
+        { $group: { _id: null, donationsCount: { $sum: 1 }, donationsAmount: { $sum: '$amount' } } },
+      ]),
     ]);
 
     const uniqueChatters = uniqueChattersAgg.length > 0 ? uniqueChattersAgg[0].total : 0;
@@ -1069,6 +1114,10 @@ async function loadOverallStats() {
       totalUniqueChattersLabel: formatNumber(uniqueChatters),
       totalMemes,
       totalMemesLabel: formatNumber(totalMemes),
+      totalDonations: donationStats[0]?.donationsCount || 0,
+      totalDonationsLabel: formatNumber(donationStats[0]?.donationsCount || 0),
+      totalDonationsAmount: donationStats[0]?.donationsAmount || 0,
+      totalDonationsAmountLabel: `${formatNumber(donationStats[0]?.donationsAmount || 0)} ₽`,
       peakViewersAllTime: peakStream ? peakStream.maxViewers : 0,
       peakViewersAllTimeLabel: formatNumber(peakStream ? peakStream.maxViewers : 0),
       avgStreamDuration,

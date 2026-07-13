@@ -1,8 +1,9 @@
 const axios = require('axios');
 const config = require('../config');
+const legacyMemeIds = require('../data/legacyMemes');
 
 const MEMEALERTS_HOST = config.MEMEALERTS_HOST || 'memealerts.com';
-const STREAMER_ID = '64483d657cd2a3c9dab584bb';
+const STREAMER_ID = config.MEMEALERTS_CHANNEL_ID || '64483d657cd2a3c9dab584bb';
 
 function getHeaders(referer) {
   return {
@@ -88,6 +89,28 @@ async function sendMeme(stickerId, isSoundOnly) {
  * Create a random meme reward handler
  * @param {boolean} isSoundOnly - if true, send as audio-only meme
  */
+async function fetchAllMemes(channelId) {
+  const streamerId = channelId || STREAMER_ID;
+  const streamerMemes = await fetchCatalogue(
+    'https://' + MEMEALERTS_HOST + '/api/sticker/streamer-area/catalogue',
+    { limit: 100, skip: 0, categories: [], streamerId, pageSize: 100 },
+    'https://memealerts.com/' + (config.CHANNEL || 'nglzzz')
+  );
+  const legacyMemes = legacyMemeIds.map((id) => ({ id, name: `Legacy meme · ${id}`, source: 'legacy' }));
+  const seen = new Set();
+  return [...streamerMemes.map((meme) => ({ ...meme, source: 'channel' })), ...legacyMemes].filter((meme) => {
+    if (!meme.id || seen.has(meme.id)) return false;
+    seen.add(meme.id);
+    return true;
+  });
+}
+
+async function getRandomMeme(channelId) {
+  const memes = await fetchAllMemes(channelId);
+  if (memes.length === 0) throw new Error('Meme catalogue is empty');
+  return memes[Math.floor(Math.random() * memes.length)];
+}
+
 function createHandler(isSoundOnly) {
   const logPrefix = isSoundOnly ? '[RandomAudioMeme]' : '[RandomMeme]';
   const successPrefix = isSoundOnly ? '🔊 Случайный аудио-мем' : '🎲 Случайный мем';
@@ -97,40 +120,7 @@ function createHandler(isSoundOnly) {
 
   return async function onRandomMemeReward() {
     try {
-      // Fetch memes from both catalogues in parallel
-      const [personalMemes, streamerMemes] = await Promise.all([
-        fetchCatalogue(
-          'https://' + MEMEALERTS_HOST + '/api/sticker/personal-area/catalogue',
-          { limit: 100, skip: 0 },
-          'https://memealerts.com/stickers'
-        ),
-        fetchCatalogue(
-          'https://' + MEMEALERTS_HOST + '/api/sticker/streamer-area/catalogue',
-          { limit: 100, skip: 0, categories: [], streamerId: STREAMER_ID, pageSize: 100 },
-          'https://memealerts.com/' + (config.CHANNEL || 'nglzzz')
-        )
-      ]);
-
-      console.log(`${logPrefix} Fetched ${personalMemes.length} personal memes, ${streamerMemes.length} streamer memes`);
-
-      // Combine and deduplicate by id
-      const seen = new Set();
-      const allMemes = [];
-
-      for (const meme of [...personalMemes, ...streamerMemes]) {
-        if (!seen.has(meme.id)) {
-          seen.add(meme.id);
-          allMemes.push(meme);
-        }
-      }
-
-      if (allMemes.length === 0) {
-        throw new Error('Meme catalogue is empty');
-      }
-
-      // Pick a random meme
-      const randomIndex = Math.floor(Math.random() * allMemes.length);
-      const chosenMeme = allMemes[randomIndex];
+      const chosenMeme = await getRandomMeme();
 
       console.log(`${logPrefix} Selected meme: "${chosenMeme.name}" (${chosenMeme.id})`);
 
@@ -154,3 +144,5 @@ function createHandler(isSoundOnly) {
 
 module.exports = createHandler(false);
 module.exports.createHandler = createHandler;
+module.exports.fetchAllMemes = fetchAllMemes;
+module.exports.getRandomMeme = getRandomMeme;

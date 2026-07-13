@@ -1,0 +1,11 @@
+<section class="admin-page">
+  <div class="admin-page__heading"><div><div class="eyebrow">Управление каналом</div><h1>Обзор</h1></div></div>
+  {{#if success}}<p class="form-notice form-notice--success">{{success}}</p>{{/if}}{{#if error}}<p class="form-notice form-notice--error">{{error}}</p>{{/if}}
+  <div class="admin-metrics"><article><span>Отправлено донатов</span><strong>{{totalDonations}}</strong></article><article><span>Сумма отправленных</span><strong>{{totalAmount}} ₽</strong></article><article><span>Донатов в очереди</span><strong>{{pendingDonations}}</strong></article><article><span>Мемов в очереди</span><strong>{{pendingMemes}}</strong></article></div>
+  <div class="admin-grid">
+    <article class="admin-card"><h2>Тестовый донат</h2><p class="admin-card__hint">Отправляется в StreamElements через сервер, как импорт из DonationAlerts.</p>
+      <form method="post" action="/admin/test-donation" class="admin-form"><input type="hidden" name="_csrf" value="{{csrfToken}}" /><label>Ник<input name="donorName" maxlength="100" required /></label><label>Сумма<input name="amount" type="number" step="0.01" min="0.01" required /></label><label>Валюта<input name="currency" value="RUB" maxlength="8" /></label><label>Сообщение<textarea name="message" maxlength="255"></textarea></label><button class="btn btn--primary" type="submit">Отправить тестовый донат</button></form>
+    </article>
+    <article class="admin-card"><h2>Последние донаты</h2>{{#if hasRecentDonations}}<div class="admin-list">{{#each recentDonations}}<div class="admin-list__row"><div><strong>{{donorName}}</strong><span>{{message}}</span></div><div><strong>{{amountLabel}}</strong><span>{{createdAtLabel}} · {{status}}</span></div></div>{{/each}}</div>{{else}}<p class="empty-state">Донатов пока нет.</p>{{/if}}</article>
+  </div>
+</section>

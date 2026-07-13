@@ -1,0 +1,15 @@
+<section class="admin-login">
+  <div class="admin-card admin-login__card">
+    <a class="site-logo" href="/"><span>NGLZZZ</span></a>
+    <h1>{{#if configurationError}}Админка ещё не настроена{{else}}Вход в админку{{/if}}</h1>
+    {{#if configurationError}}<p class="form-notice form-notice--error">{{configurationError}}</p>{{else}}
+      {{#if error}}<p class="form-notice form-notice--error">{{error}}</p>{{/if}}
+      <form method="post" action="/admin/login" class="admin-form">
+        <label>Логин<input name="username" type="text" autocomplete="username" required /></label>
+        <label>Пароль<input name="password" type="password" autocomplete="current-password" required /></label>
+        <p class="admin-card__hint">Первый логин — значение <code>CHANNEL</code>. Временный пароль: <code>{{temporaryPassword}}</code>; его потребуется заменить сразу после входа.</p>
+        <button class="btn btn--primary" type="submit">Войти</button>
+      </form>
+    {{/if}}
+  </div>
+</section>

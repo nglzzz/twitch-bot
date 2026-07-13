@@ -13,6 +13,22 @@
     max-width: none;
   }
 
+  {{#if isOverlay}}
+  html,
+  body.site-body {
+    background: transparent;
+  }
+
+  body.site-body::before,
+  body.site-body::after {
+    display: none;
+  }
+
+  .speak-page {
+    margin: 0;
+  }
+  {{/if}}
+
   {{#unless isOverlay}}
   .speak-page {
     height: auto;
@@ -165,6 +181,27 @@
     color: var(--text);
   }
 
+  .speak-msg__platform {
+    align-self: center;
+    padding: 0.08rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.16);
+    color: var(--muted);
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-transform: uppercase;
+  }
+
+  .speak-emote {
+    display: inline-block;
+    width: auto;
+    height: 1.5em;
+    margin: -0.3em 0.08em;
+    vertical-align: middle;
+    object-fit: contain;
+  }
+
   .speak-msg__time {
     font-size: 0.7rem;
     color: rgba(148, 163, 184, 0.5);
@@ -181,9 +218,57 @@
     color: var(--muted);
     font-size: 0.9rem;
   }
+
+  .speak-page--chat-overlay .speak-status,
+  .speak-page--chat-overlay .speak-controls {
+    display: none;
+  }
+
+  .speak-page--chat-overlay .speak-chat {
+    padding: 0;
+    gap: 0.4rem;
+  }
+
+  .speak-page--chat-overlay .speak-msg {
+    background: rgba(8, 6, 18, 0.82);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.26);
+  }
+
+  .speak-page--chat-overlay .speak-msg__time {
+    display: none;
+  }
+
+  .speak-obs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--panel-border);
+    background: rgba(168, 85, 247, 0.08);
+  }
+
+  .speak-obs__text {
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .speak-obs__button {
+    text-decoration: none;
+  }
+
+  @media (max-width: 720px) {
+    .speak-obs {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .speak-obs__text {
+      grid-column: 1 / -1;
+    }
+  }
 </style>
 
-<div class="speak-page">
+<div class="speak-page{{#if isChatOverlay}} speak-page--chat-overlay{{/if}}">
   <div class="speak-status">
     <span class="speak-status__dot" id="wsDot"></span>
     <span id="wsStatus">Подключение...</span>
@@ -219,6 +304,14 @@
     </button>
   </div>
 
+  {{#unless isOverlay}}
+  <div class="speak-obs">
+    <span class="speak-obs__text">Добавьте ссылку как «Браузер» в OBS. Оверлеи прозрачные; размер источника — по вашему макету.</span>
+    <button class="speak-btn speak-obs__button" type="button" data-copy-overlay="/speak?overlay=1" data-copy-label="🔊 Скопировать оверлей озвучки">🔊 Скопировать оверлей озвучки</button>
+    <button class="speak-btn" type="button" data-copy-overlay="/speak?overlay=chat" data-copy-label="💬 Скопировать чат для OBS">💬 Скопировать чат для OBS</button>
+  </div>
+  {{/unless}}
+
   <div class="speak-chat" id="chatContainer">
     <div class="speak-empty" id="emptyState">Ожидание сообщений...</div>
   </div>
@@ -238,7 +331,9 @@
     { name: 'ru-RU-Standard-E', label: 'Google Standard E' }
   ];
 
-  let speechEnabled = true;
+  const isOverlay = {{#if isOverlay}}true{{else}}false{{/if}};
+  const isChatOverlay = {{#if isChatOverlay}}true{{else}}false{{/if}};
+  let speechEnabled = !isChatOverlay;
   let speakNickname = true;
   let lastSpokenNick = null;
   let selectedVoice = 'ru-RU-Standard-E';
@@ -265,8 +360,7 @@
   let currentSource = null;
   let queueVersion = 0;
 
-  const isOverlay = {{#if isOverlay}}true{{else}}false{{/if}};
-  if (isOverlay) {
+  if (isOverlay && !isChatOverlay) {
     setTimeout(() => {
       activateSpeech();
     }, 1000);
@@ -529,6 +623,19 @@
     lastSpokenNick = null;
   });
 
+  document.querySelectorAll('[data-copy-overlay]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const url = new URL(button.dataset.copyOverlay, window.location.origin).toString();
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = '✓ Ссылка скопирована';
+        setTimeout(() => { button.textContent = button.dataset.copyLabel; }, 1800);
+      } catch (_) {
+        window.prompt('Скопируйте ссылку для OBS:', url);
+      }
+    });
+  });
+
   // --- Messages ---
   function updateCounter() {
     msgCounter.textContent = messageCount + ' сообщени' + pluralize(messageCount);
@@ -548,7 +655,37 @@
     return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   }
 
-  function addMessage(nickname, message, timestamp, isSub, shouldSpeak = true) {
+  const emotesByName = new Map();
+  const platformLabels = {
+    twitch: 'Twitch',
+    kick: 'Kick',
+    vkplay: 'VK Play',
+    'w.tv': 'W.TV',
+    goodgame: 'GG',
+    trovo: 'Trovo',
+    wasd: 'WASD',
+    youtube: 'YouTube'
+  };
+
+  function renderMessageContent(container, message) {
+    String(message).split(/(\s+)/).forEach(part => {
+      const emote = emotesByName.get(part);
+      if (!emote) {
+        container.appendChild(document.createTextNode(part));
+        return;
+      }
+
+      const image = document.createElement('img');
+      image.className = 'speak-emote';
+      image.src = emote.url;
+      image.alt = part;
+      image.title = part + ' · ' + emote.provider.toUpperCase();
+      image.loading = 'lazy';
+      container.appendChild(image);
+    });
+  }
+
+  function addMessage(nickname, message, timestamp, isSub, platform = 'twitch', shouldSpeak = true) {
     if (emptyState.parentNode) emptyState.style.display = 'none';
 
     messageCount++;
@@ -560,10 +697,27 @@
 
     const time = formatTime(timestamp || Date.now());
 
-    el.innerHTML =
-      '<span class="speak-msg__nick">' + escapeHtml(nickname) + '</span>' +
-      '<span class="speak-msg__text">' + escapeHtml(message) + '</span>' +
-      '<span class="speak-msg__time">' + time + '</span>';
+    const nicknameEl = document.createElement('span');
+    nicknameEl.className = 'speak-msg__nick';
+    nicknameEl.textContent = nickname;
+    el.appendChild(nicknameEl);
+
+    if (platform && platform !== 'twitch') {
+      const platformEl = document.createElement('span');
+      platformEl.className = 'speak-msg__platform';
+      platformEl.textContent = platformLabels[platform] || platform;
+      el.appendChild(platformEl);
+    }
+
+    const textEl = document.createElement('span');
+    textEl.className = 'speak-msg__text';
+    renderMessageContent(textEl, message);
+    el.appendChild(textEl);
+
+    const timeEl = document.createElement('span');
+    timeEl.className = 'speak-msg__time';
+    timeEl.textContent = time;
+    el.appendChild(timeEl);
 
     chatContainer.appendChild(el);
 
@@ -576,7 +730,7 @@
     chatContainer.scrollTop = chatContainer.scrollHeight;
 
     // Speak
-    if (shouldSpeak && !message.startsWith('!')) {
+    if (shouldSpeak && speechEnabled && !message.startsWith('!')) {
       if (!speechActivated) {
         pendingQueue.push({ text: message, nickname: nickname });
         el.classList.add('speak-msg--speaking');
@@ -585,12 +739,6 @@
         el.classList.add('speak-msg--speaking');
       }
     }
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
   }
 
   // --- Load recent messages ---
@@ -604,6 +752,7 @@
           m.message,
           m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
           false,
+          'twitch',
           false
         );
       });
@@ -643,7 +792,16 @@
       const data = JSON.parse(event.data);
 
       if (data.type === 'chat') {
-        addMessage(data.nickname, data.message, data.timestamp, data.isSub);
+        addMessage(data.nickname, data.message, data.timestamp, data.isSub, data.platform);
+      }
+
+      if (data.type === 'emotes' && Array.isArray(data.emotes)) {
+        emotesByName.clear();
+        data.emotes.forEach(emote => {
+          if (emote && typeof emote.name === 'string' && typeof emote.url === 'string') {
+            emotesByName.set(emote.name, emote);
+          }
+        });
       }
 
       if (data.type === 'speech') {

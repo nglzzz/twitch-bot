@@ -1,0 +1,12 @@
+<section class="admin-page admin-page--narrow"><div class="admin-page__heading"><div><div class="eyebrow">Интеграции</div><h1>Настройки</h1></div></div>
+{{#if success}}<p class="form-notice form-notice--success">{{success}}</p>{{/if}}{{#if error}}<p class="form-notice form-notice--error">{{error}}</p>{{/if}}
+{{#unless settings.encryptionConfigured}}<p class="form-notice form-notice--error">Перед сохранением токенов задайте <code>ADMIN_CREDENTIALS_ENCRYPTION_KEY</code> (или <code>ADMIN_SESSION_SECRET</code>) в .env.</p>{{/unless}}
+<article class="admin-card"><p class="admin-card__hint">Значения API-ключей хранятся зашифрованными и больше не возвращаются в браузер. Оставьте поле пустым, чтобы сохранить текущее значение.</p><form method="post" action="/admin/settings" class="admin-form"><input type="hidden" name="_csrf" value="{{csrfToken}}" />
+<label>DonationAlerts API Key {{#if settings.donationAlertsConfigured}}<small>сохранён</small>{{/if}}<input name="donationAlertsApiKey" type="password" autocomplete="off" /></label>
+<label>StreamElements token {{#if settings.streamElementsConfigured}}<small>сохранён</small>{{/if}}<input name="streamElementsToken" type="password" autocomplete="off" /></label>
+<label>StreamElements Channel ID<input name="streamElementsChannelId" value="{{settings.streamElementsChannelId}}" required /></label>
+<label>MemeAlerts Channel ID <small>нужен для расписания мемов</small><input name="memeAlertsChannelId" value="{{settings.memeAlertsChannelId}}" /></label>
+<hr><h2>Тестовый пользователь MemeAlerts</h2><p class="admin-card__hint">Укажите JWT другого MemeAlerts-пользователя. Сервер отправит тестовый мем через Bearer-токен, без браузерной сессии владельца канала.</p>
+<label>Тестовый пользователь — JWT {{#if settings.memeAlertsTestConfigured}}<small>сохранён</small>{{/if}}<input name="memeAlertsTestToken" type="password" autocomplete="off" /></label>
+<label>Имя отправителя<input name="memeAlertsTestName" value="{{settings.memeAlertsTestName}}" placeholder="Например, TestUser" /></label>
+<button class="btn btn--primary" type="submit">Сохранить и переподключить DA</button></form></article></section>

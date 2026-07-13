@@ -1,5 +1,5 @@
 const config = require('../config');
-const copyPastList = require('../utils/copypasts');
+const copyPastList = require('../data/copypasts');
 const arrayHelper = require('../helpers/arrayHelper');
 
 async function onCopyPastCommand(channel, tags, message) {

@@ -1,0 +1,19 @@
+<section class="admin-page">
+  <div class="admin-page__heading"><div><div class="eyebrow">История</div><h1>Все донаты</h1></div></div>
+  <form class="stats-filters admin-history-filter" method="get" action="/admin/donations/history">
+    <label class="stats-filters__label" for="donation-test-filter">Показывать</label>
+    <select class="stats-filters__select" name="test" id="donation-test-filter">
+      <option value="all" {{#if (eq activeFilter 'all')}}selected{{/if}}>Все донаты</option>
+      <option value="no" {{#if (eq activeFilter 'no')}}selected{{/if}}>Только реальные</option>
+      <option value="yes" {{#if (eq activeFilter 'yes')}}selected{{/if}}>Только тестовые</option>
+    </select>
+    <button class="button button--primary button--small" type="submit">Применить</button>
+  </form>
+  <article class="admin-card">
+    {{#if hasDonations}}
+      <div class="stats-table-wrap"><table class="stats-table"><thead><tr><th>Дата</th><th>Донатер</th><th>Сумма</th><th>Тип</th><th>Источник</th><th>Статус</th><th>Сообщение</th></tr></thead><tbody>
+      {{#each donations}}<tr><td>{{createdAtLabel}}</td><td>{{donorName}}</td><td>{{amountLabel}}</td><td><span class="status-badge {{#if isTest}}status-badge--ended{{else}}status-badge--live{{/if}}">{{testLabel}}</span></td><td>{{sourceLabel}}</td><td>{{status}}{{#if error}}<br><small>{{error}}</small>{{/if}}</td><td>{{message}}</td></tr>{{/each}}
+      </tbody></table></div>
+    {{else}}<p class="empty-state">Донатов по выбранному фильтру нет.</p>{{/if}}
+  </article>
+</section>

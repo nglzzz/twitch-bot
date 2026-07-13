@@ -1,5 +1,5 @@
 const Chat = require('../app/chat');
-const copyPastList = require('../utils/copypasts');
+const copyPastList = require('../data/copypasts');
 const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
 const { getLatestChatters } = require('./chatters');
@@ -8,6 +8,10 @@ const viewerModel = require('../models/viewer.model');
 const { isChannelLive } = require('../twitchApi/channelInfo');
 const { startTracking, linkViewerSnapshotToStream } = require('../services/streamTracker.service');
 const { startPolling } = require('../services/memeAlerts.service');
+const { startScheduler } = require('../services/scheduler.service');
+const { refreshDonationAlertsConnection, ensureDonationIndexes } = require('../services/donations.service');
+const { ensureInitialAdmin } = require('../services/adminAuth.service');
+const db = require('../app/db');
 
 const copyPastTimer = setInterval(async () => {
   let latestChatter = '';
@@ -82,6 +86,21 @@ startTracking(5 * 60 * 1000);
 
 // Start meme alerts polling (every 2 minutes by default)
 startPolling();
+
+// Scheduled tasks and the DonationAlerts Socket.IO client are server-side and
+// therefore continue working when the admin browser is closed.
+startScheduler();
+const initializeAdminIntegrations = () => {
+  ensureDonationIndexes().catch((error) => console.error('[Donations] Index migration failed:', error.message));
+  ensureInitialAdmin().catch((error) => console.error('[Admin] Bootstrap failed:', error.message));
+  refreshDonationAlertsConnection();
+};
+if (db.connection.readyState === 1) {
+  initializeAdminIntegrations();
+} else {
+  db.connection.once('connected', initializeAdminIntegrations);
+}
+setInterval(refreshDonationAlertsConnection, 60 * 1000);
 
 module.exports = {
   copyPastTimer: copyPastTimer,
