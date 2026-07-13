@@ -199,7 +199,7 @@ routes.post('/admin/settings', adminForm, requireAdmin, requireCsrf, async (req,
 
 routes.get('/admin/donations', requireAdmin, async (req, res, next) => {
   try {
-    const items = await ScheduledDonation.find().sort({ scheduledFor: 1 }).limit(100).lean();
+    const items = await ScheduledDonation.find({ status: { $in: ['pending', 'processing', 'failed'] } }).sort({ scheduledFor: 1 }).limit(100).lean();
     return res.render('pages/admin-donations', adminPage('donations', {
       scheduledDonations: items.map((item) => ({ ...item, scheduledForLabel: formatAdminDate(item.scheduledFor), amountLabel: `${item.amount} ${item.currency}`, errorLabel: item.error || '' })),
       hasScheduledDonations: items.length > 0,
@@ -272,7 +272,7 @@ routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
 
 routes.get('/admin/memes', requireAdmin, async (req, res, next) => {
   try {
-    const items = await ScheduledMeme.find().sort({ scheduledFor: 1 }).limit(100).lean();
+    const items = await ScheduledMeme.find({ status: { $in: ['pending', 'processing', 'failed'] } }).sort({ scheduledFor: 1 }).limit(100).lean();
     let memeOptions = [];
     let memeCatalogError = '';
     if (config.MEMEALERTS_JWT) {
