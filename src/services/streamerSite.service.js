@@ -11,7 +11,7 @@ const { getChannelInfo } = require('../twitchApi/channelInfo');
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 const RECENT_MESSAGES_LIMIT = 10;
 const TOP_CHATTERS_LIMIT = 20;
-const VIEWER_HISTORY_LIMIT = 12;
+const VIEWER_HISTORY_LIMIT = 24;
 const STREAMS_LIMIT = 30;
 const TOP_MEMERS_LIMIT = 10;
 const TOP_MEMES_LIMIT = 10;
@@ -223,6 +223,31 @@ function formatDuration(from, to) {
   parts.push(`${minutes} мин`);
 
   return parts.join(' ');
+}
+
+/**
+ * Pick up to `maxPoints` items from `arr` (already in chronological order)
+ * spread evenly across the whole range, so a long sequence collapses to a
+ * representative timeline without losing its start or end.
+ */
+function sampleEvenly(arr, maxPoints) {
+  if (!Array.isArray(arr) || arr.length <= maxPoints) {
+    return arr || [];
+  }
+
+  if (maxPoints <= 0) {
+    return [];
+  }
+
+  const result = [];
+  const lastIndex = arr.length - 1;
+  const step = lastIndex / (maxPoints - 1);
+
+  for (let i = 0; i < maxPoints; i += 1) {
+    result.push(arr[Math.min(Math.round(i * step), lastIndex)]);
+  }
+
+  return result;
 }
 
 function sanitizeHost(hostname) {
@@ -468,16 +493,11 @@ async function loadChatStats(streamSessionId) {
     const streamObjectId = toObjectId(streamSessionId);
     const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
 
-    // Топ чаттеров считаем по стрим-сессии: при явном выборе — по выбранной,
-    // на главной — по последнему стриму. Между стримами может пройти больше
-    // суток, поэтому скользящее 24-часовое окно здесь не подходит.
-    const latestSession = streamObjectId
-      ? null
-      : await StreamSession.findOne({}).sort({ startedAt: -1 }).select('_id').lean();
-    const topChattersObjectId = streamObjectId || toObjectId(latestSession?._id);
-    const topChattersFilter = topChattersObjectId
-      ? { streamSessionId: topChattersObjectId }
-      : { createdAt: { $gte: since } };
+    // Топ чаттеров: при выборе конкретного стрима — по нему,
+    // без фильтра («Все стримы») — за всё время.
+    const topChattersFilter = streamObjectId
+      ? { streamSessionId: streamObjectId }
+      : {};
 
     const [recentMessages, totalMessages24h, totalMessagesAllTime, uniqueChatters24h, topChatters] = await Promise.all([
       chatLogModel.find(streamFilter).sort({ createdAt: -1 }).limit(RECENT_MESSAGES_LIMIT).lean(),
@@ -517,6 +537,7 @@ async function loadChatStats(streamSessionId) {
       dbAvailable: true,
       recentMessages: mappedRecentMessages.length > 0 ? mappedRecentMessages : memoryRecentMessages,
       hasRecentMessages: mappedRecentMessages.length > 0 || memoryRecentMessages.length > 0,
+      topChattersSource: streamObjectId ? 'stream' : 'allTime',
       topChatters: mappedTopChatters.length > 0 ? mappedTopChatters : fallbackTopChatters,
       hasTopChatters: mappedTopChatters.length > 0 || fallbackTopChatters.length > 0,
       totalMessages24h,
@@ -594,11 +615,9 @@ async function loadViewerStats(streamSessionId) {
     const averageViewerCount = Math.round(
       viewerCounts.reduce((sum, count) => sum + count, 0) / viewerCounts.length
     );
-    // For a single stream show the whole timeline from its start; for the
-    // 24h overview show only the most recent slices (chronological order).
-    const historySource = streamObjectId
-      ? snapshots.slice(0, VIEWER_HISTORY_LIMIT)
-      : snapshots.slice(-VIEWER_HISTORY_LIMIT);
+    // Evenly sample across the full timeline so a long stream (e.g. one that
+    // spans two days) is represented end-to-end, instead of only its first hour.
+    const historySource = sampleEvenly(snapshots, VIEWER_HISTORY_LIMIT);
     const historyMax = Math.max(...historySource.map((snapshot) => (snapshot.viewers || []).length), 1);
 
     const viewerHistory = historySource.map((snapshot) => {

@@ -432,6 +432,14 @@
       <p class="notice notice--warning">{{chatStats.note}}</p>
     {{/if}}
 
+    <p class="section-description">
+      {{#eq chatStats.topChattersSource 'stream'}}
+        Топ за выбранный стрим.
+      {{else}}
+        Топ за всё время по всем записанным сообщениям.
+      {{/eq}}
+    </p>
+
     {{#if chatStats.hasTopChatters}}
       <ol class="leaderboard-list leaderboard-list--large">
         {{#each chatStats.topChatters}}
