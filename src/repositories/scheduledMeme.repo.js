@@ -111,6 +111,13 @@ function cancelIfPending(id) {
   return _map(row);
 }
 
+/**
+ * Удаление по id.
+ */
+function removeById(id) {
+  stmt('DELETE FROM scheduled_meme WHERE id = ?').run(id);
+}
+
 module.exports = {
   findByStatuses,
   countPending,
@@ -120,4 +127,5 @@ module.exports = {
   update,
   claimDue,
   cancelIfPending,
+  removeById,
 };

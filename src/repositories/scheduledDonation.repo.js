@@ -95,6 +95,13 @@ function cancelIfPending(id) {
   return _map(row);
 }
 
+/**
+ * Удаление по id.
+ */
+function removeById(id) {
+  stmt('DELETE FROM scheduled_donation WHERE id = ?').run(id);
+}
+
 module.exports = {
   findById,
   findByStatuses,
@@ -104,4 +111,5 @@ module.exports = {
   claimDue,
   claimForManualSend,
   cancelIfPending,
+  removeById,
 };

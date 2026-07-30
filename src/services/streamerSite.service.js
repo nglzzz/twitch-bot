@@ -757,6 +757,16 @@ async function loadChatterStats(chatterName) {
       }
     }
 
+    // Склейка «замечен» с границами сообщений: сам факт отправки сообщения
+    // означает присутствие в чате, поэтому «замечен» всегда должен покрывать
+    // «сообщение». Снапшоты viewer пишутся только таймером saveViewersTimer
+    // (раз в 5 минут и только когда стрим live), из-за чего «Последний раз
+    // замечен» мог оказаться старее «Последнее сообщение».
+    const firstSeenEpochs = [firstSeenAsViewerAt, stat.firstMessageAt].filter(Number.isFinite);
+    firstSeenAsViewerAt = firstSeenEpochs.length ? Math.min(...firstSeenEpochs) : null;
+    const lastSeenEpochs = [lastSeenAsViewerAt, stat.lastMessageAt].filter(Number.isFinite);
+    lastSeenAsViewerAt = lastSeenEpochs.length ? Math.max(...lastSeenEpochs) : null;
+
     // Build hourly activity array (0-23)
     const hourlyMap = new Array(24).fill(0);
     hourlyActivity.forEach(h => { hourlyMap[h._id] = h.count; });

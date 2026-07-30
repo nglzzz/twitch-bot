@@ -238,6 +238,11 @@ routes.post('/admin/donations/:id/cancel', adminForm, requireAdmin, requireCsrf,
   return res.redirect('/admin/donations?success=Задача+отменена');
 });
 
+routes.post('/admin/donations/:id/delete', adminForm, requireAdmin, requireCsrf, async (req, res) => {
+  scheduledDonationRepo.removeById(req.params.id);
+  return res.redirect('/admin/donations?success=Задача+удалена');
+});
+
 routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
   try {
     const filter = String(req.query.test || 'all');
@@ -313,6 +318,11 @@ routes.post('/admin/memes', adminForm, requireAdmin, requireCsrf, async (req, re
 routes.post('/admin/memes/:id/cancel', adminForm, requireAdmin, requireCsrf, async (req, res) => {
   scheduledMemeRepo.cancelIfPending(req.params.id);
   return res.redirect('/admin/memes?success=Задача+отменена');
+});
+
+routes.post('/admin/memes/:id/delete', adminForm, requireAdmin, requireCsrf, async (req, res) => {
+  scheduledMemeRepo.removeById(req.params.id);
+  return res.redirect('/admin/memes?success=Задача+удалена');
 });
 
 routes.get('/admin/users', requireAdmin, async (req, res, next) => {
