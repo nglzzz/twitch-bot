@@ -184,13 +184,13 @@
     </div>
     <div class="panel">
       <div class="panel__head">
-        <h3>🏆 Топ чаттеров за стрим</h3>
+        <h3>🏆 Топ чаттеров</h3>
         <a class="panel__link" href="/stats">Вся статистика →</a>
       </div>
       {{#if chatStats.hasTopChatters}}
         <ol class="leaderboard">
           {{#each chatStats.topChatters}}
-            {{#if (lt position 6)}}
+            {{#if (lt position 11)}}
               <li class="leaderboard__item">
                 <span class="leaderboard__pos leaderboard__pos--{{position}}">{{position}}</span>
                 <div class="leaderboard__info">

@@ -1,17 +1,13 @@
 const axios = require('axios');
 const config = require('../config');
-const db = require('../app/db');
-const ScheduledDonation = require('../models/scheduledDonation.model');
-const ScheduledMeme = require('../models/scheduledMeme.model');
+const { isDbReady } = require('../app/db');
+const scheduledDonationRepo = require('../repositories/scheduledDonation.repo');
+const scheduledMemeRepo = require('../repositories/scheduledMeme.repo');
 const { createAndSendDonation } = require('./donations.service');
 const { getRuntimeSettings } = require('./adminSettings.service');
 const randomMeme = require('../rewards/randomMeme');
 
 let timer = null;
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
 
 async function sendMeme(meme) {
   const settings = await getRuntimeSettings();
@@ -59,44 +55,34 @@ async function sendMeme(meme) {
 
 async function processDueDonations() {
   while (true) {
-    const item = await ScheduledDonation.findOneAndUpdate(
-      { status: 'pending', scheduledFor: { $lte: new Date() } },
-      { $set: { status: 'processing', error: null } },
-      { sort: { scheduledFor: 1 }, new: true }
-    );
+    const item = scheduledDonationRepo.claimDue();
     if (!item) return;
     try {
       await createAndSendDonation(item, 'scheduled');
-      item.status = 'sent';
-      item.sentAt = new Date();
-      await item.save();
+      scheduledDonationRepo.update(item._id, { status: 'sent', sentAt: new Date() });
     } catch (error) {
-      item.status = 'failed';
-      item.error = error.response?.data?.message || error.message;
-      await item.save();
-      console.error('[Scheduler] Donation failed:', item.error);
+      scheduledDonationRepo.update(item._id, {
+        status: 'failed',
+        error: error.response?.data?.message || error.message,
+      });
+      console.error('[Scheduler] Donation failed:', error.response?.data?.message || error.message);
     }
   }
 }
 
 async function processDueMemes() {
   while (true) {
-    const item = await ScheduledMeme.findOneAndUpdate(
-      { status: 'pending', scheduledFor: { $lte: new Date() } },
-      { $set: { status: 'processing', error: null } },
-      { sort: { scheduledFor: 1 }, new: true }
-    );
+    const item = scheduledMemeRepo.claimDue();
     if (!item) return;
     try {
       await sendMeme(item);
-      item.status = 'sent';
-      item.sentAt = new Date();
-      await item.save();
+      scheduledMemeRepo.update(item._id, { status: 'sent', sentAt: new Date() });
     } catch (error) {
-      item.status = 'failed';
-      item.error = error.response?.data?.message || error.message;
-      await item.save();
-      console.error('[Scheduler] Meme failed:', item.error);
+      scheduledMemeRepo.update(item._id, {
+        status: 'failed',
+        error: error.response?.data?.message || error.message,
+      });
+      console.error('[Scheduler] Meme failed:', error.response?.data?.message || error.message);
     }
   }
 }

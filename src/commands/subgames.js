@@ -1,9 +1,7 @@
-const subGameModel = require('../models/subGame.model');
+const subGameRepo = require('../repositories/subGame.repo');
 
 async function onSubGamesCommand(channel, tags) {
-    const subGames = await subGameModel.find({
-      closedDate: null
-    });
+    const subGames = subGameRepo.findOpen();
 
     return 'Заказанные игры на сабдей: ' + subGames.map(subGame => subGame.user + ': ' + subGame.game).join(', ');
 }

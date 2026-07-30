@@ -1,10 +1,10 @@
 const config = require('../config');
-const db = require('../app/db');
-const chatLogModel = require('../models/chatLog.model');
-const viewerModel = require('../models/viewer.model');
-const StreamSession = require('../models/streamSession.model');
-const MemeLog = require('../models/memeLog.model');
-const Donation = require('../models/donation.model');
+const { isDbReady } = require('../app/db');
+const chatLogRepo = require('../repositories/chatLog.repo');
+const viewerRepo = require('../repositories/viewer.repo');
+const streamSessionRepo = require('../repositories/streamSession.repo');
+const memeLogRepo = require('../repositories/memeLog.repo');
+const donationRepo = require('../repositories/donation.repo');
 const { getLatestChatters, getRecentMessages } = require('../chat/chatters');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
 
@@ -15,41 +15,16 @@ const VIEWER_HISTORY_LIMIT = 24;
 const STREAMS_LIMIT = 30;
 const TOP_MEMERS_LIMIT = 10;
 const TOP_MEMES_LIMIT = 10;
-const CHATTER_STATS_LIMIT = 20;
+const DONATION_LIMIT = 20;
+const TOP_DONORS_LIMIT = 10;
 const DEFAULT_CHANNEL = (config.CHANNEL || 'nglzzz').toLowerCase();
 const TIMEZONE = config.TIMEZONE || 'Europe/Minsk';
 
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
-
-function isValidObjectId(id) {
-  return db?.Types?.ObjectId?.isValid(id) ?? false;
-}
-
-/**
- * Convert a value to a mongoose ObjectId, or null if invalid.
- * Required because Model.aggregate() does NOT cast strings to ObjectId
- * (unlike find/countDocuments), so $match on streamSessionId silently
- * matches nothing when given a raw string.
- */
-function toObjectId(value) {
-  if (!value || !isValidObjectId(value)) {
-    return null;
-  }
-
-  try {
-    return db.Types.ObjectId(value);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Resolve a raw stream filter value into a usable streamSessionId.
- * - "latest" (case-insensitive) resolves to the most recent StreamSession._id
- * - Valid ObjectId strings are returned as-is
- * - Anything else returns null (no filter)
+ * - "latest" (case-insensitive) resolves to the most recent stream_session id
+ * - any other non-empty string is returned as-is (TEXT PK в SQLite)
+ * - empty/null → null (no filter)
  */
 async function resolveStreamSessionId(rawId) {
   if (!rawId) {
@@ -68,25 +43,14 @@ async function resolveStreamSessionId(rawId) {
     }
 
     try {
-      const latest = await StreamSession
-        .findOne({})
-        .sort({ startedAt: -1 })
-        .select('_id')
-        .lean();
-
-      return latest ? latest._id : null;
+      return streamSessionRepo.findLatestId();
     } catch (error) {
       console.error('Error resolving latest stream session:', error.message);
       return null;
     }
   }
 
-  if (isValidObjectId(value)) {
-    return value;
-  }
-
-  console.warn(`Invalid streamSessionId ignored: "${value}"`);
-  return null;
+  return value;
 }
 
 function formatNumber(value) {
@@ -489,38 +453,16 @@ async function loadChatStats(streamSessionId) {
   }
 
   try {
-    const since = new Date(Date.now() - DAY_IN_MS);
-    const streamObjectId = toObjectId(streamSessionId);
-    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
+    const since = Date.now() - DAY_IN_MS;
+    const streamId = streamSessionId || null;
 
     // Топ чаттеров: при выборе конкретного стрима — по нему,
     // без фильтра («Все стримы») — за всё время.
-    const topChattersFilter = streamObjectId
-      ? { streamSessionId: streamObjectId }
-      : {};
-
-    const [recentMessages, totalMessages24h, totalMessagesAllTime, uniqueChatters24h, topChatters] = await Promise.all([
-      chatLogModel.find(streamFilter).sort({ createdAt: -1 }).limit(RECENT_MESSAGES_LIMIT).lean(),
-      chatLogModel.countDocuments({ ...streamFilter, createdAt: { $gte: since } }),
-      streamObjectId
-        ? chatLogModel.countDocuments(streamFilter)
-        : chatLogModel.estimatedDocumentCount(),
-      chatLogModel.distinct('user', { ...streamFilter, createdAt: { $gte: since } }),
-      chatLogModel.aggregate([
-        { $match: topChattersFilter },
-        { $sort: { createdAt: -1 } },
-        {
-          $group: {
-            _id: '$user',
-            displayName: { $first: '$displayName' },
-            messagesCount: { $sum: 1 },
-            lastMessageAt: { $first: '$createdAt' },
-          },
-        },
-        { $sort: { messagesCount: -1, lastMessageAt: -1 } },
-        { $limit: TOP_CHATTERS_LIMIT },
-      ]),
-    ]);
+    const recentMessages = chatLogRepo.findRecent({ streamSessionId: streamId, limit: RECENT_MESSAGES_LIMIT });
+    const totalMessages24h = chatLogRepo.countSince({ streamSessionId: streamId, since });
+    const totalMessagesAllTime = chatLogRepo.countSince({ streamSessionId: streamId });
+    const uniqueChatters24h = chatLogRepo.distinctUsersSince({ streamSessionId: streamId, since });
+    const topChatters = chatLogRepo.getTopChatters({ streamSessionId: streamId, limit: TOP_CHATTERS_LIMIT });
 
     const mappedRecentMessages = recentMessages.map(mapRecentMessage);
     const mappedTopChatters = topChatters.map((entry, index) => ({
@@ -537,15 +479,15 @@ async function loadChatStats(streamSessionId) {
       dbAvailable: true,
       recentMessages: mappedRecentMessages.length > 0 ? mappedRecentMessages : memoryRecentMessages,
       hasRecentMessages: mappedRecentMessages.length > 0 || memoryRecentMessages.length > 0,
-      topChattersSource: streamObjectId ? 'stream' : 'allTime',
+      topChattersSource: streamId ? 'stream' : 'allTime',
       topChatters: mappedTopChatters.length > 0 ? mappedTopChatters : fallbackTopChatters,
       hasTopChatters: mappedTopChatters.length > 0 || fallbackTopChatters.length > 0,
       totalMessages24h,
       totalMessages24hLabel: formatNumber(totalMessages24h),
       totalMessagesAllTime,
       totalMessagesAllTimeLabel: formatNumber(totalMessagesAllTime),
-      uniqueChatters24h: uniqueChatters24h.length,
-      uniqueChatters24hLabel: formatNumber(uniqueChatters24h.length),
+      uniqueChatters24h,
+      uniqueChatters24hLabel: formatNumber(uniqueChatters24h),
       activeChattersNow: memoryActiveChatters,
       activeChattersNowLabel: formatNumber(memoryActiveChatters),
       note: null,
@@ -553,7 +495,7 @@ async function loadChatStats(streamSessionId) {
   } catch (error) {
     return {
       ...fallback,
-      note: `Не удалось прочитать chatLog из MongoDB: ${error.message}`,
+      note: `Не удалось прочитать chatLog: ${error.message}`,
     };
   }
 }
@@ -582,24 +524,21 @@ async function loadViewerStats(streamSessionId) {
   }
 
   try {
-    const since = new Date(Date.now() - DAY_IN_MS);
-    const streamObjectId = toObjectId(streamSessionId);
-    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
+    const since = Date.now() - DAY_IN_MS;
+    const streamId = streamSessionId || null;
 
-    const [snapshots, totalSnapshots] = await Promise.all([
-      viewerModel.find({ ...streamFilter, ...(!streamObjectId ? { createdAt: { $gte: since } } : {}) })
-        .sort({ createdAt: 1 })
-        .limit(streamObjectId ? 0 : 288)
-        .lean(),
-      viewerModel.countDocuments(streamFilter),
-    ]);
+    // При фильтре по стриму — без лимита (limit 0); иначе — только за 24ч, до 288 срезов.
+    const snapshots = streamId
+      ? viewerRepo.findSnapshots({ streamSessionId: streamId })
+      : viewerRepo.findSnapshots({ since, limit: 288 });
+    const totalSnapshots = viewerRepo.countSnapshots({ streamSessionId: streamId });
 
     if (snapshots.length === 0) {
       return {
         ...fallback,
         source: 'database',
         dbAvailable: true,
-        filteredByStream: Boolean(streamObjectId),
+        filteredByStream: Boolean(streamId),
         totalSnapshots,
         totalSnapshotsLabel: formatNumber(totalSnapshots),
       };
@@ -635,7 +574,7 @@ async function loadViewerStats(streamSessionId) {
     return {
       source: 'database',
       dbAvailable: true,
-      filteredByStream: Boolean(streamObjectId),
+      filteredByStream: Boolean(streamId),
       latestViewerCount: (latestSnapshot.viewers || []).length,
       latestViewerCountLabel: formatNumber((latestSnapshot.viewers || []).length),
       peakViewerCount24h: maxViewerCount,
@@ -653,7 +592,7 @@ async function loadViewerStats(streamSessionId) {
   } catch (error) {
     return {
       ...fallback,
-      note: `Не удалось прочитать viewer-лог из MongoDB: ${error.message}`,
+      note: `Не удалось прочитать viewer-лог: ${error.message}`,
     };
   }
 }
@@ -664,11 +603,7 @@ async function loadStreamSessions() {
   }
 
   try {
-    const streams = await StreamSession
-      .find({})
-      .sort({ startedAt: -1 })
-      .limit(STREAMS_LIMIT)
-      .lean();
+    const streams = streamSessionRepo.findRecent(STREAMS_LIMIT);
 
     const mapped = streams.map((s) => ({
       id: s._id,
@@ -726,42 +661,12 @@ async function loadMemeStats(streamSessionId) {
   }
 
   try {
-    const streamObjectId = toObjectId(streamSessionId);
-    const streamFilter = streamObjectId ? { streamSessionId: streamObjectId } : {};
+    const streamId = streamSessionId || null;
 
-    const [totalMemes, topMemers, topMemes, recentMemes] = await Promise.all([
-      MemeLog.countDocuments(streamFilter),
-      MemeLog.aggregate([
-        { $match: { ...streamFilter } },
-        {
-          $group: {
-            _id: '$user',
-            userAlias: { $first: '$userAlias' },
-            memesCount: { $sum: 1 },
-            lastMemeAt: { $max: '$sentAt' },
-          },
-        },
-        { $sort: { memesCount: -1, lastMemeAt: -1 } },
-        { $limit: TOP_MEMERS_LIMIT },
-      ]),
-      MemeLog.aggregate([
-        { $match: { ...streamFilter } },
-        {
-          $group: {
-            _id: '$stickerName',
-            stickerName: { $first: '$stickerName' },
-            usageCount: { $sum: 1 },
-            lastUsedAt: { $max: '$sentAt' },
-          },
-        },
-        { $sort: { usageCount: -1, lastUsedAt: -1 } },
-        { $limit: TOP_MEMES_LIMIT },
-      ]),
-      MemeLog.find(streamFilter)
-        .sort({ sentAt: -1 })
-        .limit(15)
-        .lean(),
-    ]);
+    const totalMemes = memeLogRepo.count({ streamSessionId: streamId });
+    const topMemers = memeLogRepo.getTopMemers({ streamSessionId: streamId, limit: TOP_MEMERS_LIMIT });
+    const topMemes = memeLogRepo.getTopMemes({ streamSessionId: streamId, limit: TOP_MEMES_LIMIT });
+    const recentMemes = memeLogRepo.findRecent({ streamSessionId: streamId, limit: 15 });
 
     const mappedTopMemers = topMemers.map((entry, index) => ({
       position: index + 1,
@@ -814,75 +719,21 @@ async function loadChatterStats(chatterName) {
   try {
     const user = String(chatterName).toLowerCase().trim();
 
-    const [messages, stats, memeAgg, hourlyActivity, dailyActivity, rankAgg, viewerSnapshots] = await Promise.all([
-      chatLogModel
-        .find({ user })
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .lean(),
-      chatLogModel.aggregate([
-        { $match: { user } },
-        {
-          $group: {
-            _id: '$user',
-            displayName: { $first: '$displayName' },
-            totalMessages: { $sum: 1 },
-            firstMessageAt: { $min: '$createdAt' },
-            lastMessageAt: { $max: '$createdAt' },
-            streams: { $addToSet: '$streamSessionId' },
-          },
-        },
-      ]),
-      MemeLog.aggregate([
-        { $match: { user } },
-        {
-          $group: {
-            _id: null,
-            totalMemes: { $sum: 1 },
-            firstMemeAt: { $min: '$sentAt' },
-            lastMemeAt: { $max: '$sentAt' },
-            stickers: { $push: '$stickerName' },
-          },
-        },
-      ]),
-      chatLogModel.aggregate([
-        { $match: { user } },
-        {
-          $group: {
-            _id: { $hour: '$createdAt' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { _id: 1 } },
-      ]),
-      chatLogModel.aggregate([
-        { $match: { user } },
-        {
-          $group: {
-            _id: { $dayOfWeek: '$createdAt' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { _id: 1 } },
-      ]),
-      chatLogModel.aggregate([
-        { $group: { _id: '$user', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ]),
-      // Find viewer snapshots where this user was present (each snapshot = 5 min interval)
-      viewerModel
-        .find({ viewers: user })
-        .sort({ createdAt: 1 })
-        .lean(),
-    ]);
+    const messages = chatLogRepo.findRecentByUser(user, 50);
+    const stats = chatLogRepo.getUserLifetimeStats(user);
+    const memeDataAgg = memeLogRepo.getUserMemeStats(user);
+    const hourlyActivity = chatLogRepo.getUserHourlyActivity(user);
+    const dailyActivity = chatLogRepo.getUserWeeklyActivity(user);
+    const rank = chatLogRepo.getUserRank(user);
+    const viewerSnapshots = viewerRepo.findSnapshotsByUser(user);
 
-    if (!stats || stats.length === 0) {
+    if (!stats) {
       return { notFound: true, searchedUser: user };
     }
 
-    const stat = stats[0];
-    const uniqueStreams = (stat.streams || []).filter(Boolean);
-    const rank = rankAgg.findIndex(entry => entry._id === user) + 1;
+    const stat = stats;
+    // streams — COUNT(DISTINCT stream_session_id), уже число.
+    const streamsCount = Number(stat.streams) || 0;
 
     // Estimate watch time from viewer snapshots (each snapshot = 5 min interval)
     let watchTimeMinutes = 0;
@@ -912,7 +763,7 @@ async function loadChatterStats(chatterName) {
     const peakHour = hourlyMap.indexOf(Math.max(...hourlyMap));
     const maxHourlyCount = Math.max(...hourlyMap);
 
-    // Build daily activity array (1-7, MongoDB dayOfWeek: 1=Sunday)
+    // Build daily activity array (1-7, приведено к нотации Mongo: 1=Sunday)
     const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     const dailyMap = new Array(7).fill(0);
     dailyActivity.forEach(d => { dailyMap[d._id - 1] = d.count; });
@@ -921,23 +772,14 @@ async function loadChatterStats(chatterName) {
 
     // Process meme stats
     let memeData = null;
-    if (memeAgg.length > 0) {
-      const memeCounts = new Map();
-      (memeAgg[0].stickers || []).forEach(name => {
-        if (name) memeCounts.set(name, (memeCounts.get(name) || 0) + 1);
-      });
-      const topUserMemes = Array.from(memeCounts.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ stickerName: name, count, countLabel: formatNumber(count) }));
-
+    if (memeDataAgg) {
       memeData = {
-        totalMemes: memeAgg[0].totalMemes,
-        totalMemesLabel: formatNumber(memeAgg[0].totalMemes),
-        firstMemeAtLabel: formatDateTime(memeAgg[0].firstMemeAt),
-        lastMemeAtLabel: formatDateTime(memeAgg[0].lastMemeAt),
-        topMemes: topUserMemes,
-        hasTopMemes: topUserMemes.length > 0,
+        totalMemes: memeDataAgg.totalMemes,
+        totalMemesLabel: formatNumber(memeDataAgg.totalMemes),
+        firstMemeAtLabel: formatDateTime(memeDataAgg.firstMemeAt),
+        lastMemeAtLabel: formatDateTime(memeDataAgg.lastMemeAt),
+        topMemes: (memeDataAgg.topMemes || []).map((m) => ({ stickerName: m.stickerName, count: m.count, countLabel: formatNumber(m.count) })),
+        hasTopMemes: (memeDataAgg.topMemes || []).length > 0,
       };
     }
 
@@ -973,8 +815,8 @@ async function loadChatterStats(chatterName) {
       firstMessageAtLabel: formatDateTime(stat.firstMessageAt),
       lastMessageAt: stat.lastMessageAt,
       lastMessageAtLabel: formatDateTime(stat.lastMessageAt),
-      streamsCount: uniqueStreams.length,
-      streamsCountLabel: formatNumber(uniqueStreams.length),
+      streamsCount,
+      streamsCountLabel: formatNumber(streamsCount),
       watchTimeMinutes,
       watchTimeLabel,
       viewerSnapshotCount,
@@ -983,14 +825,14 @@ async function loadChatterStats(chatterName) {
       firstSeenAsViewerAtLabel: firstSeenAsViewerAt ? formatDateTime(firstSeenAsViewerAt) : null,
       lastSeenAsViewerAt,
       lastSeenAsViewerAtLabel: lastSeenAsViewerAt ? formatDateTime(lastSeenAsViewerAt) : null,
-      avgMessagesPerStream: uniqueStreams.length > 0
-        ? Math.round(stat.totalMessages / uniqueStreams.length)
+      avgMessagesPerStream: streamsCount > 0
+        ? Math.round(stat.totalMessages / streamsCount)
         : stat.totalMessages,
-      avgMessagesPerStreamLabel: uniqueStreams.length > 0
-        ? formatNumber(Math.round(stat.totalMessages / uniqueStreams.length))
+      avgMessagesPerStreamLabel: streamsCount > 0
+        ? formatNumber(Math.round(stat.totalMessages / streamsCount))
         : formatNumber(stat.totalMessages),
-      rank: rank > 0 ? rank : null,
-      rankLabel: rank > 0 ? `#${rank}` : '—',
+      rank: rank ? rank : null,
+      rankLabel: rank ? `#${rank}` : '—',
       activityLevel,
       activityLevelClass,
       peakHourLabel: peakHour >= 0 && maxHourlyCount > 0
@@ -1010,18 +852,13 @@ async function loadChatterStats(chatterName) {
 }
 
 async function loadStreamOverview(streamSessionId) {
-  if (!streamSessionId || !isDbReady() || !isValidObjectId(streamSessionId)) {
+  if (!streamSessionId || !isDbReady()) {
     return null;
   }
 
   try {
-    const [stream, donationStats] = await Promise.all([
-      StreamSession.findById(streamSessionId).lean(),
-      Donation.aggregate([
-        { $match: { streamSessionId: toObjectId(streamSessionId), status: 'sent' } },
-        { $group: { _id: null, donationsCount: { $sum: 1 }, donationsAmount: { $sum: '$amount' } } },
-      ]),
-    ]);
+    const stream = streamSessionRepo.findById(streamSessionId);
+    const donationStats = donationRepo.getSentTotals({ streamSessionId });
 
     if (!stream) {
       return null;
@@ -1048,14 +885,63 @@ async function loadStreamOverview(streamSessionId) {
       uniqueChattersLabel: formatNumber(stream.uniqueChatters),
       memesCount: stream.memesCount || 0,
       memesCountLabel: formatNumber(stream.memesCount),
-      donationsCount: donationStats[0]?.donationsCount || 0,
-      donationsCountLabel: formatNumber(donationStats[0]?.donationsCount || 0),
-      donationsAmount: donationStats[0]?.donationsAmount || 0,
-      donationsAmountLabel: `${formatNumber(donationStats[0]?.donationsAmount || 0)} ₽`,
+      donationsCount: donationStats.donationsCount,
+      donationsCountLabel: formatNumber(donationStats.donationsCount),
+      donationsAmount: donationStats.donationsAmount,
+      donationsAmountLabel: `${formatNumber(donationStats.donationsAmount)} ₽`,
     };
   } catch (error) {
     console.error('Error loading stream overview:', error.message);
     return null;
+  }
+}
+
+async function loadDonationStats(streamSessionId) {
+  const fallback = {
+    dbAvailable: false,
+    recentDonations: [],
+    hasRecentDonations: false,
+    topDonors: [],
+    hasTopDonors: false,
+  };
+
+  if (!isDbReady()) {
+    return fallback;
+  }
+
+  try {
+    const streamId = streamSessionId || null;
+
+    const recentDonations = donationRepo.findMany({ streamSessionId: streamId, status: 'sent', limit: DONATION_LIMIT });
+    const topDonors = donationRepo.getTopDonors({ streamSessionId: streamId, limit: TOP_DONORS_LIMIT });
+
+    const mappedRecent = recentDonations.map((donation) => ({
+      donorName: donation.donorName,
+      amountLabel: `${formatNumber(donation.amount)} ₽`,
+      message: donation.message,
+      createdAtLabel: formatShortDateTime(donation.createdAt),
+    }));
+
+    const mappedTopDonors = topDonors.map((entry, index) => ({
+      position: index + 1,
+      donorName: entry._id,
+      donationsCount: entry.donationsCount,
+      donationsCountLabel: formatNumber(entry.donationsCount),
+      totalAmount: entry.totalAmount,
+      totalAmountLabel: `${formatNumber(entry.totalAmount)} ₽`,
+      lastAtLabel: formatShortDateTime(entry.lastAt),
+    }));
+
+    return {
+      dbAvailable: true,
+      recentDonations: mappedRecent,
+      hasRecentDonations: mappedRecent.length > 0,
+      topDonors: mappedTopDonors,
+      hasTopDonors: mappedTopDonors.length > 0,
+    };
+  } catch (error) {
+    console.error('Error loading donation stats:', error.message);
+    return { ...fallback, dbAvailable: isDbReady() };
   }
 }
 
@@ -1077,49 +963,27 @@ async function loadOverallStats() {
       totalDonationsAmountLabel: '—',
       peakViewersAllTime: 0,
       peakViewersAllTimeLabel: '—',
+      peakViewersAllTimeAtLabel: '—',
       avgStreamDuration: '—',
     };
   }
 
   try {
-    const [totalStreams, totalMessages, totalMemes, uniqueChattersAgg, peakStream, donationStats] = await Promise.all([
-      StreamSession.countDocuments({}),
-      chatLogModel.estimatedDocumentCount(),
-      MemeLog.countDocuments({}),
-      chatLogModel.aggregate([
-        { $group: { _id: '$user' } },
-        { $count: 'total' },
-      ]),
-      StreamSession
-        .findOne({})
-        .sort({ maxViewers: -1 })
-        .lean(),
-      Donation.aggregate([
-        { $match: { status: 'sent' } },
-        { $group: { _id: null, donationsCount: { $sum: 1 }, donationsAmount: { $sum: '$amount' } } },
-      ]),
-    ]);
-
-    const uniqueChatters = uniqueChattersAgg.length > 0 ? uniqueChattersAgg[0].total : 0;
+    const totalStreams = streamSessionRepo.countAll();
+    const totalMessages = chatLogRepo.countAll();
+    const totalMemes = memeLogRepo.countAll();
+    const uniqueChatters = chatLogRepo.countDistinctUsers();
+    const peakStream = streamSessionRepo.findPeakByViewers();
+    const donationStats = donationRepo.getSentTotals({});
 
     // Calculate average stream duration
-    const durationAgg = await StreamSession.aggregate([
-      { $match: { status: 'ended', startedAt: { $ne: null }, endedAt: { $ne: null } } },
-      {
-        $group: {
-          _id: null,
-          avgDurationMs: {
-            $avg: { $subtract: ['$endedAt', '$startedAt'] },
-          },
-        },
-      },
-    ]);
+    const avgDurationMsValue = streamSessionRepo.avgDurationMs();
 
     let avgStreamDuration = '—';
-    if (durationAgg.length > 0 && durationAgg[0].avgDurationMs) {
+    if (avgDurationMsValue) {
       avgStreamDuration = formatDuration(
         new Date(0),
-        new Date(durationAgg[0].avgDurationMs)
+        new Date(avgDurationMsValue)
       );
     }
 
@@ -1133,12 +997,13 @@ async function loadOverallStats() {
       totalUniqueChattersLabel: formatNumber(uniqueChatters),
       totalMemes,
       totalMemesLabel: formatNumber(totalMemes),
-      totalDonations: donationStats[0]?.donationsCount || 0,
-      totalDonationsLabel: formatNumber(donationStats[0]?.donationsCount || 0),
-      totalDonationsAmount: donationStats[0]?.donationsAmount || 0,
-      totalDonationsAmountLabel: `${formatNumber(donationStats[0]?.donationsAmount || 0)} ₽`,
+      totalDonations: donationStats.donationsCount,
+      totalDonationsLabel: formatNumber(donationStats.donationsCount),
+      totalDonationsAmount: donationStats.donationsAmount,
+      totalDonationsAmountLabel: `${formatNumber(donationStats.donationsAmount)} ₽`,
       peakViewersAllTime: peakStream ? peakStream.maxViewers : 0,
       peakViewersAllTimeLabel: formatNumber(peakStream ? peakStream.maxViewers : 0),
+      peakViewersAllTimeAtLabel: peakStream ? formatDate(peakStream.lastSeenAt || peakStream.startedAt) : '—',
       avgStreamDuration,
     };
   } catch (error) {
@@ -1248,13 +1113,14 @@ async function buildStatsPageData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
   const chatterName = filters?.chatter || null;
 
-  const [shared, streamSessions, memeStats, overallStats, chatterStats, streamOverview] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, chatterStats, streamOverview, donationStats] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
     loadOverallStats(),
     chatterName ? loadChatterStats(chatterName) : Promise.resolve(null),
     loadStreamOverview(streamSessionId),
+    loadDonationStats(streamSessionId),
   ]);
 
   // If filtering by stream, reload viewer/chat stats with filter
@@ -1281,6 +1147,7 @@ async function buildStatsPageData(hostname, filters) {
     overallStats,
     chatterStats,
     streamOverview,
+    donationStats,
     filters: {
       streamId: streamSessionId || '',
       chatter: chatterName || '',
@@ -1302,12 +1169,13 @@ async function getSummaryApiData(hostname) {
 async function getStatsApiData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
 
-  const [shared, streamSessions, memeStats, overallStats, streamOverview] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, streamOverview, donationStats] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
     loadOverallStats(),
     loadStreamOverview(streamSessionId),
+    loadDonationStats(streamSessionId),
   ]);
 
   return {
@@ -1319,6 +1187,7 @@ async function getStatsApiData(hostname, filters) {
     memeStats,
     overallStats,
     streamOverview,
+    donationStats,
   };
 }
 

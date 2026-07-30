@@ -1,4 +1,4 @@
-const subGameModel = require('../models/subGame.model');
+const subGameRepo = require('../repositories/subGame.repo');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onSubGameCommand(channel, tags, message) {
@@ -16,31 +16,19 @@ async function onSubGameCommand(channel, tags, message) {
     return getCurrentUserGame(user);
   }
 
-  let subGame = await subGameModel.findOne({
-    user: user,
-    closedDate: null
-  });
+  const subGame = subGameRepo.findOneOpenByUser(user);
 
-  if (null === subGame) {
-    subGame = new subGameModel({
-      game: subject,
-      user: user,
-    });
+  if (!subGame) {
+    subGameRepo.create({ game: subject, user });
   } else {
-    subGame.game = subject;
-    subGame.updatedAt = new Date();
+    subGameRepo.update(subGame._id, { game: subject });
   }
-
-  subGame.save();
 
   return `@${chatter}, заказ принят. Игра: "${subject}"`;
 }
 
 async function getCurrentUserGame(username) {
-  const subGame = await subGameModel.findOne({
-    user: username,
-    closedDate: null
-  });
+  const subGame = subGameRepo.findOneOpenByUser(username);
 
   if (!subGame) {
     return `@${username}, у тебя нет заказанных игр. Готов заказать?`;

@@ -104,3 +104,9 @@ dist
 .tern-port
 
 storage/
+
+# SQLite database files
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

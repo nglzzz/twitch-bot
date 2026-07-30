@@ -34,9 +34,6 @@ app.engine('handlebars', handlebars({
       return Array.prototype.slice.call(arguments, 0, -1).some(Boolean);
     },
     toString: function (value) {
-      if (value && typeof value.toString === 'function' && value.constructor.name === 'ObjectId') {
-        return value.toString();
-      }
       return String(value != null ? value : '');
     },
   },

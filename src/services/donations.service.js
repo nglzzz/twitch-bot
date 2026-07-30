@@ -1,17 +1,13 @@
 const axios = require('axios');
 const io = require('socket.io-client');
 const config = require('../config');
-const db = require('../app/db');
-const Donation = require('../models/donation.model');
+const { isDbReady } = require('../app/db');
+const donationRepo = require('../repositories/donation.repo');
 const { getActiveSession } = require('./streamTracker.service');
 const { getRuntimeSettings } = require('./adminSettings.service');
 
 let socket = null;
 let activeToken = null;
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
 
 function normaliseAmount(value) {
   const amount = Number(value);
@@ -78,14 +74,15 @@ async function sendTipToStreamElements(donation, runtimeSettings) {
 }
 
 async function createAndSendDonation(data, source) {
-  if (!isDbReady()) throw new Error('MongoDB is unavailable');
-  const existing = data.externalId ? await Donation.findOne({ source, externalId: data.externalId }) : null;
+  if (!isDbReady()) throw new Error('Database is unavailable');
+  const existing = data.externalId ? donationRepo.findOneByExternalId(source, String(data.externalId)) : null;
   if (existing?.status === 'sent') return existing;
   const activeSession = await getActiveSession();
-  const donation = existing || new Donation({
+
+  const donationData = {
     source,
     isTest: source !== 'donationalerts',
-    ...(data.externalId ? { externalId: String(data.externalId) } : {}),
+    externalId: data.externalId ? String(data.externalId) : null,
     donorId: data.donorId || '',
     donorName: String(data.donorName || 'Anonymous').trim().slice(0, 100),
     amount: normaliseAmount(data.amount),
@@ -93,39 +90,29 @@ async function createAndSendDonation(data, source) {
     message: String(data.message || '').slice(0, 255),
     raw: data.raw || null,
     streamSessionId: activeSession?._id || null,
-  });
-  donation.status = 'pending';
-  donation.error = null;
-  await donation.save();
+  };
+
+  let donation;
+  if (existing) {
+    donation = donationRepo.update(existing._id, { ...donationData, status: 'pending', error: null });
+  } else {
+    donation = donationRepo.create({ ...donationData, status: 'pending', error: null });
+  }
+
   try {
     const response = await sendTipToStreamElements(donation);
-    donation.status = 'sent';
-    donation.streamElementsActivityId = response?._id || response?.id || null;
-    await donation.save();
+    donation = donationRepo.update(donation._id, {
+      status: 'sent',
+      error: null,
+      streamElementsActivityId: response?._id || response?.id || null,
+    });
     return donation;
   } catch (error) {
-    donation.status = 'failed';
-    donation.error = formatRemoteError(error);
-    await donation.save();
+    donationRepo.update(donation._id, {
+      status: 'failed',
+      error: formatRemoteError(error),
+    });
     throw error;
-  }
-}
-
-async function ensureDonationIndexes() {
-  if (!isDbReady()) return;
-  const indexesCursor = await Donation.collection.listIndexes();
-  const indexes = await indexesCursor.toArray();
-  const legacyIndex = indexes.find((index) => index.name === 'source_1_externalId_1');
-  if (legacyIndex) {
-    await Donation.collection.dropIndex(legacyIndex.name);
-    console.log('[Donations] Removed legacy nullable externalId index');
-  }
-  const currentIndex = indexes.find((index) => index.name === 'source_externalId_unique');
-  if (!currentIndex) {
-    await Donation.collection.createIndex(
-      { source: 1, externalId: 1 },
-      { unique: true, partialFilterExpression: { externalId: { $type: 'string' } }, name: 'source_externalId_unique' }
-    );
   }
 }
 
@@ -219,7 +206,6 @@ async function refreshDonationAlertsConnection() {
 
 module.exports = {
   createAndSendDonation,
-  ensureDonationIndexes,
   connectDonationAlerts,
   disconnectDonationAlerts,
   refreshDonationAlertsConnection,

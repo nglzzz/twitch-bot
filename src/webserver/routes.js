@@ -1,11 +1,13 @@
 const express = require('express');
 const routes = express.Router();
 const db = require('../app/db');
+const { isDbReady } = require('../app/db');
 const config = require('../config');
-const AdminUser = require('../models/adminUser.model');
-const Donation = require('../models/donation.model');
-const ScheduledDonation = require('../models/scheduledDonation.model');
-const ScheduledMeme = require('../models/scheduledMeme.model');
+const adminUserRepo = require('../repositories/adminUser.repo');
+const donationRepo = require('../repositories/donation.repo');
+const scheduledDonationRepo = require('../repositories/scheduledDonation.repo');
+const scheduledMemeRepo = require('../repositories/scheduledMeme.repo');
+const chatLogRepo = require('../repositories/chatLog.repo');
 const speech = require('../utils/speech');
 const {
   ensureInitialAdmin,
@@ -30,10 +32,6 @@ const {
 } = require('../services/streamerSite.service');
 
 const adminForm = express.urlencoded({ extended: false, limit: '32kb' });
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
 
 function adminNavigation(currentPage) {
   return [
@@ -103,16 +101,15 @@ routes.get('/admin/login', (req, res) => {
 
 routes.post('/admin/login', adminForm, async (req, res, next) => {
   try {
-    if (!isDbReady()) return res.redirect('/admin/login?error=MongoDB%20недоступна');
+    if (!isDbReady()) return res.redirect('/admin/login?error=База%20данных%20недоступна');
     await ensureInitialAdmin();
     const username = String(req.body.username || '').trim().toLowerCase();
     const password = String(req.body.password || '');
-    const user = await AdminUser.findOne({ username });
+    const user = adminUserRepo.findOneByUsername(username);
     if (!user || !user.isActive || !verifyPassword(password, user.passwordHash)) {
       return res.redirect('/admin/login?error=Неверный%20логин%20или%20пароль');
     }
-    user.lastLoginAt = new Date();
-    await user.save();
+    adminUserRepo.update(user._id, { lastLoginAt: new Date() });
     setSessionCookie(req, res, user);
     return res.redirect(user.mustChangePassword ? '/admin/change-password' : '/admin');
   } catch (error) {
@@ -137,26 +134,24 @@ routes.post('/admin/change-password', adminForm, requireAdmin, requireCsrf, asyn
   if (password.length < 12) return res.redirect('/admin/change-password?error=Пароль+должен+содержать+минимум+12+символов');
   if (password !== confirmation) return res.redirect('/admin/change-password?error=Пароли+не+совпадают');
   if (password === DEFAULT_PASSWORD) return res.redirect('/admin/change-password?error=Нельзя+оставить+временный+пароль');
-  const user = await AdminUser.findById(req.adminUser._id);
-  user.passwordHash = createPasswordHash(password);
-  user.mustChangePassword = false;
-  await user.save();
+  adminUserRepo.update(req.adminUser._id, {
+    passwordHash: createPasswordHash(password),
+    mustChangePassword: false,
+  });
   return res.redirect('/admin?success=Пароль+изменён');
 });
 
 routes.get('/admin', requireAdmin, async (req, res, next) => {
   try {
-    const [recentDonations, pendingDonations, pendingMemes, totals] = await Promise.all([
-      Donation.find().sort({ createdAt: -1 }).limit(12).lean(),
-      ScheduledDonation.countDocuments({ status: 'pending' }),
-      ScheduledMeme.countDocuments({ status: 'pending' }),
-      Donation.aggregate([{ $match: { status: 'sent' } }, { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$amount' } } }]),
-    ]);
+    const recentDonations = donationRepo.findMany({ limit: 12 });
+    const pendingDonations = scheduledDonationRepo.countPending();
+    const pendingMemes = scheduledMemeRepo.countPending();
+    const totals = donationRepo.getSentTotals({});
     return res.render('pages/admin-dashboard', adminPage('dashboard', {
       recentDonations: recentDonations.map((item) => ({ ...item, amountLabel: `${item.amount} ${item.currency}`, createdAtLabel: formatAdminDate(item.createdAt) })),
       hasRecentDonations: recentDonations.length > 0,
-      totalDonations: totals[0]?.count || 0,
-      totalAmount: (totals[0]?.amount || 0).toLocaleString('ru-RU'),
+      totalDonations: totals.donationsCount,
+      totalAmount: totals.donationsAmount.toLocaleString('ru-RU'),
       pendingDonations,
       pendingMemes,
       success: req.query.success || null,
@@ -199,7 +194,7 @@ routes.post('/admin/settings', adminForm, requireAdmin, requireCsrf, async (req,
 
 routes.get('/admin/donations', requireAdmin, async (req, res, next) => {
   try {
-    const items = await ScheduledDonation.find({ status: { $in: ['pending', 'processing', 'failed'] } }).sort({ scheduledFor: 1 }).limit(100).lean();
+    const items = scheduledDonationRepo.findByStatuses(['pending', 'processing', 'failed']);
     return res.render('pages/admin-donations', adminPage('donations', {
       scheduledDonations: items.map((item) => ({ ...item, scheduledForLabel: formatAdminDate(item.scheduledFor), amountLabel: `${item.amount} ${item.currency}`, errorLabel: item.error || '' })),
       hasScheduledDonations: items.length > 0,
@@ -212,7 +207,7 @@ routes.get('/admin/donations', requireAdmin, async (req, res, next) => {
 
 routes.post('/admin/donations', adminForm, requireAdmin, requireCsrf, async (req, res) => {
   try {
-    await ScheduledDonation.create({
+    scheduledDonationRepo.create({
       donorName: String(req.body.donorName || '').trim() || 'Anonymous',
       amount: parseAmount(req.body.amount),
       currency: String(req.body.currency || 'RUB').toUpperCase(),
@@ -225,36 +220,29 @@ routes.post('/admin/donations', adminForm, requireAdmin, requireCsrf, async (req
 });
 
 routes.post('/admin/donations/:id/send-now', adminForm, requireAdmin, requireCsrf, async (req, res) => {
-  const item = await ScheduledDonation.findOneAndUpdate(
-    { _id: req.params.id, status: { $in: ['pending', 'failed'] } },
-    { $set: { status: 'processing', error: null } },
-    { new: true }
-  );
+  const item = scheduledDonationRepo.claimForManualSend(req.params.id);
   if (!item) return res.redirect('/admin/donations?error=Задача+уже+отправляется+или+отменена');
   try {
     await createAndSendDonation(item, 'scheduled');
-    item.status = 'sent';
-    item.sentAt = new Date();
-    await item.save();
+    scheduledDonationRepo.update(item._id, { status: 'sent', sentAt: new Date() });
     return res.redirect('/admin/donations?success=Донат+отправлен+сейчас');
   } catch (error) {
-    item.status = 'failed';
-    item.error = error.response?.data?.message || error.message;
-    await item.save();
-    return res.redirect(`/admin/donations?error=${encodeURIComponent(`Не удалось отправить: ${item.error}`)}`);
+    const failError = error.response?.data?.message || error.message;
+    scheduledDonationRepo.update(item._id, { status: 'failed', error: failError });
+    return res.redirect(`/admin/donations?error=${encodeURIComponent(`Не удалось отправить: ${failError}`)}`);
   }
 });
 
 routes.post('/admin/donations/:id/cancel', adminForm, requireAdmin, requireCsrf, async (req, res) => {
-  await ScheduledDonation.findOneAndUpdate({ _id: req.params.id, status: 'pending' }, { $set: { status: 'cancelled' } });
+  scheduledDonationRepo.cancelIfPending(req.params.id);
   return res.redirect('/admin/donations?success=Задача+отменена');
 });
 
 routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
   try {
     const filter = String(req.query.test || 'all');
-    const query = filter === 'yes' ? { isTest: true } : (filter === 'no' ? { isTest: false } : {});
-    const donations = await Donation.find(query).sort({ createdAt: -1 }).limit(300).lean();
+    const isTestFilter = filter === 'yes' ? true : (filter === 'no' ? false : null);
+    const donations = donationRepo.findMany({ isTest: isTestFilter, limit: 300 });
     return res.render('pages/admin-donation-history', adminPage('donation-history', {
       donations: donations.map((donation) => ({
         ...donation,
@@ -272,7 +260,7 @@ routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
 
 routes.get('/admin/memes', requireAdmin, async (req, res, next) => {
   try {
-    const items = await ScheduledMeme.find({ status: { $in: ['pending', 'processing', 'failed'] } }).sort({ scheduledFor: 1 }).limit(100).lean();
+    const items = scheduledMemeRepo.findByStatuses(['pending', 'processing', 'failed']);
     let memeOptions = [];
     let memeCatalogError = '';
     if (config.MEMEALERTS_JWT) {
@@ -317,19 +305,19 @@ routes.post('/admin/memes', adminForm, requireAdmin, requireCsrf, async (req, re
       scheduledFor: new Date(firstTime.getTime() + index * intervalMinutes * 60 * 1000),
       createdBy: req.adminUser._id,
     }));
-    await ScheduledMeme.insertMany(payload);
+    await scheduledMemeRepo.insertMany(payload);
     return res.redirect(`/admin/memes?success=${encodeURIComponent(`Запланировано мемов: ${quantity}`)}`);
   } catch (error) { return res.redirect(`/admin/memes?error=${encodeURIComponent(getFormError(error))}`); }
 });
 
 routes.post('/admin/memes/:id/cancel', adminForm, requireAdmin, requireCsrf, async (req, res) => {
-  await ScheduledMeme.findOneAndUpdate({ _id: req.params.id, status: 'pending' }, { $set: { status: 'cancelled' } });
+  scheduledMemeRepo.cancelIfPending(req.params.id);
   return res.redirect('/admin/memes?success=Задача+отменена');
 });
 
 routes.get('/admin/users', requireAdmin, async (req, res, next) => {
   try {
-    const users = await AdminUser.find().sort({ createdAt: 1 }).lean();
+    const users = adminUserRepo.findAllOrdered();
     return res.render('pages/admin-users', adminPage('users', {
       users: users.map((user) => ({ ...user, createdAtLabel: formatAdminDate(user.createdAt), lastLoginAtLabel: formatAdminDate(user.lastLoginAt), isCurrent: String(user._id) === String(req.adminUser._id) })),
       temporaryPassword: DEFAULT_PASSWORD,
@@ -343,15 +331,18 @@ routes.post('/admin/users', adminForm, requireAdmin, requireCsrf, async (req, re
   try {
     const username = String(req.body.username || '').trim().toLowerCase();
     if (!/^[a-z0-9_]{3,25}$/i.test(username)) throw new Error('Логин: 3–25 символов, буквы, цифры и _.');
-    await AdminUser.create({ username, displayName: String(req.body.displayName || '').trim() || username, passwordHash: createPasswordHash(DEFAULT_PASSWORD), mustChangePassword: true });
+    adminUserRepo.create({ username, displayName: String(req.body.displayName || '').trim() || username, passwordHash: createPasswordHash(DEFAULT_PASSWORD), mustChangePassword: true });
     return res.redirect('/admin/users?success=Пользователь+создан');
-  } catch (error) { return res.redirect(`/admin/users?error=${encodeURIComponent(error.code === 11000 ? 'Такой+пользователь+уже+существует' : getFormError(error))}`); }
+  } catch (error) {
+    const isDuplicate = /UNIQUE constraint failed/i.test(error.message);
+    return res.redirect(`/admin/users?error=${encodeURIComponent(isDuplicate ? 'Такой+пользователь+уже+существует' : getFormError(error))}`);
+  }
 });
 
 routes.post('/admin/users/:id/toggle', adminForm, requireAdmin, requireCsrf, async (req, res) => {
   if (String(req.params.id) === String(req.adminUser._id)) return res.redirect('/admin/users?error=Нельзя+отключить+себя');
-  const user = await AdminUser.findById(req.params.id);
-  if (user) { user.isActive = !user.isActive; await user.save(); }
+  const user = adminUserRepo.findById(req.params.id);
+  if (user) { adminUserRepo.update(user._id, { isActive: !user.isActive }); }
   return res.redirect('/admin/users?success=Статус+пользователя+обновлён');
 });
 
@@ -411,10 +402,7 @@ routes.get('/api/streamer/chatters/:user', async (req, res, next) => {
 routes.get('/api/diagnostics/db', (req, res) => {
   const status = typeof db.getDbStatus === 'function'
     ? db.getDbStatus()
-    : {
-      readyState: db?.connection?.readyState ?? 0,
-      state: 'unknown',
-    };
+    : { readyState: isDbReady() ? 1 : 0, state: 'unknown' };
 
   res.json({
     ok: status.readyState === 1,
@@ -472,16 +460,11 @@ routes.post('/api/chat/messages', express.json({ limit: '16kb' }), (req, res) =>
 
 routes.get('/api/chat/recent', async (req, res, next) => {
   try {
-    if (db?.connection?.readyState !== 1) {
+    if (!isDbReady()) {
       return res.json([]);
     }
-    const chatLogModel = require('../models/chatLog.model');
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const messages = await chatLogModel
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    const messages = chatLogRepo.findRecent({ limit });
     res.json(messages.reverse());
   } catch (error) {
     next(error);

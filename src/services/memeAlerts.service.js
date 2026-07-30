@@ -1,7 +1,8 @@
 const axios = require('axios');
 const config = require('../config');
-const db = require('../app/db');
-const MemeLog = require('../models/memeLog.model');
+const { isDbReady } = require('../app/db');
+const memeLogRepo = require('../repositories/memeLog.repo');
+const streamSessionRepo = require('../repositories/streamSession.repo');
 const { getActiveSession } = require('./streamTracker.service');
 
 const MEMEALERTS_HOST = config.MEMEALERTS_HOST || 'memealerts.com';
@@ -10,10 +11,6 @@ const POLL_INTERVAL_MS = (parseInt(config.MEMEALERTS_POLL_INTERVAL, 10) || 2) * 
 
 let _pollTimer = null;
 let _lastSeenEventId = null;
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
 
 function buildRequestHeaders() {
   return {
@@ -81,13 +78,13 @@ async function saveNewMemes(events) {
     }
 
     try {
-      const exists = await MemeLog.findOne({ eventId }).lean();
+      const exists = memeLogRepo.findOneByEventId(eventId);
 
       if (exists) {
         continue;
       }
 
-      const memeEntry = new MemeLog({
+      memeLogRepo.insert({
         eventId,
         user: (event.user || '').toLowerCase(),
         userAlias: event.userAlias || event.user || '',
@@ -97,25 +94,19 @@ async function saveNewMemes(events) {
         streamSessionId: session ? session._id : null,
         raw: event,
       });
-
-      await memeEntry.save();
       saved += 1;
-
-      // Update stream meme count
-      if (session) {
-        session.memesCount = (session.memesCount || 0) + 1;
-      }
     } catch (error) {
-      if (error.code !== 11000) { // Ignore duplicate key errors
+      // UNIQUE-нарушение (дубликат eventId) игнорируем — аналог error.code !== 11000 в Mongo.
+      if (!/UNIQUE constraint failed/i.test(error.message)) {
         console.error('[MemeAlerts] Error saving meme:', error.message);
       }
     }
   }
 
-  // Save updated session once
+  // Update stream meme count once
   if (session && saved > 0) {
     try {
-      await session.save();
+      streamSessionRepo.update(session._id, { memesCount: (session.memesCount || 0) + saved });
     } catch (error) {
       console.error('[MemeAlerts] Error updating session meme count:', error.message);
     }

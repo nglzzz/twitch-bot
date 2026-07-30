@@ -7,7 +7,8 @@
     "start": "node index.js",
     "test": "node ./scripts/siteDataSmoke.js",
     "lint": "eslint .",
-    "smoke:site": "node ./scripts/siteDataSmoke.js"
+    "smoke:site": "node ./scripts/siteDataSmoke.js",
+    "migrate:mongo": "node ./scripts/migrate-mongo-to-sqlite.js"
   },
   "keywords": [
     "twitch",
@@ -18,11 +19,11 @@
   "license": "MIT",
   "dependencies": {
     "axios": "^0.21.1",
+    "better-sqlite3": "^11.10.0",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "express-handlebars": "^5.2.0",
     "helmet": "^4.4.1",
-    "mongoose": "^5.11.13",
     "socket.io-client": "^2.5.0",
     "tmi.js": "^1.7.1",
     "ws": "^7.4.0"

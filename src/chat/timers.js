@@ -4,14 +4,14 @@ const arrayHelper = require('../helpers/arrayHelper');
 const config = require('../config');
 const { getLatestChatters } = require('./chatters');
 const getChannelViewers = require('../twitchApi/viewers');
-const viewerModel = require('../models/viewer.model');
+const viewerRepo = require('../repositories/viewer.repo');
 const { isChannelLive } = require('../twitchApi/channelInfo');
 const { startTracking, linkViewerSnapshotToStream } = require('../services/streamTracker.service');
 const { startPolling } = require('../services/memeAlerts.service');
 const { startScheduler } = require('../services/scheduler.service');
-const { refreshDonationAlertsConnection, ensureDonationIndexes } = require('../services/donations.service');
+const { refreshDonationAlertsConnection } = require('../services/donations.service');
 const { ensureInitialAdmin } = require('../services/adminAuth.service');
-const db = require('../app/db');
+const { isDbReady } = require('../app/db');
 
 const copyPastTimer = setInterval(async () => {
   let latestChatter = '';
@@ -65,17 +65,19 @@ const saveViewersTimer = setInterval(async () => {
     if (viewers.length === 0) {
       return;
     }
-    const viewerDb = new viewerModel({
-      viewers: viewers,
-    });
 
+    let streamSessionId = null;
     try {
-      await linkViewerSnapshotToStream(viewerDb);
+      streamSessionId = await linkViewerSnapshotToStream(viewers.length);
     } catch (_) {
       // Ignore — snapshot will be saved without stream link
     }
 
-    viewerDb.save();
+    try {
+      viewerRepo.insert({ viewers, streamSessionId });
+    } catch (error) {
+      console.log('Could not save viewer snapshot:', error.message);
+    }
   } catch (error) {
     console.error('[Timers] Error in saveViewersTimer:', error.code || error.message);
   }
@@ -91,14 +93,13 @@ startPolling();
 // therefore continue working when the admin browser is closed.
 startScheduler();
 const initializeAdminIntegrations = () => {
-  ensureDonationIndexes().catch((error) => console.error('[Donations] Index migration failed:', error.message));
   ensureInitialAdmin().catch((error) => console.error('[Admin] Bootstrap failed:', error.message));
   refreshDonationAlertsConnection();
 };
-if (db.connection.readyState === 1) {
+// В SQLite соединение устанавливается синхронно при загрузке модуля db.js,
+// поэтому инициализируем админ-интеграции сразу.
+if (isDbReady()) {
   initializeAdminIntegrations();
-} else {
-  db.connection.once('connected', initializeAdminIntegrations);
 }
 setInterval(refreshDonationAlertsConnection, 60 * 1000);
 

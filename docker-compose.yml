@@ -11,26 +11,15 @@ services:
       TZ: ${TZ:-Europe/Minsk}
     env_file: .env
     volumes:
-      - .:/app
-      - node_modules:/app/node_modules
+      - dbdata:/app/data
     ports:
       - ${DOCKER_WEB_PORT:-80}:${WEB_PORT:-8080}
       - ${DOCKER_WEBSOCKET_PORT:-81}:${WEBSOCKET_PORT:-8081}
     networks:
       - nglzzz_twitch_bot
 
-#  db:
-#    image: mongo:4.4.3-bionic
-#    container_name: db
-#    restart: unless-stopped
-#    env_file: .env
-#    environment:
-#      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-root}
-#      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-root}
-#    volumes:
-#      - dbdata:/data/db
-#    networks:
-#      - nglzzz_twitch_bot
+# SQLite: база хранится в файле внутри тома dbdata (примонтирован в /app/data).
+# Путь задаётся переменной SQLITE_PATH (по умолчанию ./data/twitch-bot.sqlite).
 
 networks:
   nglzzz_twitch_bot:
@@ -38,5 +27,4 @@ networks:
     driver: bridge
 
 volumes:
-  node_modules:
   dbdata:

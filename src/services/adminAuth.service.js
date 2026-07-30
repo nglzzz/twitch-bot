@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const config = require('../config');
-const db = require('../app/db');
-const AdminUser = require('../models/adminUser.model');
+const { isDbReady } = require('../app/db');
+const adminUserRepo = require('../repositories/adminUser.repo');
 
 const SESSION_COOKIE = 'nglzzz_admin_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
@@ -9,10 +9,6 @@ const DEFAULT_PASSWORD = 'change-me';
 
 function getSecret() {
   return config.ADMIN_SESSION_SECRET || '';
-}
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
 }
 
 function base64Url(value) {
@@ -45,9 +41,9 @@ async function ensureInitialAdmin() {
   if (!isDbReady()) return;
   const username = String(config.CHANNEL || '').trim().toLowerCase();
   if (!username) throw new Error('CHANNEL is not configured');
-  const existing = await AdminUser.findOne({ username }).lean();
+  const existing = adminUserRepo.findOneByUsername(username);
   if (existing) return;
-  await AdminUser.create({
+  adminUserRepo.create({
     username,
     displayName: username,
     passwordHash: createPasswordHash(DEFAULT_PASSWORD),
@@ -98,7 +94,7 @@ async function requireAdmin(req, res, next) {
     const cookies = parseCookies(req.headers.cookie);
     const session = readSession(cookies[SESSION_COOKIE]);
     if (!session || !isDbReady()) return res.redirect('/admin/login');
-    const user = await AdminUser.findById(session.userId).lean();
+    const user = adminUserRepo.findById(session.userId);
     if (!user || !user.isActive) return res.redirect('/admin/login');
     if (user.mustChangePassword && req.path !== '/admin/change-password' && req.path !== '/admin/logout') {
       return res.redirect('/admin/change-password');

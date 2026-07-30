@@ -1,4 +1,4 @@
-const subGameModel = require('../models/subGame.model');
+const subGameRepo = require('../repositories/subGame.repo');
 const messageHelper = require('../helpers/messageHelper');
 
 async function onSubGamesCommand(channel, tags, message) {
@@ -16,12 +16,7 @@ async function onSubGamesCommand(channel, tags, message) {
 
     const users = subject.split(',').map(s => s.replace('@', '').trim());
 
-    const subGames = await subGameModel.find({
-      user: {
-        "$in": users
-      },
-      closedDate: null
-    });
+    const subGames = subGameRepo.findOpenByUsers(users);
 
     const games = subGames.map(subGame => subGame.game);
 
@@ -29,26 +24,23 @@ async function onSubGamesCommand(channel, tags, message) {
         return 'Не найдено заказанных игр для выбранных пользователей.';
     }
 
-    subGames.forEach(function(item) {
-        item.remove();
+    subGames.forEach((item) => {
+        subGameRepo.removeById(item._id);
     });
 
     return `Игры для выбранных пользователей (${users.join(', ')}) удалены`;
 }
 
 async function removeMyGame(user) {
-    const subGame = await subGameModel.findOne({
-      user: user,
-      closedDate: null
-    });
+    const subGame = subGameRepo.findOneOpenByUser(user);
 
-    if (null === subGame) {
+    if (!subGame) {
         return `@${user}, у тебя нет заказанных игр.`;
     }
 
     const game = subGame.game;
 
-    subGame.remove();
+    subGameRepo.removeById(subGame._id);
 
     return `@${user}, игра "${game}" была успешно удалена.`;
 }

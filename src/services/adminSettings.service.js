@@ -1,11 +1,7 @@
 const crypto = require('crypto');
 const config = require('../config');
-const db = require('../app/db');
-const AdminSettings = require('../models/adminSettings.model');
-
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
+const { isDbReady } = require('../app/db');
+const adminSettingsRepo = require('../repositories/adminSettings.repo');
 
 function encryptionKey() {
   const secret = config.ADMIN_CREDENTIALS_ENCRYPTION_KEY || config.ADMIN_SESSION_SECRET || '';
@@ -36,7 +32,7 @@ function decrypt(value) {
 
 async function getSettings() {
   if (!isDbReady()) return null;
-  return AdminSettings.findOne({ singletonKey: 'primary' }).lean();
+  return adminSettingsRepo.getSingleton();
 }
 
 async function getRuntimeSettings() {
@@ -55,7 +51,7 @@ async function getRuntimeSettings() {
 }
 
 async function updateSettings(input) {
-  if (!isDbReady()) throw new Error('MongoDB is unavailable');
+  if (!isDbReady()) throw new Error('Database is unavailable');
   const current = await getSettings();
   const data = {
     streamElementsChannelId: String(input.streamElementsChannelId || '').trim(),
@@ -68,7 +64,7 @@ async function updateSettings(input) {
   if (String(input.memeAlertsTestCsrf || '').trim()) data.memeAlertsTestCsrf = encrypt(String(input.memeAlertsTestCsrf).trim());
   if (String(input.memeAlertsTestCsrfToken || '').trim()) data.memeAlertsTestCsrfToken = encrypt(String(input.memeAlertsTestCsrfToken).trim());
   if (!current) data.singletonKey = 'primary';
-  return AdminSettings.findOneAndUpdate({ singletonKey: 'primary' }, { $set: data }, { new: true, upsert: true }).lean();
+  return adminSettingsRepo.upsert(data);
 }
 
 function getSettingsView(settings) {

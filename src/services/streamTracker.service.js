@@ -1,5 +1,7 @@
-const db = require('../app/db');
-const StreamSession = require('../models/streamSession.model');
+const { isDbReady } = require('../app/db');
+const streamSessionRepo = require('../repositories/streamSession.repo');
+const chatLogRepo = require('../repositories/chatLog.repo');
+const viewerRepo = require('../repositories/viewer.repo');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
 const config = require('../config');
 
@@ -7,14 +9,13 @@ const DEFAULT_CHANNEL = (config.CHANNEL || 'nglzzz').toLowerCase();
 
 let _activeSession = null;
 let _pollTimer = null;
-let _lastStreamId = null;
 
 const STREAM_OFFLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
-function isDbReady() {
-  return db?.connection?.readyState === 1;
-}
-
+/**
+ * Возвращает активную сессию стрима (объект camelCase) или null.
+ * Кэшируется в памяти между вызовами.
+ */
 async function getActiveSession() {
   if (_activeSession) {
     return _activeSession;
@@ -25,7 +26,7 @@ async function getActiveSession() {
   }
 
   try {
-    const live = await StreamSession.findOne({ status: 'live' }).sort({ startedAt: -1 });
+    const live = streamSessionRepo.findOneLiveLatest();
 
     if (live) {
       _activeSession = live;
@@ -44,7 +45,7 @@ async function _createSession(streamData) {
   }
 
   try {
-    const session = new StreamSession({
+    const session = streamSessionRepo.create({
       streamId: streamData.id || streamData.stream_id,
       title: streamData.title || '',
       gameName: streamData.game_name || '',
@@ -53,9 +54,7 @@ async function _createSession(streamData) {
       status: 'live',
     });
 
-    await session.save();
     _activeSession = session;
-    _lastStreamId = session._id;
     console.log(`[StreamTracker] New stream session started: "${session.title}" (${session.streamId})`);
     return session;
   } catch (error) {
@@ -70,49 +69,38 @@ async function _endSession(session) {
   }
 
   try {
-    session.status = 'ended';
-    session.endedAt = new Date();
+    const endedAt = Date.now();
+    const since = session.startedAt || session.createdAt;
 
-    // Finalize unique viewers/chatters from chatLog and viewer snapshots
-    if (isDbReady()) {
-      const chatLogModel = require('../models/chatLog.model');
-      const viewerModel = require('../models/viewer.model');
+    const patch = {
+      status: 'ended',
+      endedAt: new Date(endedAt),
+    };
 
-      const since = session.startedAt || session.createdAt;
+    if (isDbReady() && since !== null && since !== undefined) {
+      const sinceMs = since instanceof Date ? since.getTime() : Number(since);
 
-      const [chatterStats, viewerSnapshots] = await Promise.all([
-        chatLogModel.aggregate([
-          { $match: { createdAt: { $gte: since } } },
-          { $group: { _id: '$user' } },
-          { $count: 'total' },
-        ]),
-        viewerModel.find({ createdAt: { $gte: since } }).lean(),
-      ]);
+      patch.uniqueChatters = chatLogRepo.countBetween(sinceMs, endedAt) > 0
+        ? chatLogRepo.distinctUsersSince({ since: sinceMs })
+        : 0;
 
-      if (chatterStats.length > 0) {
-        session.uniqueChatters = chatterStats[0].total;
-      }
-
+      const snapshots = viewerRepo.findSnapshots({ since: sinceMs });
       const allViewers = new Set();
-      viewerSnapshots.forEach((snap) => {
+      snapshots.forEach((snap) => {
         (snap.viewers || []).forEach((v) => allViewers.add(String(v).toLowerCase()));
       });
-      session.uniqueViewers = allViewers.size;
+      patch.uniqueViewers = allViewers.size;
 
-      // Count messages for this session
-      session.messagesCount = await chatLogModel.countDocuments({
-        createdAt: { $gte: since },
-        ...(session.endedAt ? { createdAt: { $lte: session.endedAt } } : {}),
-      });
+      patch.messagesCount = chatLogRepo.countBetween(sinceMs, endedAt);
     }
 
-    await session.save();
+    streamSessionRepo.update(session._id, patch);
     console.log(`[StreamTracker] Stream ended: "${session.title}" (${session.streamId})`);
   } catch (error) {
     console.error('[StreamTracker] Error ending session:', error.message);
   }
 
-  if (_activeSession && _activeSession._id.equals(session._id)) {
+  if (_activeSession && _activeSession._id === session._id) {
     _activeSession = null;
   }
 }
@@ -140,10 +128,14 @@ async function checkStreamStatus() {
         session = await _createSession(streamData);
       } else {
         // Update existing session
-        session.title = streamData.title || session.title;
-        session.gameName = streamData.game_name || session.gameName;
-        session.lastSeenAt = new Date();
-        await session.save();
+        const updated = streamSessionRepo.update(session._id, {
+          title: streamData.title || session.title,
+          gameName: streamData.game_name || session.gameName,
+          lastSeenAt: new Date(),
+        });
+        if (updated) {
+          _activeSession = updated;
+        }
       }
     } else {
       // Stream is offline
@@ -162,25 +154,28 @@ async function checkStreamStatus() {
   }
 }
 
-async function linkMessageToStream(chatLogEntry) {
+/**
+ * Возвращает id активной сессии стрима (для привязки chatLog), либо null.
+ */
+async function linkMessageToStream() {
   const session = await getActiveSession();
-
-  if (session && chatLogEntry) {
-    chatLogEntry.streamSessionId = session._id;
-  }
+  return session ? session._id : null;
 }
 
-async function linkViewerSnapshotToStream(viewerDoc) {
+/**
+ * Привязывает снапшот зрителей к активной сессии и обновляет её статистику
+ * зрителей (макс/среднее/счётчик). Возвращает id сессии или null.
+ * currentCount — число зрителей в снапшоте.
+ */
+async function linkViewerSnapshotToStream(currentCount) {
   const session = await getActiveSession();
 
-  if (session && viewerDoc) {
-    viewerDoc.streamSessionId = session._id;
-
-    // Update session viewer stats
-    const count = (viewerDoc.viewers || []).length;
-    session.updateViewers(count);
-    await session.save();
+  if (session) {
+    streamSessionRepo.applyViewerUpdate(session._id, currentCount);
+    return session._id;
   }
+
+  return null;
 }
 
 async function getActiveSessionId() {

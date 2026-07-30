@@ -57,6 +57,7 @@
     <button class="stats-tabs__btn" data-tab="streams">🎬 Стримы</button>
     <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">💬 Чаттеры</button>
     <button class="stats-tabs__btn" data-tab="memes">🎨 Мемы</button>
+    <button class="stats-tabs__btn" data-tab="donations">💸 Донаты</button>
     <button class="stats-tabs__btn" data-tab="viewers">👁 Зрители</button>
   </div>
 </section>
@@ -171,7 +172,7 @@
       <article class="stat-card stat-card--neutral">
         <span class="stat-card__label">🔥 Пиковый онлайн за всё время</span>
         <strong class="stat-card__value">{{overallStats.peakViewersAllTimeLabel}}</strong>
-        <p class="stat-card__description">Максимальное число зрителей на стриме.</p>
+        <p class="stat-card__description">Рекорд зафиксирован {{overallStats.peakViewersAllTimeAtLabel}}.</p>
       </article>
 
       <article class="stat-card stat-card--neutral">
@@ -530,6 +531,57 @@
               <span>{{sentAtLabel}}</span>
             </div>
             <p>🎨 {{stickerName}}</p>
+          </li>
+        {{/each}}
+      </ul>
+    </article>
+  {{/if}}
+</section>
+
+{{! ── Tab: Donations ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="donations">
+  <article class="panel-card">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Топ донатеров</div>
+        <h2>Самые щедрые</h2>
+      </div>
+    </div>
+
+    {{#if donationStats.hasTopDonors}}
+      <ol class="leaderboard-list">
+        {{#each donationStats.topDonors}}
+          <li class="leaderboard-item">
+            <span class="leaderboard-item__position">#{{position}}</span>
+            <div class="leaderboard-item__content">
+              <strong>{{donorName}}</strong>
+              <span>{{totalAmountLabel}} · {{donationsCountLabel}} донат(ов) · последний: {{lastAtLabel}}</span>
+            </div>
+          </li>
+        {{/each}}
+      </ol>
+    {{else}}
+      <p class="empty-state">Донатов пока нет. Данные появятся после первого доната.</p>
+    {{/if}}
+  </article>
+
+  {{#if donationStats.hasRecentDonations}}
+    <article class="panel-card leaderboard-section">
+      <div class="panel-card__header">
+        <div>
+          <div class="eyebrow">Последние донаты</div>
+          <h2>Лента донатов</h2>
+        </div>
+      </div>
+
+      <ul class="message-list">
+        {{#each donationStats.recentDonations}}
+          <li class="message-item">
+            <div class="message-item__head">
+              <strong>{{donorName}}</strong>
+              <span>{{createdAtLabel}}</span>
+            </div>
+            <p>💸 {{amountLabel}}{{#if message}} · {{message}}{{/if}}</p>
           </li>
         {{/each}}
       </ul>
