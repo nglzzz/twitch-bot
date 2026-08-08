@@ -14,6 +14,34 @@ const getSubjectFromMessage = (message) => {
   return words.join(' ').replace('@', '').trim();
 }
 
+const stripLeadingMention = (message, username) => {
+  if (typeof message !== 'string' || typeof username !== 'string') {
+    return message;
+  }
+
+  const normalizedUsername = username.trim();
+  if (!normalizedUsername) {
+    return message.trim();
+  }
+
+  const mention = `@${normalizedUsername}`;
+  let result = message.trim();
+
+  while (result.slice(0, mention.length).toLowerCase() === mention.toLowerCase()) {
+    const nextCharacter = result[mention.length];
+    if (nextCharacter && /[\p{L}\p{N}_]/u.test(nextCharacter)) {
+      break;
+    }
+
+    result = result
+      .slice(mention.length)
+      .replace(/^[\s,.;:!?()[\]{}"'`~—–-]+/, '')
+      .trim();
+  }
+
+  return result;
+}
+
 const formatStringToNumber = (string, maxLength) => {
   let stringNumberSum = 0;
   for (let i = 0; i < string.length; i++) {
@@ -46,6 +74,7 @@ const getDigitalRoot = (digital, maxLength) => {
 module.exports = {
   isHighlightMessage: isHighlightMessage,
   getSubjectFromMessage: getSubjectFromMessage,
+  stripLeadingMention: stripLeadingMention,
   formatStringToNumber: formatStringToNumber,
   getDigitalRoot: getDigitalRoot,
   isSubscriberMessage: isSubscriberMessage,

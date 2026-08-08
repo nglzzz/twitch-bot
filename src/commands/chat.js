@@ -13,7 +13,7 @@ async function onChatCommand(channel, tags, message) {
   const answer = await ChatGPT.addMessage(chatter, text);
 
   if (typeof answer !== 'undefined') {
-    return `@${chatter}, ${answer}`;
+    return `@${chatter}, ${messageHelper.stripLeadingMention(answer, chatter)}`;
   }
 
   return 'Не удалось получить данные с OpenAI';

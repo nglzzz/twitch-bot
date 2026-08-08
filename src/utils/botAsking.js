@@ -1,5 +1,6 @@
 const ChatGpt = require('../utils/chatGPT');
 const arrayHelper = require('../helpers/arrayHelper');
+const messageHelper = require('../helpers/messageHelper');
 const config = require('../config');
 const {randomInteger} = require('../helpers/numberHelper');
 
@@ -9,8 +10,9 @@ async function doRandomAsk(subject, message) {
 
   ChatGpt.updateContext(subject, 'user', question);
   const answer = await ChatGpt.addMessage(subject, question, config.BOT_NAME);
+  const normalizedAnswer = messageHelper.stripLeadingMention(answer, subject);
 
-  return `@${subject} ${answer}`;
+  return `@${subject} ${normalizedAnswer}`.trim();
 }
 
 function getPreparedAsk(subject) {
