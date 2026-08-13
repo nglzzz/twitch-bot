@@ -7,6 +7,8 @@ const memeLogRepo = require('../repositories/memeLog.repo');
 const donationRepo = require('../repositories/donation.repo');
 const { getLatestChatters, getRecentMessages } = require('../chat/chatters');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
+const { getCachedCatalog, loadCatalog } = require('./emoteCatalog.service');
+const { buildEmoteMap, renderMessageHtml } = require('../helpers/emoteHelper');
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 const RECENT_MESSAGES_LIMIT = 10;
@@ -19,6 +21,43 @@ const DONATION_LIMIT = 20;
 const TOP_DONORS_LIMIT = 10;
 const DEFAULT_CHANNEL = (config.CHANNEL || 'nglzzz').toLowerCase();
 const TIMEZONE = config.TIMEZONE || 'Europe/Minsk';
+
+// Каталог смайлов (7tv/BetterTV/FFZ) для серверного рендера сообщений.
+// Во время стрима его греет chat/eventHandler; здесь — страховочный подогрев,
+// чтобы виджеты на сайте рисовали смайлы и в офлайне.
+const EMOTE_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+let _emoteWarmerStarted = false;
+let _emoteCatalogReadyPromise = null;
+let _emoteCatalogRef = null;
+let _emoteMap = buildEmoteMap([]);
+
+function refreshEmoteCatalog() {
+  return loadCatalog(config.BROADCASTER_ID)
+    .catch((error) => {
+      console.warn('[Emotes] Could not warm catalog for site:', error.message);
+      return getCachedCatalog(config.BROADCASTER_ID);
+    });
+}
+
+function ensureEmoteCatalog() {
+  if (_emoteWarmerStarted) {
+    return _emoteCatalogReadyPromise;
+  }
+
+  _emoteWarmerStarted = true;
+  _emoteCatalogReadyPromise = refreshEmoteCatalog();
+  setInterval(refreshEmoteCatalog, EMOTE_REFRESH_INTERVAL_MS);
+  return _emoteCatalogReadyPromise;
+}
+
+function getEmoteMap() {
+  const catalog = getCachedCatalog(config.BROADCASTER_ID);
+  if (catalog !== _emoteCatalogRef) {
+    _emoteCatalogRef = catalog;
+    _emoteMap = buildEmoteMap(catalog);
+  }
+  return _emoteMap;
+}
 
 /**
  * Resolve a raw stream filter value into a usable streamSessionId.
@@ -368,12 +407,14 @@ async function loadStreamData() {
   }
 }
 
-function mapRecentMessage(message) {
+function mapRecentMessage(message, emoteMap) {
+  const text = message.message || message.text;
   return {
     id: message.id || `${message.user}-${message.createdAt}`,
     user: message.user,
     displayName: message.displayName || message.user,
-    text: message.message || message.text,
+    text,
+    textHtml: renderMessageHtml(text, emoteMap),
     createdAt: message.createdAt,
     createdAtLabel: formatShortDateTime(message.createdAt),
   };
@@ -422,11 +463,13 @@ function buildTopChattersFromMessages(messages) {
 }
 
 async function loadChatStats(streamSessionId) {
+  await ensureEmoteCatalog();
+  const emoteMap = getEmoteMap();
   const memoryMessages = getRecentMessages();
   const memoryRecentMessages = memoryMessages
     .slice(-RECENT_MESSAGES_LIMIT)
     .reverse()
-    .map(mapRecentMessage);
+    .map((message) => mapRecentMessage(message, emoteMap));
   const fallbackTopChatters = buildTopChattersFromMessages(memoryMessages);
   const memoryActiveChatters = getLatestChatters().length;
 
@@ -464,7 +507,7 @@ async function loadChatStats(streamSessionId) {
     const uniqueChatters24h = chatLogRepo.distinctUsersSince({ streamSessionId: streamId, since });
     const topChatters = chatLogRepo.getTopChatters({ streamSessionId: streamId, limit: TOP_CHATTERS_LIMIT });
 
-    const mappedRecentMessages = recentMessages.map(mapRecentMessage);
+    const mappedRecentMessages = recentMessages.map((message) => mapRecentMessage(message, emoteMap));
     const mappedTopChatters = topChatters.map((entry, index) => ({
       position: index + 1,
       user: entry._id,
@@ -527,6 +570,20 @@ async function loadViewerStats(streamSessionId) {
     const since = Date.now() - DAY_IN_MS;
     const streamId = streamSessionId || null;
 
+    // При фильтре по конкретному стриму пиковый/средний онлайн берём из агрегатов
+    // stream_session — они обновляются из Streams API (viewer_count) и не зависят
+    // от moderator-скоупа chat/chatters, в отличие от массивов viewers[] в срезах.
+    let sessionAggregates = null;
+    if (streamId) {
+      const session = streamSessionRepo.findById(streamId);
+      if (session && session.viewerSnapshotCount > 0) {
+        sessionAggregates = {
+          peak: session.maxViewers || 0,
+          average: session.avgViewers || 0,
+        };
+      }
+    }
+
     // При фильтре по стриму — без лимита (limit 0); иначе — только за 24ч, до 288 срезов.
     const snapshots = streamId
       ? viewerRepo.findSnapshots({ streamSessionId: streamId })
@@ -541,6 +598,10 @@ async function loadViewerStats(streamSessionId) {
         filteredByStream: Boolean(streamId),
         totalSnapshots,
         totalSnapshotsLabel: formatNumber(totalSnapshots),
+        peakViewerCount24h: sessionAggregates ? sessionAggregates.peak : null,
+        peakViewerCount24hLabel: sessionAggregates ? formatNumber(sessionAggregates.peak) : '—',
+        averageViewerCount24h: sessionAggregates ? sessionAggregates.average : null,
+        averageViewerCount24hLabel: sessionAggregates ? formatNumber(sessionAggregates.average) : '—',
       };
     }
 
@@ -550,10 +611,12 @@ async function loadViewerStats(streamSessionId) {
     const uniqueViewers = new Set(
       snapshots.flatMap((snapshot) => (snapshot.viewers || []).map((viewer) => String(viewer).toLowerCase()))
     );
-    const maxViewerCount = Math.max(...viewerCounts);
-    const averageViewerCount = Math.round(
+    const snapshotPeak = Math.max(...viewerCounts);
+    const snapshotAverage = Math.round(
       viewerCounts.reduce((sum, count) => sum + count, 0) / viewerCounts.length
     );
+    const peakViewerCount = sessionAggregates ? sessionAggregates.peak : snapshotPeak;
+    const averageViewerCount = sessionAggregates ? sessionAggregates.average : snapshotAverage;
     // Evenly sample across the full timeline so a long stream (e.g. one that
     // spans two days) is represented end-to-end, instead of only its first hour.
     const historySource = sampleEvenly(snapshots, VIEWER_HISTORY_LIMIT);
@@ -577,8 +640,8 @@ async function loadViewerStats(streamSessionId) {
       filteredByStream: Boolean(streamId),
       latestViewerCount: (latestSnapshot.viewers || []).length,
       latestViewerCountLabel: formatNumber((latestSnapshot.viewers || []).length),
-      peakViewerCount24h: maxViewerCount,
-      peakViewerCount24hLabel: formatNumber(maxViewerCount),
+      peakViewerCount24h: peakViewerCount,
+      peakViewerCount24hLabel: formatNumber(peakViewerCount),
       averageViewerCount24h: averageViewerCount,
       averageViewerCount24hLabel: formatNumber(averageViewerCount),
       uniqueViewers24h: uniqueViewers.size,
@@ -717,6 +780,7 @@ async function loadChatterStats(chatterName) {
   }
 
   try {
+    await ensureEmoteCatalog();
     const user = String(chatterName).toLowerCase().trim();
 
     const messages = chatLogRepo.findRecentByUser(user, 50);
@@ -852,7 +916,7 @@ async function loadChatterStats(chatterName) {
       hourlyBars,
       dailyBars,
       memeStats: memeData,
-      recentMessages: messages.map(mapRecentMessage),
+      recentMessages: messages.map((message) => mapRecentMessage(message, getEmoteMap())),
       hasRecentMessages: messages.length > 0,
     };
   } catch (error) {

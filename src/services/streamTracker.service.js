@@ -135,6 +135,19 @@ async function checkStreamStatus() {
         });
         if (updated) {
           _activeSession = updated;
+          session = updated;
+        }
+      }
+
+      // Пиковый/средний онлайн берём из надёжного Streams API (viewer_count).
+      // Раньше счётчик шёл из chat/chatters, но тот эндпоинт требует
+      // user-access токена со скоупом moderator:read:chatters и часто отдаёт
+      // пустой список — из-за чего max/avgviewers не сохранялись.
+      if (session && streamData.viewer_count !== undefined && streamData.viewer_count !== null) {
+        try {
+          streamSessionRepo.applyViewerUpdate(session._id, Number(streamData.viewer_count) || 0);
+        } catch (error) {
+          console.error('[StreamTracker] Error applying viewer update:', error.message);
         }
       }
     } else {

@@ -6,7 +6,7 @@ const { getLatestChatters } = require('./chatters');
 const getChannelViewers = require('../twitchApi/viewers');
 const viewerRepo = require('../repositories/viewer.repo');
 const { isChannelLive } = require('../twitchApi/channelInfo');
-const { startTracking, linkViewerSnapshotToStream } = require('../services/streamTracker.service');
+const { startTracking, getActiveSessionId } = require('../services/streamTracker.service');
 const { startPolling } = require('../services/memeAlerts.service');
 const { startScheduler } = require('../services/scheduler.service');
 const { refreshDonationAlertsConnection } = require('../services/donations.service');
@@ -66,9 +66,12 @@ const saveViewersTimer = setInterval(async () => {
       return;
     }
 
+    // Снапшот нужен для unique-viewers/watch-time. Пиковый/средний онлайн теперь
+    // считается в streamTracker из Streams API, поэтому здесь сессия только
+    // привязывается к снапшоту — счётчик из chat/chatters больше не гоняем.
     let streamSessionId = null;
     try {
-      streamSessionId = await linkViewerSnapshotToStream(viewers.length);
+      streamSessionId = await getActiveSessionId();
     } catch (_) {
       // Ignore — snapshot will be saved without stream link
     }

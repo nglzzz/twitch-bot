@@ -1048,6 +1048,16 @@ code {
   word-break: break-word;
 }
 
+/* 7tv/BetterTV/FFZ смайлы в серверных виджетах сообщений */
+.chat-emote {
+  display: inline-block;
+  width: auto;
+  height: 1.5em;
+  margin: -0.3em 0.08em;
+  vertical-align: middle;
+  object-fit: contain;
+}
+
 /* ═══ Leaderboard ═══ */
 
 .leaderboard {

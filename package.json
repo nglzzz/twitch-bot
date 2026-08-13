@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node ./scripts/siteDataSmoke.js",
+    "test": "node --test ./tests/*.test.js && node ./scripts/siteDataSmoke.js",
     "lint": "eslint .",
     "smoke:site": "node ./scripts/siteDataSmoke.js",
-    "migrate:mongo": "node ./scripts/migrate-mongo-to-sqlite.js"
+    "migrate:mongo": "node ./scripts/migrate-mongo-to-sqlite.js",
+    "repair:viewer-stats": "node ./scripts/backfill-viewer-stats.js"
   },
   "keywords": [
     "twitch",

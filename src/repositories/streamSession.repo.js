@@ -99,6 +99,7 @@ function update(id, patch) {
  * и lastSeenAt одним атомарным UPDATE.
  */
 function applyViewerUpdate(id, currentCount) {
+  const now = Date.now();
   stmt(
     `UPDATE stream_session SET
        viewer_snapshot_count = viewer_snapshot_count + 1,
@@ -108,7 +109,7 @@ function applyViewerUpdate(id, currentCount) {
        last_seen_at          = ?,
        updated_at            = ?
      WHERE id = ?`
-  ).run(currentCount, currentCount, currentCount, currentCount, Date.now(), Date.now(), id);
+  ).run(currentCount, currentCount, currentCount, now, now, id);
 }
 
 module.exports = {
