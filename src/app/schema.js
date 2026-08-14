@@ -11,7 +11,7 @@
 // из Mongo сохраняются исходные строковые ObjectId, поэтому связи по
 // stream_session_id / created_by остаются консистентными.
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const STATEMENTS = [
   // --- stream_session: центральная таблица (аналитический хаб) ---
@@ -169,6 +169,8 @@ const STATEMENTS = [
     donation_alerts_api_key TEXT NOT NULL DEFAULT '',
     stream_elements_token TEXT NOT NULL DEFAULT '',
     stream_elements_channel_id TEXT NOT NULL DEFAULT '',
+    boosty_token TEXT NOT NULL DEFAULT '',
+    twitch_token TEXT NOT NULL DEFAULT '',
     meme_alerts_channel_id TEXT NOT NULL DEFAULT '',
     meme_alerts_test_token TEXT NOT NULL DEFAULT '',
     meme_alerts_test_csrf TEXT NOT NULL DEFAULT '',
@@ -195,7 +197,33 @@ const STATEMENTS = [
   )`,
 ];
 
+/**
+ * Add columns introduced after the initial SQLite schema was deployed.
+ * SQLite has no portable `ADD COLUMN IF NOT EXISTS`, so each column is
+ * checked before it is added. This keeps upgrades safe for existing data
+ * while the CREATE TABLE statement above remains sufficient for new files.
+ *
+ * @param {import('better-sqlite3').Database} database
+ */
+function upgradeSchema(database) {
+  const existingColumns = new Set(
+    database.prepare('PRAGMA table_info(admin_settings)').all().map((column) => column.name)
+  );
+
+  const columns = {
+    boosty_token: "TEXT NOT NULL DEFAULT ''",
+    twitch_token: "TEXT NOT NULL DEFAULT ''",
+  };
+
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existingColumns.has(name)) {
+      database.exec(`ALTER TABLE admin_settings ADD COLUMN ${name} ${definition}`);
+    }
+  }
+}
+
 module.exports = {
   SCHEMA_VERSION,
   STATEMENTS,
+  upgradeSchema,
 };

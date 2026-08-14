@@ -3,6 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const Chat = require('./chat');
 const { updateRedemptionStatus } = require('../twitchApi/rewardRedemptions');
+const { getTwitchAccessToken } = require('../services/token.service');
 
 const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIBE_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
@@ -63,10 +64,10 @@ function registerReward(rewardId, handler) {
  * Subscribe to a Twitch EventSub event type
  */
 async function subscribe(type, version, condition) {
-  const token = config.TWITCH_ACCESS_TOKEN;
+  const token = await getTwitchAccessToken();
 
   if (!token) {
-    console.error('[EventSub] TWITCH_ACCESS_TOKEN is not set in config');
+    console.error('[EventSub] Twitch access token is not configured');
     return;
   }
 
@@ -586,9 +587,17 @@ function _createSocket(url, options) {
  * Connect to EventSub WebSocket (fresh connection).
  * After session_welcome, subscribeAll() will be called automatically.
  */
-function connect(url) {
-  if (!config.TWITCH_ACCESS_TOKEN) {
-    console.error('[EventSub] Cannot connect: TWITCH_ACCESS_TOKEN is not set');
+async function connect(url) {
+  let token;
+  try {
+    token = await getTwitchAccessToken();
+  } catch (error) {
+    console.error('[EventSub] Cannot resolve Twitch access token:', error.message);
+    return;
+  }
+
+  if (!token) {
+    console.error('[EventSub] Cannot connect: Twitch access token is not configured');
     return;
   }
   if (!config.TWITCH_API_CLIENT_ID) {

@@ -94,7 +94,9 @@ docker-compose up --build
 
 ## Примечания по окружению
 
-- для live-блока нужны `TWITCH_API_CLIENT_ID` и `TWITCH_ACCESS_TOKEN`;
+- для Twitch API нужен `TWITCH_API_CLIENT_ID`; токен можно задать в `/admin/settings`, через
+  `TWITCH_ACCESS_TOKEN` или legacy-файл `storage/twitch-token` (приоритет именно в этом порядке);
+- Boosty token также задаётся в `/admin/settings`, а без него читается из `storage/boosty-token`;
 - для статистики из БД нужна рабочая Mongo-конфигурация (`MONGO_*`);
 - Twitch embed требует корректный `parent` hostname, он вычисляется автоматически из запроса;
 - если проект стоит за reverse proxy / docker ingress и наружный домен отличается от того, что видит контейнер, задай `SITE_PUBLIC_HOST=your-domain.example` в `.env`.

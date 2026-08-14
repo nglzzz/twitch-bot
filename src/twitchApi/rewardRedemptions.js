@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config');
+const { getTwitchAccessToken } = require('../services/token.service');
 
 const VALID_STATUSES = new Set(['FULFILLED', 'CANCELED']);
 
@@ -18,6 +19,11 @@ async function updateRedemptionStatus({ broadcasterId, rewardId, redemptionId, s
     throw new Error(`Invalid redemption status: ${status}`);
   }
 
+  const token = await getTwitchAccessToken();
+  if (!token) {
+    throw new Error('Twitch access token is not configured');
+  }
+
   try {
     await axios.patch(
       'https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions',
@@ -30,7 +36,7 @@ async function updateRedemptionStatus({ broadcasterId, rewardId, redemptionId, s
         },
         headers: {
           'Client-Id': config.TWITCH_API_CLIENT_ID,
-          'Authorization': 'Bearer ' + config.TWITCH_ACCESS_TOKEN,
+          'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
         }
       }
@@ -56,6 +62,12 @@ async function updateRedemptionStatus({ broadcasterId, rewardId, redemptionId, s
 async function fetchAllRewards() {
   const rewards = [];
   let cursor = undefined;
+  const token = await getTwitchAccessToken();
+
+  if (!token) {
+    console.error('[Rewards] Twitch access token is not configured');
+    return rewards;
+  }
 
   try {
     while (true) {
@@ -68,7 +80,7 @@ async function fetchAllRewards() {
           params,
           headers: {
             'Client-Id': config.TWITCH_API_CLIENT_ID,
-            'Authorization': 'Bearer ' + config.TWITCH_ACCESS_TOKEN
+            'Authorization': 'Bearer ' + token
           }
         }
       );
@@ -94,6 +106,12 @@ async function fetchAllRewards() {
  * Create a single custom reward via Twitch Helix API
  */
 async function createReward(rewardConfig) {
+  const token = await getTwitchAccessToken();
+  if (!token) {
+    console.error(`[Rewards] Failed to create "${rewardConfig.title}": Twitch access token is not configured`);
+    return null;
+  }
+
   try {
     const response = await axios.post(
       `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${config.BROADCASTER_ID}`,
@@ -108,7 +126,7 @@ async function createReward(rewardConfig) {
       {
         headers: {
           'Client-Id': config.TWITCH_API_CLIENT_ID,
-          'Authorization': 'Bearer ' + config.TWITCH_ACCESS_TOKEN,
+          'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
         }
       }

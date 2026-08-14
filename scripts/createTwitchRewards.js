@@ -20,15 +20,11 @@ global.SRC_PATH = path.join(APP_PATH, 'src');
 
 const config = require('../src/config');
 const axios = require('axios');
+const { getTwitchAccessToken } = require('../src/services/token.service');
 
 const BROADCASTER_ID = config.BROADCASTER_ID;
 const CLIENT_ID = config.TWITCH_API_CLIENT_ID;
-const ACCESS_TOKEN = config.TWITCH_ACCESS_TOKEN;
-
-if (!BROADCASTER_ID || !CLIENT_ID || !ACCESS_TOKEN) {
-  console.error('Missing required env vars: BROADCASTER_ID, TWITCH_API_CLIENT_ID, TWITCH_ACCESS_TOKEN');
-  process.exit(1);
-}
+let ACCESS_TOKEN;
 
 const REWARDS = [
   {
@@ -87,6 +83,14 @@ async function createReward(rewardConfig) {
 }
 
 async function main() {
+  ACCESS_TOKEN = await getTwitchAccessToken();
+
+  if (!BROADCASTER_ID || !CLIENT_ID || !ACCESS_TOKEN) {
+    console.error('Missing required configuration: BROADCASTER_ID, TWITCH_API_CLIENT_ID, or Twitch access token');
+    process.exitCode = 1;
+    return;
+  }
+
   console.log('Creating Twitch Channel Points rewards...');
   console.log(`Broadcaster ID: ${BROADCASTER_ID}`);
   console.log(`Client ID: ${CLIENT_ID}`);
@@ -104,4 +108,7 @@ async function main() {
   console.log('Then disable/delete the OLD rewards in your Twitch dashboard.');
 }
 
-main();
+main().catch((error) => {
+  console.error('Failed to create Twitch rewards:', error.message);
+  process.exitCode = 1;
+});

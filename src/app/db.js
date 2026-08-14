@@ -3,7 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
-const { SCHEMA_VERSION, STATEMENTS } = require('./schema');
+const { SCHEMA_VERSION, STATEMENTS, upgradeSchema } = require('./schema');
 
 // Путь к файлу базы данных. По умолчанию ./data/twitch-bot.sqlite.
 const SQLITE_PATH = process.env.SQLITE_PATH
@@ -30,6 +30,8 @@ function runMigrations(database) {
   for (const statement of STATEMENTS) {
     database.exec(statement);
   }
+
+  upgradeSchema(database);
 
   const applied = database.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(SCHEMA_VERSION);
   if (!applied) {

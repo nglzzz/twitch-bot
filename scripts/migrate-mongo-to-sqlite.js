@@ -23,11 +23,11 @@ const { MongoClient } = require('mongodb');
 const Database = require('better-sqlite3');
 // Схему подключаем независимо от того, откуда запускается скрипт:
 // из scripts/ репозитория (../src/app/schema) или из корня migrator-образа (./src/app/schema).
-let STATEMENTS, SCHEMA_VERSION;
+let STATEMENTS, SCHEMA_VERSION, upgradeSchema;
 try {
-  ({ STATEMENTS, SCHEMA_VERSION } = require('../src/app/schema'));
+  ({ STATEMENTS, SCHEMA_VERSION, upgradeSchema } = require('../src/app/schema'));
 } catch (_) {
-  ({ STATEMENTS, SCHEMA_VERSION } = require('./src/app/schema'));
+  ({ STATEMENTS, SCHEMA_VERSION, upgradeSchema } = require('./src/app/schema'));
 }
 
 const MONGO_URI = process.env.MONGO_URI;
@@ -127,6 +127,7 @@ async function main() {
   for (const statement of STATEMENTS) {
     sqlite.exec(statement);
   }
+  upgradeSchema(sqlite);
   const applied = sqlite.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(SCHEMA_VERSION);
   if (!applied) {
     sqlite.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(SCHEMA_VERSION, Date.now());
@@ -167,12 +168,14 @@ async function main() {
     // --- admin_settings (singleton) ---
     results.push(await migrateCollection(
       db.collection('adminsettings'), 'admin_settings',
-      ['singleton_key', 'donation_alerts_api_key', 'stream_elements_token', 'stream_elements_channel_id', 'meme_alerts_channel_id', 'meme_alerts_test_token', 'meme_alerts_test_csrf', 'meme_alerts_test_csrf_token', 'meme_alerts_test_name', 'updated_at'],
+      ['singleton_key', 'donation_alerts_api_key', 'stream_elements_token', 'stream_elements_channel_id', 'boosty_token', 'twitch_token', 'meme_alerts_channel_id', 'meme_alerts_test_token', 'meme_alerts_test_csrf', 'meme_alerts_test_csrf_token', 'meme_alerts_test_name', 'updated_at'],
       (doc) => [
         doc.singletonKey ?? 'primary',
         doc.donationAlertsApiKey ?? '',
         doc.streamElementsToken ?? '',
         doc.streamElementsChannelId ?? '',
+        doc.boostyToken ?? '',
+        doc.twitchToken ?? '',
         doc.memeAlertsChannelId ?? '',
         doc.memeAlertsTestToken ?? '',
         doc.memeAlertsTestCsrf ?? '',

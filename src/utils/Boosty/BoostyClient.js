@@ -8,7 +8,7 @@ class BoostyClient
     attempts = 0;
 
     constructor(apiKey) {
-        this.apiKey = (apiKey || this.getTokenFromFile()).trim();
+        this.apiKey = String(apiKey || this.getTokenFromFile() || '').trim();
     }
 
     async getSubscribers(limit) {
@@ -96,12 +96,14 @@ class BoostyClient
     }
 
     getTokenFromFile() {
-        const filePath = path.join(APP_PATH, 'storage', 'boosty-token');
+        const filePath = path.join(global.APP_PATH || path.resolve(__dirname, '../../..'), 'storage', 'boosty-token');
 
         try {
-            return fs.readFileSync(filePath, 'utf8').toString();
+            return fs.readFileSync(filePath, 'utf8').toString().trim();
         } catch (e) {
-            console.error(e);
+            if (e.code !== 'ENOENT') {
+                console.error('[Boosty] Error reading token file:', e.code || e.message);
+            }
             return null;
         }
     }

@@ -18,6 +18,8 @@ function upsert(data) {
     'donation_alerts_api_key',
     'stream_elements_token',
     'stream_elements_channel_id',
+    'boosty_token',
+    'twitch_token',
     'meme_alerts_channel_id',
     'meme_alerts_test_token',
     'meme_alerts_test_csrf',

@@ -1,11 +1,12 @@
 const BoostyClient = require('../utils/Boosty/BoostyClient');
 const PointAucClient = require('../utils/PointAuc/PointAucClient');
 const messageHelper = require('../helpers/messageHelper');
+const { getBoostyToken } = require('../services/token.service');
 
 let lastBids = {};
 
 async function onSubCommand(channel, tags, message) {
-    const boostyClient = new BoostyClient();
+    const boostyClient = new BoostyClient(await getBoostyToken());
     const subscribers = await boostyClient.getPaidSubscribers(1000);
     const chatter = (tags['display-name'] ?? tags.username).toLowerCase();
 

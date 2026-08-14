@@ -1,17 +1,25 @@
 const axios = require('axios');
 const config = require('../config');
 const oAuthModel = require('../models/oAuthToken.model');
-const path = require('path');
-const fs = require('fs');
+const { getTwitchAccessToken } = require('../services/token.service');
 
 let latestToken;
 
 const getOAuthToken = async (force = false) => {
+  const configuredToken = await getTwitchAccessToken();
+
+  if (configuredToken) {
+    if (!force && latestToken instanceof oAuthModel && latestToken.token === configuredToken && latestToken.expires.getTime() > Date.now()) {
+      return latestToken;
+    }
+
+    latestToken = new oAuthModel(configuredToken, 60 * 60 * 24);
+    return latestToken;
+  }
+
   if (!force) {
-    if (typeof latestToken === oAuthModel) {
-      if (latestToken.exceeds.getTime() > Date.now()) {
-        return latestToken;
-      }
+    if (latestToken instanceof oAuthModel && latestToken.expires.getTime() > Date.now()) {
+      return latestToken;
     }
   }
 
@@ -36,27 +44,10 @@ const getOAuthToken = async (force = false) => {
       console.error('[OAuth] Error fetching token:', error.code || error.message);
     }
 
-    const fileData = getTokenFromFile();
-    if (fileData) {
-      latestToken = new oAuthModel(fileData, Date.now() + (60 * 60 * 24));
-      return latestToken;
-    }
-
     return null;
   }
 
   return latestToken;
-}
-
-function getTokenFromFile() {
-  const filePath = path.join(APP_PATH, 'storage', 'twitch-token');
-
-  try {
-    return fs.readFileSync(filePath, 'utf8').toString();
-  } catch (error) {
-    console.error('[OAuth] Error reading token file:', error.code || error.message);
-    return null;
-  }
 }
 
 module.exports = getOAuthToken;

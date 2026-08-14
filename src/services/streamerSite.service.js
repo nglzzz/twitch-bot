@@ -7,6 +7,7 @@ const memeLogRepo = require('../repositories/memeLog.repo');
 const donationRepo = require('../repositories/donation.repo');
 const { getLatestChatters, getRecentMessages } = require('../chat/chatters');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
+const { getTwitchAccessToken } = require('./token.service');
 const { getCachedCatalog, loadCatalog } = require('./emoteCatalog.service');
 const { buildEmoteMap, renderMessageHtml } = require('../helpers/emoteHelper');
 
@@ -364,7 +365,8 @@ async function loadStreamData() {
     error: null,
   };
 
-  if (!config.TWITCH_API_CLIENT_ID || !config.TWITCH_ACCESS_TOKEN) {
+  const twitchToken = await getTwitchAccessToken();
+  if (!config.TWITCH_API_CLIENT_ID || !twitchToken) {
     return {
       ...emptyState,
       error: 'Twitch API не настроен, поэтому live-метрики недоступны.',

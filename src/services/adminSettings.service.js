@@ -37,11 +37,24 @@ async function getSettings() {
 
 async function getRuntimeSettings() {
   const settings = await getSettings();
-  if (!settings) return { donationAlertsApiKey: '', streamElementsToken: '', streamElementsChannelId: '', memeAlertsChannelId: '', memeAlertsTestToken: '', memeAlertsTestCsrf: '', memeAlertsTestCsrfToken: '', memeAlertsTestName: '' };
+  if (!settings) return {
+    donationAlertsApiKey: '',
+    streamElementsToken: '',
+    streamElementsChannelId: '',
+    boostyToken: '',
+    twitchToken: '',
+    memeAlertsChannelId: '',
+    memeAlertsTestToken: '',
+    memeAlertsTestCsrf: '',
+    memeAlertsTestCsrfToken: '',
+    memeAlertsTestName: '',
+  };
   return {
     donationAlertsApiKey: decrypt(settings.donationAlertsApiKey),
     streamElementsToken: decrypt(settings.streamElementsToken),
     streamElementsChannelId: settings.streamElementsChannelId || '',
+    boostyToken: decrypt(settings.boostyToken),
+    twitchToken: decrypt(settings.twitchToken),
     memeAlertsChannelId: settings.memeAlertsChannelId || config.MEMEALERTS_CHANNEL_ID || '',
     memeAlertsTestToken: decrypt(settings.memeAlertsTestToken),
     memeAlertsTestCsrf: decrypt(settings.memeAlertsTestCsrf),
@@ -60,6 +73,8 @@ async function updateSettings(input) {
   };
   if (String(input.donationAlertsApiKey || '').trim()) data.donationAlertsApiKey = encrypt(String(input.donationAlertsApiKey).trim());
   if (String(input.streamElementsToken || '').trim()) data.streamElementsToken = encrypt(String(input.streamElementsToken).trim());
+  if (String(input.boostyToken || '').trim()) data.boostyToken = encrypt(String(input.boostyToken).trim());
+  if (String(input.twitchToken || '').trim()) data.twitchToken = encrypt(String(input.twitchToken).trim());
   if (String(input.memeAlertsTestToken || '').trim()) data.memeAlertsTestToken = encrypt(String(input.memeAlertsTestToken).trim());
   if (String(input.memeAlertsTestCsrf || '').trim()) data.memeAlertsTestCsrf = encrypt(String(input.memeAlertsTestCsrf).trim());
   if (String(input.memeAlertsTestCsrfToken || '').trim()) data.memeAlertsTestCsrfToken = encrypt(String(input.memeAlertsTestCsrfToken).trim());
@@ -72,6 +87,8 @@ function getSettingsView(settings) {
     donationAlertsConfigured: Boolean(settings?.donationAlertsApiKey),
     streamElementsConfigured: Boolean(settings?.streamElementsToken),
     streamElementsChannelId: settings?.streamElementsChannelId || '',
+    boostyConfigured: Boolean(settings?.boostyToken),
+    twitchConfigured: Boolean(settings?.twitchToken),
     memeAlertsChannelId: settings?.memeAlertsChannelId || config.MEMEALERTS_CHANNEL_ID || '',
     memeAlertsTestConfigured: Boolean(settings?.memeAlertsTestToken),
     memeAlertsTestName: settings?.memeAlertsTestName || '',

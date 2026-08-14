@@ -1,16 +1,23 @@
 const axios = require('axios');
 const config = require('../config');
 const arrayHelper = require('../helpers/arrayHelper');
+const { getTwitchAccessToken } = require('../services/token.service');
 
 const getChannelViewers = async () => {
   let response;
+  const token = await getTwitchAccessToken();
+
+  if (!token) {
+    console.error('[TwitchAPI] Twitch access token is not configured');
+    return [];
+  }
 
   try {
     const url = `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${config.BROADCASTER_ID}&moderator_id=${config.MODERATOR_ID || config.BROADCASTER_ID}`;
     response = await axios.get(url, {
       headers: {
         'Client-Id': config.TWITCH_API_CLIENT_ID,
-        'Authorization': `Bearer ${config.TWITCH_ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${token}`,
       },
     });
   } catch (error) {
