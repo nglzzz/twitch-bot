@@ -21,6 +21,10 @@ function findById(id) {
   return _map(row);
 }
 
+function countBySource(source) {
+  return stmt('SELECT COUNT(*) AS c FROM donation WHERE source = ?').get(source).c;
+}
+
 function findMany({ streamSessionId = null, status = null, isTest = null, limit = 20, orderByCreatedAtDesc = true } = {}) {
   const conditions = [];
   const params = [];
@@ -132,6 +136,7 @@ module.exports = {
   update,
   findById,
   findOneByExternalId,
+  countBySource,
   findMany,
   getSentTotals,
   getTopDonors,

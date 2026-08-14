@@ -43,6 +43,7 @@ async function getRuntimeSettings() {
     streamElementsChannelId: '',
     boostyToken: '',
     twitchToken: '',
+    usdtTrc20WalletAddress: config.USDT_TRC20_WALLET || '',
     memeAlertsChannelId: '',
     memeAlertsTestToken: '',
     memeAlertsTestCsrf: '',
@@ -55,6 +56,7 @@ async function getRuntimeSettings() {
     streamElementsChannelId: settings.streamElementsChannelId || '',
     boostyToken: decrypt(settings.boostyToken),
     twitchToken: decrypt(settings.twitchToken),
+    usdtTrc20WalletAddress: settings.usdtTrc20WalletAddress || config.USDT_TRC20_WALLET || '',
     memeAlertsChannelId: settings.memeAlertsChannelId || config.MEMEALERTS_CHANNEL_ID || '',
     memeAlertsTestToken: decrypt(settings.memeAlertsTestToken),
     memeAlertsTestCsrf: decrypt(settings.memeAlertsTestCsrf),
@@ -66,8 +68,13 @@ async function getRuntimeSettings() {
 async function updateSettings(input) {
   if (!isDbReady()) throw new Error('Database is unavailable');
   const current = await getSettings();
+  const usdtTrc20WalletAddress = String(input.usdtTrc20WalletAddress || '').trim();
+  if (usdtTrc20WalletAddress && !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(usdtTrc20WalletAddress)) {
+    throw new Error('Некорректный TRON-адрес кошелька USDT TRC20');
+  }
   const data = {
     streamElementsChannelId: String(input.streamElementsChannelId || '').trim(),
+    usdtTrc20WalletAddress,
     memeAlertsChannelId: String(input.memeAlertsChannelId || '').trim(),
     memeAlertsTestName: String(input.memeAlertsTestName || '').trim().slice(0, 100),
   };
@@ -89,6 +96,7 @@ function getSettingsView(settings) {
     streamElementsChannelId: settings?.streamElementsChannelId || '',
     boostyConfigured: Boolean(settings?.boostyToken),
     twitchConfigured: Boolean(settings?.twitchToken),
+    usdtTrc20WalletAddress: settings?.usdtTrc20WalletAddress || config.USDT_TRC20_WALLET || '',
     memeAlertsChannelId: settings?.memeAlertsChannelId || config.MEMEALERTS_CHANNEL_ID || '',
     memeAlertsTestConfigured: Boolean(settings?.memeAlertsTestToken),
     memeAlertsTestName: settings?.memeAlertsTestName || '',

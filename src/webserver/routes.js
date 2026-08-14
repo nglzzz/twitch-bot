@@ -251,9 +251,11 @@ routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
     return res.render('pages/admin-donation-history', adminPage('donation-history', {
       donations: donations.map((donation) => ({
         ...donation,
-        isTest: donation.isTest ?? donation.source !== 'donationalerts',
-        testLabel: (donation.isTest ?? donation.source !== 'donationalerts') ? 'Тестовый' : 'Реальный',
-        sourceLabel: donation.source === 'donationalerts' ? 'DonationAlerts' : (donation.source === 'scheduled' ? 'Расписание' : 'Админка'),
+        isTest: donation.isTest ?? !['donationalerts', 'usdt-trc20'].includes(donation.source),
+        testLabel: (donation.isTest ?? !['donationalerts', 'usdt-trc20'].includes(donation.source)) ? 'Тестовый' : 'Реальный',
+        sourceLabel: donation.source === 'donationalerts'
+          ? 'DonationAlerts'
+          : (donation.source === 'usdt-trc20' ? 'USDT TRC20' : (donation.source === 'scheduled' ? 'Расписание' : 'Админка')),
         amountLabel: `${donation.amount} ${donation.currency}`,
         createdAtLabel: formatAdminDate(donation.createdAt),
       })),

@@ -171,6 +171,7 @@ const STATEMENTS = [
     stream_elements_channel_id TEXT NOT NULL DEFAULT '',
     boosty_token TEXT NOT NULL DEFAULT '',
     twitch_token TEXT NOT NULL DEFAULT '',
+    usdt_trc20_wallet_address TEXT NOT NULL DEFAULT '',
     meme_alerts_channel_id TEXT NOT NULL DEFAULT '',
     meme_alerts_test_token TEXT NOT NULL DEFAULT '',
     meme_alerts_test_csrf TEXT NOT NULL DEFAULT '',
@@ -213,6 +214,7 @@ function upgradeSchema(database) {
   const columns = {
     boosty_token: "TEXT NOT NULL DEFAULT ''",
     twitch_token: "TEXT NOT NULL DEFAULT ''",
+    usdt_trc20_wallet_address: "TEXT NOT NULL DEFAULT ''",
   };
 
   for (const [name, definition] of Object.entries(columns)) {

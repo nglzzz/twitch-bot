@@ -56,7 +56,9 @@ async function sendTipToStreamElements(donation, runtimeSettings) {
         username: String(donation.donorName).slice(0, 25),
         email: 'scheduled.donation@test.com',
       },
-      provider: donation.source === 'donationalerts' ? 'donationalerts' : 'Schedule',
+      provider: donation.source === 'donationalerts'
+        ? 'donationalerts'
+        : (donation.source === 'usdt-trc20' ? 'USDT TRC20' : 'Schedule'),
       message: donation.message,
       amount: donation.amount,
       currency: donation.currency,
@@ -81,7 +83,8 @@ async function createAndSendDonation(data, source) {
 
   const donationData = {
     source,
-    isTest: source !== 'donationalerts',
+    // Реальные донаты приходят не только из DonationAlerts (например, USDT TRC20).
+    isTest: !['donationalerts', 'usdt-trc20'].includes(source),
     externalId: data.externalId ? String(data.externalId) : null,
     donorId: data.donorId || '',
     donorName: String(data.donorName || 'Anonymous').trim().slice(0, 100),

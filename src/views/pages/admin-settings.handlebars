@@ -7,6 +7,7 @@
 <label>StreamElements Channel ID<input name="streamElementsChannelId" value="{{settings.streamElementsChannelId}}" required /></label>
 <label>Boosty token {{#if settings.boostyConfigured}}<small>сохранён</small>{{/if}}<input name="boostyToken" type="password" autocomplete="off" /></label>
 <label>Twitch token {{#if settings.twitchConfigured}}<small>сохранён</small>{{/if}}<input name="twitchToken" type="password" autocomplete="off" /></label>
+<label>USDT TRC20 кошелёк <small>алерт при входящем переводе</small><input name="usdtTrc20WalletAddress" value="{{settings.usdtTrc20WalletAddress}}" placeholder="Например, TAZjfenZJzaXoUf7D5JpCeA9sJxVHGWtEt" /></label>
 <label>MemeAlerts Channel ID <small>нужен для расписания мемов</small><input name="memeAlertsChannelId" value="{{settings.memeAlertsChannelId}}" /></label>
 <hr><h2>Тестовый пользователь MemeAlerts</h2><p class="admin-card__hint">Укажите JWT другого MemeAlerts-пользователя. Сервер отправит тестовый мем через Bearer-токен, без браузерной сессии владельца канала.</p>
 <label>Тестовый пользователь — JWT {{#if settings.memeAlertsTestConfigured}}<small>сохранён</small>{{/if}}<input name="memeAlertsTestToken" type="password" autocomplete="off" /></label>

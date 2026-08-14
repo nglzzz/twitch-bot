@@ -20,6 +20,7 @@ function upsert(data) {
     'stream_elements_channel_id',
     'boosty_token',
     'twitch_token',
+    'usdt_trc20_wallet_address',
     'meme_alerts_channel_id',
     'meme_alerts_test_token',
     'meme_alerts_test_csrf',

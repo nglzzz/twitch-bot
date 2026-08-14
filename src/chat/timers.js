@@ -8,6 +8,7 @@ const viewerRepo = require('../repositories/viewer.repo');
 const { isChannelLive } = require('../twitchApi/channelInfo');
 const { startTracking, getActiveSessionId } = require('../services/streamTracker.service');
 const { startPolling } = require('../services/memeAlerts.service');
+const { startPolling: startUsdtTrc20Polling } = require('../services/usdtTrc20.service');
 const { startScheduler } = require('../services/scheduler.service');
 const { refreshDonationAlertsConnection } = require('../services/donations.service');
 const { ensureInitialAdmin } = require('../services/adminAuth.service');
@@ -91,6 +92,9 @@ startTracking(5 * 60 * 1000);
 
 // Start meme alerts polling (every 2 minutes by default)
 startPolling();
+
+// Start USDT TRC20 wallet polling (every 30 seconds by default)
+startUsdtTrc20Polling();
 
 // Scheduled tasks and the DonationAlerts Socket.IO client are server-side and
 // therefore continue working when the admin browser is closed.
