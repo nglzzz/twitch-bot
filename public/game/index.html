@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10131c">
+<title>Мой класс — симулятор переписки</title>
+<link rel="stylesheet" href="css/style.css?v=24">
+</head>
+<body>
+<div id="stage">
+  <div id="phone" class="case-carbon">
+    <!-- Статус-бар -->
+    <div id="statusbar">
+      <span class="sb-left"><span id="sb-time">08:00</span><span id="sb-day">День 1</span></span>
+      <span class="sb-right">
+        <button type="button" id="sb-coins" class="sb-coins" title="Магазин">🪙 100</button>
+        <span class="sb-batt">🔋</span>
+      </span>
+    </div>
+
+    <!-- ===== ДОМАШНИЙ ЭКРАН ===== -->
+    <section id="screen-home" class="screen active">
+      <div class="wallpaper"></div>
+      <div class="home-clock">
+        <div class="hc-time">08:00</div>
+        <div class="hc-date">День 1 · Вторник</div>
+      </div>
+      <button type="button" class="home-widget" id="home-widget" data-nav="chats">
+        <div class="hw-top">
+          <span class="hw-label">Чаты</span>
+          <span class="hw-count" id="hw-count">тихо</span>
+        </div>
+        <div class="hw-body" id="hw-body">
+          <span class="hw-empty">Скоро кто-нибудь напишет</span>
+        </div>
+      </button>
+      <div class="apps-grid">
+        <button class="app" data-nav="gallery">
+          <span class="app-ico" style="background:linear-gradient(135deg,#8f6cff,#5f8bff)">🖼️</span>
+          <span class="app-label">Галерея</span>
+        </button>
+        <button class="app" data-nav="store">
+          <span class="app-ico" style="background:linear-gradient(135deg,#ffb020,#ff7a00)">🛍️</span>
+          <span class="app-label">Магазин</span>
+        </button>
+        <button class="app" data-nav="games">
+          <span class="app-ico" style="background:linear-gradient(135deg,#b06cff,#ff5db1)">🎮</span>
+          <span class="app-label">Игры</span>
+        </button>
+        <button class="app" data-nav="diary">
+          <span class="app-ico" style="background:linear-gradient(135deg,#ff6b8d,#ff3d6e)">📔</span>
+          <span class="app-label">Дневник</span>
+        </button>
+        <button class="app" data-nav="ach">
+          <span class="app-ico" style="background:linear-gradient(135deg,#ffd54f,#ff9800)">🏆</span>
+          <span class="app-label">Достижения</span>
+          <span class="app-badge" id="badge-ach" hidden></span>
+        </button>
+        <button class="app" data-nav="settings">
+          <span class="app-ico" style="background:linear-gradient(135deg,#7c8899,#55606e)">⚙️</span>
+          <span class="app-label">Настройки</span>
+        </button>
+      </div>
+      <div class="dock">
+        <button class="app" data-nav="chats">
+          <span class="app-ico" style="background:linear-gradient(135deg,#43d17c,#1fa855)">💬</span>
+          <span class="app-badge" id="badge-chats" hidden></span>
+        </button>
+        <button class="app" data-nav="gallery"><span class="app-ico" style="background:linear-gradient(135deg,#8f6cff,#5f8bff)">🖼️</span></button>
+        <button class="app" data-nav="store"><span class="app-ico" style="background:linear-gradient(135deg,#ffb020,#ff7a00)">🛍️</span></button>
+        <button class="app" data-nav="settings"><span class="app-ico" style="background:linear-gradient(135deg,#7c8899,#55606e)">⚙️</span></button>
+      </div>
+    </section>
+
+    <!-- ===== СПИСОК ЧАТОВ ===== -->
+    <section id="screen-chats" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Чаты</div>
+        <button class="appbar-btn" id="btn-skip" title="Промотать время на час-два">⏩</button>
+      </header>
+      <div id="chat-list" class="scroll"></div>
+      <button type="button" id="skip-hint" class="skip-hint" hidden>Все ушли по своим делам… нажми ⏩, чтобы листать время</button>
+    </section>
+
+    <!-- ===== ЧАТ ===== -->
+    <section id="screen-chat" class="screen">
+      <header class="appbar chat-bar">
+        <button class="back" data-nav="chats">‹</button>
+        <div class="chat-ava" id="chat-ava">?</div>
+        <div class="chat-meta">
+          <div class="chat-name" id="chat-name">—</div>
+          <div class="chat-status" id="chat-status">онлайн</div>
+        </div>
+        <button class="appbar-btn" id="btn-gift" title="Отправить подарок">🎁</button>
+      </header>
+      <div id="messages" class="scroll"></div>
+      <div id="replies" class="replies"></div>
+      <div id="fake-input" class="fake-input">Выберите ответ ниже…</div>
+    </section>
+
+    <!-- ===== ГАЛЕРЕЯ ===== -->
+    <section id="screen-gallery" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Галерея</div>
+        <span class="appbar-btn" id="gallery-count"></span>
+      </header>
+      <div id="gallery-filters" class="gal-filters" hidden></div>
+      <div id="gallery-grid" class="scroll"></div>
+    </section>
+
+    <!-- ===== МАГАЗИН ===== -->
+    <section id="screen-store" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Магазин</div>
+        <button class="appbar-btn coins-btn" id="btn-free-coins">🪙 <b id="store-coins">0</b> +</button>
+      </header>
+      <div class="store-tabs">
+        <button class="store-tab active" data-tab="themes">Темы</button>
+        <button class="store-tab" data-tab="cases">Корпуса</button>
+        <button class="store-tab" data-tab="packs">Фотосеты</button>
+      </div>
+      <div id="store-grid" class="scroll"></div>
+    </section>
+
+    <!-- ===== ИГРЫ (аркада) ===== -->
+    <section id="screen-games" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Игры</div>
+        <span class="appbar-btn" id="games-cap"></span>
+      </header>
+      <div id="games-list" class="scroll"></div>
+    </section>
+
+    <!-- ===== МИНИ-ИГРА ===== -->
+    <section id="screen-minigame" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="games">‹</button>
+        <div class="appbar-title" id="mg-title">Игра</div>
+        <span class="appbar-btn" id="mg-best"></span>
+      </header>
+      <div id="mg-stage"></div>
+    </section>
+
+    <!-- ===== ДНЕВНИК ===== -->
+    <section id="screen-diary" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Дневник</div>
+      </header>
+      <div id="diary-body" class="scroll"></div>
+    </section>
+
+    <!-- ===== ДОСТИЖЕНИЯ ===== -->
+    <section id="screen-ach" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Достижения</div>
+      </header>
+      <div id="ach-list" class="scroll"></div>
+    </section>
+
+    <!-- ===== НАСТРОЙКИ ===== -->
+    <section id="screen-settings" class="screen">
+      <header class="appbar">
+        <button class="back" data-nav="home">‹</button>
+        <div class="appbar-title">Настройки</div>
+      </header>
+      <div class="scroll settings-body">
+        <div class="set-group">
+          <div class="set-label">Игра</div>
+          <label class="set-row">
+            <span>🔊 Звуки сообщений</span>
+            <input type="checkbox" id="set-sound" class="switch" checked>
+          </label>
+          <button class="set-btn" id="btn-howto">❓ Как играть</button>
+        </div>
+        <div class="set-group">
+          <div class="set-label">Сохранение</div>
+          <button class="set-btn warn" id="btn-restart-keep">🔄 Начать историю заново<div class="set-sub">галерея, покупки и монеты сохранятся</div></button>
+          <button class="set-btn danger" id="btn-restart-full">🗑️ Полный сброс<div class="set-sub">удалит всё, включая галерею</div></button>
+        </div>
+        <div class="about">Мой класс · симулятор переписки<br>v1.0 · сделано для Яндекс Игр</div>
+      </div>
+    </section>
+
+    <!-- Оверлеи -->
+    <div id="photo-viewer" class="overlay" hidden>
+      <button class="ov-close">✕</button>
+      <div class="polaroid big" id="pv-card"></div>
+      <div class="pv-caption" id="pv-caption"></div>
+    </div>
+    <div id="modal" class="overlay" hidden>
+      <div class="modal-box" id="modal-box"></div>
+    </div>
+    <div id="ad-overlay" class="overlay ad" hidden>
+      <div class="ad-box">
+        <div class="ad-label">РЕКЛАМА</div>
+        <div class="ad-mock">
+          <div class="ad-mock-title">🚀 Космо-Кот Барсик</div>
+          <div class="ad-mock-sub">Теперь в космосе никто не отберёт твою колбасу!</div>
+          <div class="ad-mock-cat">🐱🚀</div>
+        </div>
+        <div class="ad-timer" id="ad-timer">3</div>
+        <button id="ad-close" class="ad-close" disabled>Пропустить (3)</button>
+        <div class="ad-stub-note">тестовая заглушка · в релизе — Яндекс Реклама</div>
+      </div>
+    </div>
+    <div id="toasts"></div>
+  </div>
+</div>
+
+<script src="js/sdk.js?v=9"></script>
+<script src="js/photos.js?v=12"></script>
+<script src="js/data_a.js?v=24"></script>
+<script src="js/data_b.js?v=40"></script>
+<script src="js/data_c.js?v=33"></script>
+<script src="js/data_alt.js?v=6"></script>
+<script src="js/store.js?v=8"></script>
+<script src="js/games.js?v=11"></script>
+<script src="js/engine.js?v=36"></script>
+<script src="js/ui.js?v=30"></script>
+<script src="js/main.js?v=8"></script>
+</body>
+</html>
