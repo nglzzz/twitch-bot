@@ -139,10 +139,10 @@ const PHOTOS = {
 const Photo = {
   get(id){ return PHOTOS[id] || null; },
 
-  // фото лежат рядом с игрой: photos/<id>.png — свои картинки просто
+  // фото лежат рядом с игрой: photos/<id>.webp — свои картинки просто
   // кладутся в папку с этими именами. Нет файла — простая заглушка-карточка.
-  src(id){ return 'photos/' + id + '.png'; },
-  avaSrc(id){ return 'photos/ava_' + id + '.png'; },
+  src(id){ return 'photos/' + id + '.webp'; },
+  avaSrc(id){ return 'photos/ava_' + id + '.webp'; },
 
   imgTag(id){
     const def = PHOTOS[id];
