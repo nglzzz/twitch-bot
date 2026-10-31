@@ -71,6 +71,7 @@ class Chat {
   };
 
   handleMessageResult(resultMessage, channel) {
+    if (!resultMessage) return;
     if (Array.isArray(resultMessage)) {
         let delay = 0;
         resultMessage.forEach(message => {

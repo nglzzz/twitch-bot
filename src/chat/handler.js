@@ -5,6 +5,8 @@ const arrayHelper = require('../helpers/arrayHelper');
 const copyPastList = require('../data/copypasts');
 const config = require('../config');
 
+require('../services/quiz.service').initialize(Chat);
+
 Chat.registerCommand('!help', require('../commands/help'), '!хелп');
 Chat.registerCommand('!hello', require('../commands/hello'), '!привет');
 Chat.registerCommand('!penis', require('../commands/penis'), '!пенис');

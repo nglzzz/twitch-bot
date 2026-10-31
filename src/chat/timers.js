@@ -89,6 +89,7 @@ const saveViewersTimer = setInterval(async () => {
 
 // Start stream tracking (checks every 5 minutes)
 startTracking(5 * 60 * 1000);
+require('../services/quiz.service').startQuizTimer();
 
 // Start meme alerts polling (every 2 minutes by default)
 startPolling();

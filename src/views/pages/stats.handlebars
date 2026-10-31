@@ -56,6 +56,7 @@
     <button class="stats-tabs__btn{{#unless filters.chatter}} is-active{{/unless}}" data-tab="overview">📊 Обзор</button>
     <button class="stats-tabs__btn" data-tab="streams">🎬 Стримы</button>
     <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">💬 Чаттеры</button>
+    <button class="stats-tabs__btn" data-tab="quiz">🧠 Викторина</button>
     <button class="stats-tabs__btn" data-tab="memes">🎨 Мемы</button>
     <button class="stats-tabs__btn" data-tab="donations">💸 Донаты</button>
     <button class="stats-tabs__btn" data-tab="viewers">👁 Зрители</button>
@@ -455,6 +456,38 @@
       </ol>
     {{else}}
       <p class="empty-state">Пока нет достаточного количества сообщений для построения топа.</p>
+    {{/if}}
+  </article>
+</section>
+
+{{! ── Tab: Quiz leaderboard ── }}
+<section class="container section-spacing stats-tab-content" data-tab-content="quiz">
+  <article class="panel-card leaderboard-section">
+    <div class="panel-card__header">
+      <div>
+        <div class="eyebrow">Очки за правильные ответы</div>
+        <h2>Лидерборд викторины</h2>
+      </div>
+    </div>
+
+    <p class="section-description">
+      Очки сохраняются между стримами. Запусти игру командой <strong>!в</strong> или <strong>!викторина</strong>, чтобы попасть в таблицу.
+    </p>
+
+    {{#if quizLeaderboard.hasPlayers}}
+      <ol class="leaderboard-list leaderboard-list--large">
+        {{#each quizLeaderboard.players}}
+          <li class="leaderboard-item">
+            <span class="leaderboard-item__position">#{{position}}</span>
+            <div class="leaderboard-item__content">
+              <strong>{{displayName}}</strong>
+              <span>{{points}} очков</span>
+            </div>
+          </li>
+        {{/each}}
+      </ol>
+    {{else}}
+      <p class="empty-state">Пока никто не набрал очки. Ответь на загадку во время викторины — и появись здесь.</p>
     {{/if}}
   </article>
 </section>

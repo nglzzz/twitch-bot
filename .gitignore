@@ -107,6 +107,9 @@ storage/
 
 # SQLite database files
 data/
+!src/data/
+src/data/*
+!src/data/quizWords.js
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

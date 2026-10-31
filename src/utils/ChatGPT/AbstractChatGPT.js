@@ -207,6 +207,76 @@ class ChatGPTClient
     return this.extractAnswer(response, providerConfig.type);
   }
 
+  async generateJson(messages, options = {}) {
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
+      throw new TypeError('messages must be an array containing 1 to 20 entries');
+    }
+
+    const normalizedMessages = messages.map((message) => {
+      if (!message || !['system', 'user', 'assistant'].includes(message.role)
+        || typeof message.content !== 'string' || !message.content.trim()) {
+        throw new TypeError('Each message requires a valid role and non-empty text content');
+      }
+
+      return { role: message.role, content: message.content };
+    });
+
+    const maxTokens = Math.floor(Number(options.maxTokens ?? 4096));
+    const timeoutMs = Math.floor(Number(options.timeoutMs ?? REQUEST_TIMEOUT));
+    if (!Number.isFinite(maxTokens) || maxTokens < 1 || maxTokens > 8192) {
+      throw new RangeError('maxTokens must be between 1 and 8192');
+    }
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) {
+      throw new RangeError('timeoutMs must be between 1000 and 60000');
+    }
+
+    const requestMeta = this.getRequestMeta(this.modelName);
+    const { providerConfig, modelConfig, requestModel } = requestMeta;
+    const apiKey = this.getProviderApiKey(providerConfig);
+    if (!apiKey) {
+      throw new Error('Missing API key for configured model');
+    }
+
+    const maxTokensParam = modelConfig.maxTokensParam || providerConfig.maxTokensParam || 'max_tokens';
+    let data;
+    if (providerConfig.type === 'completion') {
+      const prompt = normalizedMessages.map((message) => {
+        if (message.role === 'system') return `Instructions: ${message.content}`;
+        if (message.role === 'assistant') return `Assistant: ${message.content}`;
+        return `User: ${message.content}`;
+      }).join('\n');
+
+      data = {
+        model: requestModel,
+        prompt,
+        temperature: 0.2,
+        [maxTokensParam]: maxTokens,
+      };
+    } else {
+      data = {
+        ...(providerConfig.payload || {}),
+        ...(modelConfig.payload || {}),
+        model: requestModel,
+        messages: normalizedMessages,
+        [maxTokensParam]: maxTokens,
+      };
+    }
+
+    const response = await axios({
+      url: providerConfig.url,
+      method: 'POST',
+      timeout: timeoutMs,
+      headers: this.buildRequestHeaders(providerConfig, apiKey),
+      data,
+    });
+
+    const content = this.extractAnswer(response, providerConfig.type);
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('The configured model returned an empty response');
+    }
+    return content;
+  }
+
   buildRequestData(modelName, user, requestMeta = this.getRequestMeta(modelName)) {
     const modelConfig = requestMeta.modelConfig;
     const providerConfig = requestMeta.providerConfig;

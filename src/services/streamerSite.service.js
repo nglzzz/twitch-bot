@@ -5,6 +5,7 @@ const viewerRepo = require('../repositories/viewer.repo');
 const streamSessionRepo = require('../repositories/streamSession.repo');
 const memeLogRepo = require('../repositories/memeLog.repo');
 const donationRepo = require('../repositories/donation.repo');
+const quizRepo = require('../repositories/quiz.repo');
 const { getLatestChatters, getRecentMessages } = require('../chat/chatters');
 const { getChannelInfo } = require('../twitchApi/channelInfo');
 const { getTwitchAccessToken } = require('./token.service');
@@ -1189,7 +1190,7 @@ async function buildStatsPageData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
   const chatterName = filters?.chatter || null;
 
-  const [shared, streamSessions, memeStats, overallStats, chatterStats, streamOverview, donationStats] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, chatterStats, streamOverview, donationStats, quizLeaderboard] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
@@ -1197,6 +1198,7 @@ async function buildStatsPageData(hostname, filters) {
     chatterName ? loadChatterStats(chatterName) : Promise.resolve(null),
     loadStreamOverview(streamSessionId),
     loadDonationStats(streamSessionId),
+    Promise.resolve(loadQuizLeaderboard()),
   ]);
 
   // If filtering by stream, reload viewer/chat stats with filter
@@ -1224,6 +1226,7 @@ async function buildStatsPageData(hostname, filters) {
     chatterStats,
     streamOverview,
     donationStats,
+    quizLeaderboard,
     filters: {
       streamId: streamSessionId || '',
       chatter: chatterName || '',
@@ -1245,13 +1248,14 @@ async function getSummaryApiData(hostname) {
 async function getStatsApiData(hostname, filters) {
   const streamSessionId = await resolveStreamSessionId(filters?.streamId);
 
-  const [shared, streamSessions, memeStats, overallStats, streamOverview, donationStats] = await Promise.all([
+  const [shared, streamSessions, memeStats, overallStats, streamOverview, donationStats, quizLeaderboard] = await Promise.all([
     buildSharedSiteData(hostname),
     loadStreamSessions(),
     loadMemeStats(streamSessionId),
     loadOverallStats(),
     loadStreamOverview(streamSessionId),
     loadDonationStats(streamSessionId),
+    Promise.resolve(loadQuizLeaderboard()),
   ]);
 
   return {
@@ -1264,7 +1268,22 @@ async function getStatsApiData(hostname, filters) {
     overallStats,
     streamOverview,
     donationStats,
+    quizLeaderboard,
   };
+}
+
+function loadQuizLeaderboard() {
+  if (!isDbReady()) {
+    return { players: [], hasPlayers: false };
+  }
+
+  try {
+    const players = quizRepo.getLeaderboard(20);
+    return { players, hasPlayers: players.length > 0 };
+  } catch (error) {
+    console.error('[Site] Could not load quiz leaderboard:', error.message);
+    return { players: [], hasPlayers: false };
+  }
 }
 
 module.exports = {

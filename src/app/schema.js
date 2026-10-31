@@ -191,6 +191,36 @@ const STATEMENTS = [
     updated_at INTEGER NOT NULL
   )`,
 
+  // --- quiz: lifetime points and one manual/automatic start per stream ---
+  `CREATE TABLE IF NOT EXISTS quiz_score (
+    user_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL COLLATE NOCASE,
+    display_name TEXT NOT NULL,
+    points INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_quiz_score_points ON quiz_score(points DESC, username COLLATE NOCASE)`,
+  `CREATE TABLE IF NOT EXISTS quiz_stream (
+    stream_id TEXT PRIMARY KEY,
+    started_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS quiz_question (
+    id TEXT PRIMARY KEY,
+    clue TEXT NOT NULL,
+    answers TEXT NOT NULL,
+    answer_key TEXT NOT NULL UNIQUE,
+    source TEXT NOT NULL DEFAULT 'ai',
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_quiz_question_source_created ON quiz_question(source, created_at)`,
+  `CREATE TABLE IF NOT EXISTS quiz_question_use (
+    stream_id TEXT NOT NULL,
+    question_id TEXT NOT NULL REFERENCES quiz_question(id) ON DELETE CASCADE,
+    used_at INTEGER NOT NULL,
+    PRIMARY KEY (stream_id, question_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_quiz_question_use_question ON quiz_question_use(question_id)`,
+
   // --- schema_migrations: контроль версий схемы ---
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
