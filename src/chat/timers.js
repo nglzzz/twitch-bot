@@ -90,6 +90,23 @@ const saveViewersTimer = setInterval(async () => {
 // Start stream tracking (checks every 5 minutes)
 startTracking(5 * 60 * 1000);
 require('../services/quiz.service').startQuizTimer();
+require('../services/achievements.service').startAchievementAnnouncements(Chat, { isDbReady });
+
+let refreshingCommunity = false;
+const refreshCommunityFollowers = async () => {
+  if (!isDbReady() || refreshingCommunity) return;
+  refreshingCommunity = true;
+  try {
+    await require('../services/twitchCommunity.service').refreshDueFollowers(10);
+    require('../services/achievements.service').evaluateFollowMilestones();
+  } catch (error) {
+    console.error('[Community] Follow refresh failed:', error.message);
+  } finally {
+    refreshingCommunity = false;
+  }
+};
+refreshCommunityFollowers();
+setInterval(refreshCommunityFollowers, 60 * 1000);
 
 // Start meme alerts polling (every 2 minutes by default)
 startPolling();

@@ -1,20 +1,20 @@
 'use strict';
 
 const defaultWords = require('../data/quizWords');
+const fallbackSets = require('../games/quizFallbacks');
+const {
+  getMode,
+  resolveMode,
+  buildRoundClue,
+  buildRoundHint,
+  normalizeAnswer,
+} = require('../games/quizModes');
 
 const DEFAULT_ROUND_COUNT = 10;
 const DEFAULT_ROUND_DURATION_MS = 60 * 1000;
 const DEFAULT_HINT_AFTER_MS = 30 * 1000;
 const DEFAULT_BREAK_MS = 5 * 1000;
 const DEFAULT_AUTO_DELAY_MS = 2 * 60 * 60 * 1000;
-
-function normalizeAnswer(value) {
-  return String(value || '')
-    .normalize('NFC')
-    .trim()
-    .toLocaleLowerCase('ru-RU')
-    .replace(/ё/g, 'е');
-}
 
 function isStreamer(tags) {
   return Boolean(tags && (tags.streamer || tags.badges && tags.badges.broadcaster === '1'));
@@ -34,7 +34,7 @@ function createQuizEngine(options) {
     repository,
     send,
     now = Date.now,
-    words = defaultWords,
+    words,
     questionProvider = null,
     roundCount = DEFAULT_ROUND_COUNT,
     roundDurationMs = DEFAULT_ROUND_DURATION_MS,
@@ -90,19 +90,20 @@ function createQuizEngine(options) {
     if (entry.word) answers.push(normalizeAnswer(entry.word));
     const answer = answers[0] || '';
     state.current = {
-      clue: entry.clue || entry.hint || 'Какое это слово?',
+      clue: buildRoundClue(state.mode, entry),
       answers: new Set(answers),
       answer,
       startedAt: now(),
       hinted: false,
     };
     state.waitingUntil = null;
-    sendMessage(`Викторина — раунд ${state.round}/${state.roundCount}: ${state.current.clue}`);
+    sendMessage(`${getMode(state.mode).label} — раунд ${state.round}/${state.roundCount}: ${state.current.clue}`);
   }
 
   function finishGame() {
     if (!state) return;
-    sendMessage(`Викторина завершена! ${state.roundCount} раундов позади. Команда !в топ покажет лидеров.`);
+    const ending = state.mode === 'quiz' ? 'Викторина завершена' : `Игра «${getMode(state.mode).label}» завершена`;
+    sendMessage(`${ending}! ${state.roundCount} раундов позади. Команда !в топ покажет лидеров.`);
     state = null;
   }
 
@@ -121,24 +122,26 @@ function createQuizEngine(options) {
     state.waitingUntil = now() + breakMs;
   }
 
-  async function startInternal(tags, stream, source) {
+  async function startInternal(tags, stream, source, mode) {
     if (state) {
-      sendMessage('Викторина уже идет. Отвечайте в чат!');
+      sendMessage(`Уже идет игра «${getMode(state.mode).label}». Дождитесь ее окончания.`);
       return false;
     }
 
     const online = Boolean(stream);
     if (!online && !isStreamer(tags)) {
-      sendMessage('Викторина доступна только во время стрима. Запустить ее может только стример.');
+      sendMessage('Игра доступна только во время стрима. Запустить ее офлайн может только стример.');
       return false;
     }
 
     const id = online ? streamId(stream) : '';
     const questionStreamId = id || `offline:${new Date(now()).toISOString().slice(0, 10)}`;
-    let shuffled = words.slice();
+    let roundWords = Array.isArray(words)
+      ? words.slice()
+      : (mode === 'quiz' ? defaultWords : fallbackSets[mode] || []).slice();
     if (questionProvider) {
-      sendMessage('Готовлю вопросы для викторины…');
-      shuffled = await questionProvider.getQuestions({ streamId: questionStreamId, count: roundCount });
+      sendMessage(`Готовлю вопросы для игры «${getMode(mode).label}»…`);
+      roundWords = await questionProvider.getQuestions({ streamId: questionStreamId, count: roundCount, mode });
       let latestStream;
       try {
         latestStream = await getStream({ force: true });
@@ -150,12 +153,12 @@ function createQuizEngine(options) {
         latestStream = null;
       }
       if (streamId(latestStream) !== id) {
-        sendMessage('Статус стрима изменился во время подготовки вопросов. Запустите викторину еще раз.');
+        sendMessage('Статус стрима изменился во время подготовки вопросов. Запустите игру еще раз.');
         return false;
       }
     }
-    if (!shuffled.length) {
-      sendMessage('Свежих вопросов пока нет, а генерация недоступна. Попробуйте позже: повторять вопросы этого стрима не будем.');
+    if (!roundWords.length) {
+      sendMessage(`Для игры «${getMode(mode).label}» пока нет новых заданий. Попробуйте позже.`);
       return false;
     }
 
@@ -165,19 +168,28 @@ function createQuizEngine(options) {
       active: true,
       streamId: id || null,
       questionStreamId,
+      mode,
       source: online ? source : 'streamer-offline',
       round: 1,
-      roundCount: Math.min(roundCount, shuffled.length),
-      words: shuffled,
+      roundCount: Math.min(roundCount, roundWords.length),
+      words: roundWords,
       current: null,
       waitingUntil: null,
     };
-    sendMessage('Запускаем викторину! Отвечайте одним словом, за каждый правильный ответ — 1 очко.');
+    const answerInstruction = mode === 'quiz' || mode === 'anagram'
+      ? 'Отвечайте одним словом'
+      : 'Пишите название целиком';
+    sendMessage(`Запускаем игру «${getMode(mode).label}»! ${answerInstruction}, за каждый правильный ответ — 1 очко.`);
     beginRound();
     return true;
   }
 
-  async function start(tags) {
+  async function start(tags, modeId = 'quiz') {
+    const mode = resolveMode(modeId);
+    if (!mode) {
+      send('Неизвестный режим игры. Используйте !в, !в анаграммы, !в игра или !в фильм.');
+      return false;
+    }
     return enqueue(async () => {
       let stream;
       try {
@@ -189,17 +201,17 @@ function createQuizEngine(options) {
         }
         stream = null;
       }
-      return startInternal(tags || {}, stream, 'manual');
+      return startInternal(tags || {}, stream, 'manual', mode);
     });
   }
 
   async function stopInternal(message) {
     if (!state) {
-      sendMessage('Сейчас викторина не идет.');
+      sendMessage('Сейчас игра не идет.');
       return false;
     }
     state = null;
-    sendMessage(message || 'Викторина остановлена.');
+    sendMessage(message || 'Игра остановлена.');
     return true;
   }
 
@@ -218,11 +230,11 @@ function createQuizEngine(options) {
         if (streamStatusKnown) {
           if (state.source === 'streamer-offline') {
             if (stream) {
-              await stopInternal('Викторина остановлена: начался стрим.');
+              await stopInternal('Игра остановлена: начался стрим.');
               return;
             }
           } else if (!stream || streamId(stream) !== state.streamId) {
-            await stopInternal('Викторина остановлена: стрим завершился.');
+            await stopInternal('Игра остановлена: стрим завершился.');
             return;
           }
         }
@@ -240,7 +252,7 @@ function createQuizEngine(options) {
         }
         if (!current.hinted && elapsed >= hintAfterMs) {
           current.hinted = true;
-          sendMessage(`Подсказка: слово из ${Array.from(current.answer).length} букв, начинается на «${Array.from(current.answer)[0]}».`);
+          sendMessage(buildRoundHint(state.mode, current.answer));
         }
         return;
       }
@@ -251,7 +263,7 @@ function createQuizEngine(options) {
       if (!id || startedAt === null || now() < nextAutoAttemptAt || now() - startedAt < autoDelayMs || repository.hasStarted(id)) return;
 
       nextAutoAttemptAt = now() + 60_000;
-      await startInternal({ streamer: true }, stream, 'auto');
+      await startInternal({ streamer: true }, stream, 'auto', 'quiz');
     });
   }
 
@@ -272,6 +284,9 @@ function createQuizEngine(options) {
         userId,
         username,
         displayName: String(tags && tags['display-name'] || username),
+        mode: state.mode,
+        streamId: state.streamId,
+        createdAt: now(),
       });
     } catch (error) {
       console.error('[Quiz] Could not save score:', error.message);
@@ -283,7 +298,7 @@ function createQuizEngine(options) {
     return true;
   }
 
-  async function command(tags, message) {
+  async function command(tags, message, requestedMode) {
     const args = String(message || '').trim().split(/\s+/).slice(1);
     const subcommand = normalizeAnswer(args[0] || '');
 
@@ -294,30 +309,35 @@ function createQuizEngine(options) {
         return;
       }
       const score = repository.getScore(userId);
-      sendMessage(`@${getUsername(tags)}: ${score || 0} очков в викторине.`);
+      sendMessage(`@${getUsername(tags)}: ${score || 0} очков в играх чата.`);
       return;
     }
 
     if (subcommand === 'топ' || subcommand === 'top') {
       const leaders = repository.getTop(5);
       if (!leaders.length) {
-        sendMessage('Пока в викторине никто не набрал очков.');
+        sendMessage('Пока в играх чата никто не набрал очков.');
         return;
       }
-      sendMessage(`Топ викторины: ${leaders.map((item, index) => `${index + 1}. ${item.username} — ${item.points}`).join('; ')}`);
+      sendMessage(`Топ игр чата: ${leaders.map((item, index) => `${index + 1}. ${item.username} — ${item.points}`).join('; ')}`);
       return;
     }
 
     if (subcommand === 'стоп' || subcommand === 'stop') {
       if (!isStreamer(tags)) {
-        sendMessage('Остановить викторину может только стример.');
+        sendMessage('Остановить игру может только стример.');
         return;
       }
       await enqueue(() => stopInternal());
       return;
     }
 
-    await start(tags);
+    const selectedMode = requestedMode || resolveMode(args[0] || 'quiz');
+    if (!selectedMode) {
+      sendMessage('Режимы: !в, !в анаграммы, !в игра, !в фильм. Очки: !в очки, таблица: !в топ.');
+      return;
+    }
+    await start(tags, selectedMode);
   }
 
   function getState() {
@@ -325,6 +345,7 @@ function createQuizEngine(options) {
     return {
       active: true,
       streamId: state.streamId,
+      mode: state.mode,
       source: state.source,
       round: state.round,
       roundCount: state.roundCount,

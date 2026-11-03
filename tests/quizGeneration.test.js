@@ -72,3 +72,48 @@ test('generated batches survive provider restart and feed scored rounds without 
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM quiz_question_use').get().count, 20);
   assert.ok(messages.some((message) => message.includes('Викторина завершена')));
 });
+
+test('all game modes use separate persisted pools and award shared points', async () => {
+  const stream = { id: 'multimode-stream', started_at: '2026-10-31T08:00:00Z' };
+  const fallbackSets = {
+    quiz: [],
+    anagram: [{ clue: 'Анаграмма: планета', answers: ['планета'] }],
+    game: [{ clue: '👨‍🔬 🔫 👽', answers: ['Халф Лайф 2', 'Half-Life 2'] }],
+    movie: [{ clue: '🚢 🧊 💔', answers: ['Титаник', 'Titanic'] }],
+  };
+  const messages = [];
+  const player = { 'user-id': 'multimode-player', username: 'player', badges: {} };
+  const makeProvider = () => createQuizQuestionProvider({
+    repository, fallbackSets, generate: async () => '{}',
+  });
+  const engine = createQuizEngine({
+    questionProvider: makeProvider(), repository: scoreRepository,
+    getStream: async () => stream, send: (message) => messages.push(message), roundCount: 1,
+  });
+
+  for (const [mode, answer] of [['anagram', 'планета'], ['game', 'HALF-LIFE   2'], ['movie', 'Titanic!']]) {
+    const before = messages.length;
+    assert.equal(await engine.start(player, mode), true);
+    const clue = engine.getState().clue;
+    assert.ok(clue);
+    if (mode === 'anagram') {
+      assert.ok(!messages.slice(before).some((message) => message.toLowerCase().includes('планета')));
+      assert.deepEqual(clue.replace(/^Анаграмма:\s*/, '').toLowerCase().split(/\s+/).sort(), Array.from('планета').sort());
+    } else {
+      assert.equal(clue, fallbackSets[mode][0].clue);
+    }
+    assert.equal(engine.guess(player, answer), true);
+    assert.equal(engine.getState(), null);
+    assert.equal(repository.findUnused(stream.id, 10, mode).length, 0);
+  }
+
+  assert.equal(scoreRepository.getScore('multimode-player'), 3);
+  assert.equal(scoreRepository.hasStarted(stream.id), true);
+  const recreatedEngine = createQuizEngine({
+    questionProvider: makeProvider(), repository: scoreRepository,
+    getStream: async () => stream, send: (message) => messages.push(message), roundCount: 1,
+  });
+  assert.equal(await recreatedEngine.start(player, 'movie'), false, 'used movie stays unavailable after provider recreation');
+  await recreatedEngine.tick();
+  assert.equal(recreatedEngine.getState(), null, 'manual modes suppress the automatic quiz');
+});

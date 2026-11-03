@@ -44,17 +44,25 @@ function initialize(chat) {
       .catch((error) => console.error('[Quiz] Chat send failed:', error.message));
   };
   engine = createQuizEngine({ getStream, repository, send, questionProvider: createQuizQuestionProvider() });
-  chat.registerCommand('!викторина', async (channel, tags, message) => {
-    if (!isDbReady()) return 'Викторина временно недоступна: нет соединения с базой очков.';
+  const handleGameCommand = (mode) => async (channel, tags, message) => {
+    if (!isDbReady()) return 'Игры временно недоступны: нет соединения с базой очков.';
     try {
-      if (message.trim().split(/\s+/).length === 1) statusExpiresAt = 0;
-      await engine.command(tags, message);
+      const subcommand = message.trim().split(/\s+/)[1] || '';
+      if (!['очки', 'score', 'топ', 'top', 'стоп', 'stop'].includes(subcommand.toLocaleLowerCase('ru-RU'))) {
+        statusExpiresAt = 0;
+      }
+      await engine.command(tags, message, mode);
     } catch (error) {
       console.error('[Quiz] Command failed:', error.message);
-      return 'Викторина временно недоступна. Попробуйте чуть позже.';
+      return 'Игры временно недоступны. Попробуйте чуть позже.';
     }
     return '';
-  }, '!в');
+  };
+
+  chat.registerCommand('!викторина', handleGameCommand(null), '!в');
+  chat.registerCommand('!анаграммы', handleGameCommand('anagram'), '!анаграмма');
+  chat.registerCommand('!играэмодзи', handleGameCommand('game'), '!эмодзиигра');
+  chat.registerCommand('!фильмэмодзи', handleGameCommand('movie'), '!эмодзифильм');
   chat.getClient().on('message', (channel, tags, message, self) => {
     if (self || !isDbReady()) return;
     try {

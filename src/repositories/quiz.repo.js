@@ -1,6 +1,7 @@
 'use strict';
 
-const { stmt } = require('./base');
+const { stmt, db } = require('./base');
+const communityRepo = require('./community.repo');
 
 function hasStarted(streamId) {
   if (!streamId) return false;
@@ -14,23 +15,27 @@ function markStarted(streamId, startedAt = Date.now()) {
   return hasStarted(streamId);
 }
 
-function addPoint({ userId, username, displayName }) {
+function addPoint({ userId, username, displayName, mode = 'quiz', streamId = null, createdAt = Date.now() }) {
   if (!userId || !username) throw new TypeError('userId and username are required');
 
   const normalizedUsername = String(username).trim().replace(/^@/, '').toLowerCase();
   const safeDisplayName = String(displayName || username).trim();
-  const now = Date.now();
+  const now = createdAt;
 
-  stmt(`INSERT INTO quiz_score (user_id, username, display_name, points, updated_at)
+  return db.transaction(() => {
+    communityRepo.prepareUserForEvent({ userId, username: normalizedUsername, displayName: safeDisplayName }, now);
+    stmt(`INSERT INTO quiz_score (user_id, username, display_name, points, updated_at)
     VALUES (?, ?, ?, 1, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       username = excluded.username,
       display_name = excluded.display_name,
       points = quiz_score.points + 1,
       updated_at = excluded.updated_at`)
-    .run(String(userId), normalizedUsername, safeDisplayName, now);
+      .run(String(userId), normalizedUsername, safeDisplayName, now);
 
-  return getScore(userId);
+    communityRepo.recordQuizWin({ userId, username: normalizedUsername, displayName: safeDisplayName, mode, streamId, createdAt: now });
+    return getScore(userId);
+  })();
 }
 
 function getScore(userId) {

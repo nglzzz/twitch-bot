@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const Database = require('better-sqlite3');
 const { after, beforeEach, test } = require('node:test');
+const { upgradeSchema } = require('../src/app/schema');
 
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'twitch-bot-quiz-question-'));
 process.env.SQLITE_PATH = path.join(temporaryDirectory, 'test.sqlite');
@@ -82,4 +84,76 @@ test('rejects unknown sources and caps untrusted question batches', () => {
   }));
 
   assert.equal(quizQuestionRepo.saveQuestions(questions), 100);
+});
+
+test('question pools and answer aliases are isolated by game mode', () => {
+  const clue = 'Что скрывает комбинация эмодзи?';
+  assert.equal(quizQuestionRepo.saveQuestions([
+    { clue, answers: ['Титаник', 'Titanic'] },
+  ], 'builtin', 'movie'), 1);
+  assert.equal(quizQuestionRepo.saveQuestions([
+    { clue, answers: ['Титаник', 'Titanic'] },
+  ], 'builtin', 'game'), 1);
+  assert.equal(quizQuestionRepo.saveQuestions([
+    { clue, answers: ['титаник', 'Titanic'] },
+  ], 'builtin', 'movie'), 0, 'normalized aliases deduplicate inside their mode');
+
+  const movie = quizQuestionRepo.findUnused('stream-modes', 10, 'movie');
+  const game = quizQuestionRepo.findUnused('stream-modes', 10, 'game');
+  assert.equal(movie.length, 1);
+  assert.equal(game.length, 1);
+  assert.notEqual(movie[0].id, game[0].id);
+
+  quizQuestionRepo.markUsed('stream-modes', movie);
+  assert.equal(quizQuestionRepo.findUnused('stream-modes', 10, 'movie').length, 0);
+  assert.equal(quizQuestionRepo.findUnused('stream-modes', 10, 'game').length, 1);
+  assert.deepEqual(quizQuestionRepo.getRecentAnswers('stream-modes', 100, 'movie'), ['титаник', 'titanic']);
+  assert.deepEqual(quizQuestionRepo.getRecentAnswers('stream-modes', 100, 'game'), []);
+  assert.throws(() => quizQuestionRepo.findUnused('stream-modes', 10, 'unknown'), /mode/i);
+});
+
+test('emoji clues keep their symbols in the identity so one mode can store many prompts', () => {
+  const questions = [
+    { clue: '🧱⛏️💎', answers: ['Minecraft', 'Майнкрафт'] },
+    { clue: '🚢🧊💔', answers: ['Titanic', 'Титаник'] },
+    { clue: '🦖🏝️🧬', answers: ['Jurassic Park', 'Парк Юрского периода'] },
+  ];
+
+  assert.equal(quizQuestionRepo.saveQuestions(questions, 'builtin', 'movie'), 3);
+  const saved = quizQuestionRepo.findUnused('emoji-stream', 10, 'movie');
+  assert.equal(saved.length, 3);
+  assert.deepEqual(new Set(saved.map((question) => question.clue)), new Set(questions.map((question) => question.clue)));
+});
+
+test('upgrades an old question table without changing existing trivia rows', () => {
+  const legacyDb = new Database(':memory:');
+  legacyDb.exec(`
+    CREATE TABLE admin_settings (
+      boosty_token TEXT NOT NULL DEFAULT '',
+      twitch_token TEXT NOT NULL DEFAULT '',
+      usdt_trc20_wallet_address TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE quiz_question (
+      id TEXT PRIMARY KEY,
+      clue TEXT NOT NULL,
+      answers TEXT NOT NULL,
+      answer_key TEXT NOT NULL UNIQUE,
+      source TEXT NOT NULL DEFAULT 'ai',
+      created_at INTEGER NOT NULL
+    );
+    INSERT INTO quiz_question (id, clue, answers, answer_key, source, created_at)
+    VALUES ('old-question', 'Вопрос из старой базы', '["ответ"]', 'ответ', 'builtin', 123);
+  `);
+
+  try {
+    upgradeSchema(legacyDb);
+    const row = legacyDb.prepare('SELECT * FROM quiz_question WHERE id = ?').get('old-question');
+    assert.equal(row.mode, 'quiz');
+    assert.equal(row.clue, 'Вопрос из старой базы');
+    assert.equal(row.answer_key, 'ответ');
+    upgradeSchema(legacyDb);
+    assert.equal(legacyDb.prepare('SELECT COUNT(*) AS count FROM quiz_question').get().count, 1);
+  } finally {
+    legacyDb.close();
+  }
 });

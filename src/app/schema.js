@@ -11,7 +11,7 @@
 // из Mongo сохраняются исходные строковые ObjectId, поэтому связи по
 // stream_session_id / created_by остаются консистентными.
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 5;
 
 const STATEMENTS = [
   // --- stream_session: центральная таблица (аналитический хаб) ---
@@ -43,6 +43,8 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS chat_log (
     id TEXT PRIMARY KEY,
     user TEXT NOT NULL,
+    user_id TEXT,
+    message_id TEXT,
     display_name TEXT,
     message TEXT,
     stream_session_id TEXT REFERENCES stream_session(id) ON DELETE SET NULL,
@@ -51,7 +53,71 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_chat_log_created ON chat_log(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_chat_log_user_created ON chat_log(user, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_log_lower_user ON chat_log(lower(user))`,
   `CREATE INDEX IF NOT EXISTS idx_chat_log_stream ON chat_log(stream_session_id)`,
+  // --- community profiles and game events ---
+  `CREATE TABLE IF NOT EXISTS community_user (
+    user_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL COLLATE NOCASE,
+    display_name TEXT NOT NULL,
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    followed_at INTEGER,
+    identity_checked_at INTEGER,
+    current_followed_at INTEGER,
+    follow_status INTEGER,
+    follow_checked_at INTEGER,
+    avatar_url TEXT,
+    avatar_checked_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_community_user_username ON community_user(username COLLATE NOCASE)`,
+  `CREATE TABLE IF NOT EXISTS community_game_win (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+    mode TEXT NOT NULL,
+    stream_id TEXT,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_community_game_win_user_mode ON community_game_win(user_id, mode, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_community_game_win_mode_created ON community_game_win(mode, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_community_game_win_stream ON community_game_win(stream_id)`,
+  `CREATE TABLE IF NOT EXISTS community_achievement (
+    user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+    achievement_id TEXT NOT NULL,
+    earned_at INTEGER NOT NULL,
+    is_historical INTEGER NOT NULL DEFAULT 0,
+    announced_at INTEGER,
+    PRIMARY KEY (user_id, achievement_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_community_achievement_earned ON community_achievement(earned_at DESC, achievement_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_community_achievement_pending ON community_achievement(announced_at, earned_at)`,
+  `CREATE TABLE IF NOT EXISTS community_achievement_state (
+    user_id TEXT PRIMARY KEY REFERENCES community_user(user_id) ON DELETE CASCADE,
+    initialized_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS community_redemption (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+    cost INTEGER NOT NULL CHECK (cost >= 0),
+    reward_id TEXT,
+    status TEXT NOT NULL DEFAULT 'unfulfilled',
+    redeemed_at INTEGER NOT NULL,
+    handled INTEGER NOT NULL DEFAULT 0 CHECK (handled IN (0, 1)),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_community_redemption_user_status ON community_redemption(user_id, status)`,
+  `CREATE TABLE IF NOT EXISTS community_support_link_audit (
+    id TEXT PRIMARY KEY,
+    record_kind TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+    admin_id TEXT,
+    created_at INTEGER NOT NULL,
+    UNIQUE (record_kind, record_id)
+  )`,
 
   // --- viewer: снапшот каждые 5 минут во время стрима.
   // viewers — JSON-массив ников (TEXT). Запросы по содержимому идут через json_each().
@@ -75,6 +141,7 @@ const STATEMENTS = [
     sent_at INTEGER,
     stream_session_id TEXT REFERENCES stream_session(id) ON DELETE SET NULL,
     raw TEXT,
+    community_user_id TEXT REFERENCES community_user(user_id) ON DELETE SET NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
@@ -99,6 +166,7 @@ const STATEMENTS = [
     status TEXT NOT NULL DEFAULT 'pending',
     error TEXT,
     raw TEXT,
+    community_user_id TEXT REFERENCES community_user(user_id) ON DELETE SET NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
@@ -210,6 +278,7 @@ const STATEMENTS = [
     answers TEXT NOT NULL,
     answer_key TEXT NOT NULL UNIQUE,
     source TEXT NOT NULL DEFAULT 'ai',
+    mode TEXT NOT NULL DEFAULT 'quiz',
     created_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_quiz_question_source_created ON quiz_question(source, created_at)`,
@@ -252,6 +321,92 @@ function upgradeSchema(database) {
       database.exec(`ALTER TABLE admin_settings ADD COLUMN ${name} ${definition}`);
     }
   }
+
+  const questionColumns = new Set(
+    database.prepare('PRAGMA table_info(quiz_question)').all().map((column) => column.name)
+  );
+  if (!questionColumns.has('mode')) {
+    database.exec("ALTER TABLE quiz_question ADD COLUMN mode TEXT NOT NULL DEFAULT 'quiz'");
+  }
+
+  const communityColumns = new Set(
+    database.prepare('PRAGMA table_info(community_user)').all().map((column) => column.name)
+  );
+  if (communityColumns.size > 0) {
+    const userColumns = {
+      current_followed_at: 'INTEGER',
+      identity_checked_at: 'INTEGER',
+      follow_status: 'INTEGER',
+      follow_checked_at: 'INTEGER',
+      avatar_url: 'TEXT',
+      avatar_checked_at: 'INTEGER',
+    };
+    for (const [name, definition] of Object.entries(userColumns)) {
+      if (!communityColumns.has(name)) database.exec(`ALTER TABLE community_user ADD COLUMN ${name} ${definition}`);
+    }
+    database.exec(`CREATE TABLE IF NOT EXISTS community_achievement (
+      user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+      achievement_id TEXT NOT NULL,
+      earned_at INTEGER NOT NULL,
+      is_historical INTEGER NOT NULL DEFAULT 0,
+      announced_at INTEGER,
+      PRIMARY KEY (user_id, achievement_id)
+    )`);
+    database.exec('CREATE INDEX IF NOT EXISTS idx_community_achievement_earned ON community_achievement(earned_at DESC, achievement_id)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_community_achievement_pending ON community_achievement(announced_at, earned_at)');
+    database.exec(`CREATE TABLE IF NOT EXISTS community_achievement_state (
+      user_id TEXT PRIMARY KEY REFERENCES community_user(user_id) ON DELETE CASCADE,
+      initialized_at INTEGER NOT NULL
+    )`);
+    database.exec(`CREATE TABLE IF NOT EXISTS community_redemption (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+      cost INTEGER NOT NULL CHECK (cost >= 0),
+      reward_id TEXT,
+      status TEXT NOT NULL DEFAULT 'unfulfilled',
+      redeemed_at INTEGER NOT NULL,
+      handled INTEGER NOT NULL DEFAULT 0 CHECK (handled IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`);
+    database.exec('CREATE INDEX IF NOT EXISTS idx_community_redemption_user_status ON community_redemption(user_id, status)');
+    database.exec(`CREATE TABLE IF NOT EXISTS community_support_link_audit (
+      id TEXT PRIMARY KEY,
+      record_kind TEXT NOT NULL,
+      record_id TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+      admin_id TEXT,
+      created_at INTEGER NOT NULL,
+      UNIQUE (record_kind, record_id)
+    )`);
+  }
+
+  for (const table of ['meme_log', 'donation']) {
+    const tableColumns = new Set(database.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name));
+    if (tableColumns.size > 0 && !tableColumns.has('community_user_id')) {
+      database.exec(`ALTER TABLE ${table} ADD COLUMN community_user_id TEXT REFERENCES community_user(user_id) ON DELETE SET NULL`);
+    }
+  }
+  if (database.prepare('PRAGMA table_info(meme_log)').all().some((column) => column.name === 'community_user_id')) {
+    database.exec('CREATE INDEX IF NOT EXISTS idx_meme_log_community_user_sent ON meme_log(community_user_id, sent_at DESC)');
+  }
+  if (database.prepare('PRAGMA table_info(donation)').all().some((column) => column.name === 'community_user_id')) {
+    database.exec('CREATE INDEX IF NOT EXISTS idx_donation_community_user_created ON donation(community_user_id, created_at DESC)');
+  }
+
+  const chatColumns = new Set(
+    database.prepare('PRAGMA table_info(chat_log)').all().map((column) => column.name)
+  );
+  if (chatColumns.size === 0) return;
+  if (!chatColumns.has('user_id')) {
+    database.exec('ALTER TABLE chat_log ADD COLUMN user_id TEXT');
+  }
+  if (!chatColumns.has('message_id')) {
+    database.exec('ALTER TABLE chat_log ADD COLUMN message_id TEXT');
+  }
+  database.exec('CREATE INDEX IF NOT EXISTS idx_chat_log_user_id_created ON chat_log(user_id, created_at DESC)');
+  database.exec('CREATE INDEX IF NOT EXISTS idx_chat_log_login_identity ON chat_log(lower(user), user_id)');
+  database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_log_message_id ON chat_log(message_id) WHERE message_id IS NOT NULL');
 }
 
 module.exports = {

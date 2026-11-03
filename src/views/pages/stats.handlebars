@@ -56,7 +56,7 @@
     <button class="stats-tabs__btn{{#unless filters.chatter}} is-active{{/unless}}" data-tab="overview">📊 Обзор</button>
     <button class="stats-tabs__btn" data-tab="streams">🎬 Стримы</button>
     <button class="stats-tabs__btn{{#if filters.chatter}} is-active{{/if}}" data-tab="chatters">💬 Чаттеры</button>
-    <button class="stats-tabs__btn" data-tab="quiz">🧠 Викторина</button>
+    <button class="stats-tabs__btn" data-tab="quiz">🎮 Игры чата</button>
     <button class="stats-tabs__btn" data-tab="memes">🎨 Мемы</button>
     <button class="stats-tabs__btn" data-tab="donations">💸 Донаты</button>
     <button class="stats-tabs__btn" data-tab="viewers">👁 Зрители</button>
@@ -448,7 +448,7 @@
           <li class="leaderboard-item">
             <span class="leaderboard-item__position">#{{position}}</span>
             <div class="leaderboard-item__content">
-              <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
+              <strong><a href="/users/{{user}}">{{displayName}}</a></strong>
               <span>{{messagesCountLabel}} сообщений · последнее: {{lastMessageAtLabel}}</span>
             </div>
           </li>
@@ -466,12 +466,14 @@
     <div class="panel-card__header">
       <div>
         <div class="eyebrow">Очки за правильные ответы</div>
-        <h2>Лидерборд викторины</h2>
+        <h2>Лидерборд игр чата</h2>
       </div>
     </div>
 
     <p class="section-description">
-      Очки сохраняются между стримами. Запусти игру командой <strong>!в</strong> или <strong>!викторина</strong>, чтобы попасть в таблицу.
+      Общие очки за викторину, анаграммы, игры и фильмы по эмодзи сохраняются между стримами.
+      Выбери режим: <strong>!в</strong>, <strong>!в анаграммы</strong>, <strong>!в игра</strong> или <strong>!в фильм</strong>.
+      Свои очки можно посмотреть командой <strong>!в очки</strong>.
     </p>
 
     {{#if quizLeaderboard.hasPlayers}}
@@ -480,14 +482,14 @@
           <li class="leaderboard-item">
             <span class="leaderboard-item__position">#{{position}}</span>
             <div class="leaderboard-item__content">
-              <strong>{{displayName}}</strong>
+              <strong><a href="/users/{{login}}">{{displayName}}</a></strong>
               <span>{{points}} очков</span>
             </div>
           </li>
         {{/each}}
       </ol>
     {{else}}
-      <p class="empty-state">Пока никто не набрал очки. Ответь на загадку во время викторины — и появись здесь.</p>
+      <p class="empty-state">Пока никто не набрал очки. Угадай ответ в любой игре чата — и появись здесь.</p>
     {{/if}}
   </article>
 </section>
@@ -509,7 +511,7 @@
             <li class="leaderboard-item">
               <span class="leaderboard-item__position">#{{position}}</span>
               <div class="leaderboard-item__content">
-                <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
+                <strong><a href="/users/{{user}}">{{displayName}}</a></strong>
                 <span>{{memesCountLabel}} мемов · последний: {{lastMemeAtLabel}}</span>
               </div>
             </li>
@@ -560,7 +562,7 @@
         {{#each memeStats.recentMemes}}
           <li class="message-item">
             <div class="message-item__head">
-              <strong><a href="/stats?chatter={{user}}">{{displayName}}</a></strong>
+              <strong><a href="/users/{{user}}">{{displayName}}</a></strong>
               <span>{{sentAtLabel}}</span>
             </div>
             <p>🎨 {{stickerName}}</p>

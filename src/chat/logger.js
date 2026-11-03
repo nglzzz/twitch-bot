@@ -1,6 +1,8 @@
 const { isDbReady } = require('../app/db');
 const Chat = require('../app/chat');
-const chatLogRepo = require('../repositories/chatLog.repo');
+const communityRepo = require('../repositories/community.repo');
+const { getBotList } = require('../helpers/arrayHelper');
+const config = require('../config');
 const { linkMessageToStream } = require('../services/streamTracker.service');
 
 Chat.getClient().on('message', async (channel, tags, message, self) => {
@@ -9,7 +11,9 @@ Chat.getClient().on('message', async (channel, tags, message, self) => {
   }
 
   const user = tags.username.toLowerCase();
+  if (getBotList().includes(user) || user === String(config.BOT_NAME || '').toLowerCase()) return;
   const displayName = tags['display-name'] ?? tags.username;
+  const receivedAt = Date.now();
 
   let streamSessionId = null;
   try {
@@ -19,7 +23,15 @@ Chat.getClient().on('message', async (channel, tags, message, self) => {
   }
 
   try {
-    chatLogRepo.insert({ user, displayName, message, streamSessionId });
+    communityRepo.recordChat({
+      userId: tags['user-id'],
+      username: user,
+      displayName,
+      message,
+      messageId: tags.id,
+      streamSessionId,
+      createdAt: receivedAt,
+    });
   } catch (error) {
     console.log('Could not save chat log entry:', error.message);
   }

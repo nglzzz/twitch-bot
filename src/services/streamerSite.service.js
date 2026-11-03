@@ -1102,6 +1102,11 @@ function buildNavigation(currentPage) {
       isActive: currentPage === 'stats',
     },
     {
+      label: 'Сообщество',
+      href: '/community',
+      isActive: currentPage === 'community',
+    },
+    {
       label: 'Озвучка',
       href: '/speak',
       isActive: currentPage === 'speak',
@@ -1292,4 +1297,5 @@ module.exports = {
   getSummaryApiData,
   getStatsApiData,
   loadChatterStats,
+  buildNavigation,
 };

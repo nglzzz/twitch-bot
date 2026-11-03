@@ -1,0 +1,66 @@
+<section class="admin-page admin-community-events">
+  <div class="admin-page__heading">
+    <div><div class="eyebrow">Сообщество</div><h1>События участников</h1></div>
+  </div>
+  {{#if success}}<p class="form-notice form-notice--success" role="status">{{success}}</p>{{/if}}
+  {{#if error}}<p class="form-notice form-notice--error" role="alert">{{error}}</p>{{/if}}
+  <p class="admin-card__hint admin-community-events__intro">Свяжите подтверждённый мем или донат с Twitch-профилем, чтобы обновить статистику участника и его достижения. Перед привязкой проверьте, кому принадлежит событие: имя отправителя из источника само по себе не подтверждает его Twitch-аккаунт. Исторические события добавляются в профиль без сообщения в чате.</p>
+
+  <div class="admin-grid">
+    <article class="admin-card admin-community-events__card">
+      <h2>Мемы</h2>
+      {{#if hasMemeEvents}}
+        <div class="admin-list">
+          {{#each memeEvents}}
+            <div class="admin-list__row admin-community-event">
+              <div class="admin-community-event__details">
+                <strong>{{title}}</strong>
+                <span>Отправитель в источнике: {{displayName}}</span>
+                <span>{{createdAtLabel}}{{#if source}} · {{source}}{{/if}}</span>
+                {{#if statusLabel}}<span>{{statusLabel}}</span>{{/if}}
+              </div>
+              <form method="post" action="/admin/community-events/link" class="admin-form admin-community-event__form">
+                <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+                <input type="hidden" name="kind" value="meme" />
+                <input type="hidden" name="recordId" value="{{id}}" />
+                <label for="meme-twitch-login-{{id}}">Twitch-логин участника<input id="meme-twitch-login-{{id}}" name="twitchLogin" maxlength="25" pattern="[A-Za-z0-9_]{1,25}" autocomplete="off" required /></label>
+                <label class="admin-check"><input type="checkbox" name="announce" /> Объявить новые достижения в чате</label>
+                <button class="btn btn--primary" type="submit">Подтвердить связь</button>
+              </form>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="empty-state">Нет мемов, ожидающих связи с профилем.</p>
+      {{/if}}
+    </article>
+
+    <article class="admin-card admin-community-events__card">
+      <h2>Донаты</h2>
+      {{#if hasDonationEvents}}
+        <div class="admin-list">
+          {{#each donationEvents}}
+            <div class="admin-list__row admin-community-event">
+              <div class="admin-community-event__details">
+                <strong>{{title}}</strong>
+                <span>Отправитель в источнике: {{displayName}}</span>
+                <span>{{createdAtLabel}}{{#if source}} · {{source}}{{/if}}</span>
+                {{#if statusLabel}}<span>{{statusLabel}}</span>{{/if}}
+              </div>
+              <form method="post" action="/admin/community-events/link" class="admin-form admin-community-event__form">
+                <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+                <input type="hidden" name="kind" value="donation" />
+                <input type="hidden" name="recordId" value="{{id}}" />
+                <label for="donation-twitch-login-{{id}}">Twitch-логин участника<input id="donation-twitch-login-{{id}}" name="twitchLogin" maxlength="25" pattern="[A-Za-z0-9_]{1,25}" autocomplete="off" required /></label>
+                <label class="admin-check"><input type="checkbox" name="announce" /> Объявить новые достижения в чате</label>
+                <button class="btn btn--primary" type="submit">Подтвердить связь</button>
+              </form>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="empty-state">Нет донатов, ожидающих связи с профилем.</p>
+      {{/if}}
+    </article>
+  </div>
+</section>

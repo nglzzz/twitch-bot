@@ -116,7 +116,7 @@ test('quiz scores appear in the stats API, page data, and escaped ranked templat
       const pageData = await siteService.buildStatsPageData('localhost', {});
       assert.deepEqual(pageData.quizLeaderboard.players.map((player) => player.position), [1, 2, 3]);
       const html = Handlebars.compile(statsTemplate)(pageData);
-      assert.match(html, /Лидерборд викторины/);
+      assert.match(html, /Лидерборд игр чата/);
       assert.match(html, /#1/);
       assert.match(html, /#2/);
       assert.match(html, /#3/);

@@ -125,7 +125,7 @@ function loadService(options = {}) {
   };
 }
 
-test('initialize is idempotent and registers both quiz command names and one guess listener', () => {
+test('initialize is idempotent and registers quiz and three standalone game commands', () => {
   const fixture = loadService();
   try {
     fixture.service.initialize(fixture.chat);
@@ -134,10 +134,33 @@ test('initialize is idempotent and registers both quiz command names and one gue
     assert.equal(fixture.getEngineCreateCount(), 1);
     assert.equal(fixture.getQuestionProviderCreateCount(), 1);
     assert.ok(fixture.getEngineOptions().questionProvider);
-    assert.equal(fixture.commands.length, 1);
+    assert.equal(fixture.commands.length, 4);
     assert.equal(fixture.commands[0][0], '!викторина');
     assert.equal(fixture.commands[0][2], '!в');
+    assert.deepEqual(fixture.commands.slice(1).map(([name, , alias]) => [name, alias]), [
+      ['!анаграммы', '!анаграмма'],
+      ['!играэмодзи', '!эмодзиигра'],
+      ['!фильмэмодзи', '!эмодзифильм'],
+    ]);
+    assert.ok(!fixture.commands.some(([name]) => name === '!фильм'));
     assert.equal(Object.keys(fixture.listeners).filter((event) => event === 'message').length, 1);
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('standalone commands select their matching game mode without taking over !фильм', async () => {
+  const fixture = loadService();
+  try {
+    fixture.service.initialize(fixture.chat);
+    const commandsByName = new Map(fixture.commands.map(([name, handler, alias]) => [name, handler]));
+
+    await commandsByName.get('!анаграммы')('#channel', {}, '!анаграммы');
+    await commandsByName.get('!играэмодзи')('#channel', {}, '!играэмодзи');
+    await commandsByName.get('!фильмэмодзи')('#channel', {}, '!фильмэмодзи');
+
+    assert.deepEqual(fixture.engineCalls.command.map(([, , mode]) => mode), ['anagram', 'game', 'movie']);
+    assert.equal(commandsByName.has('!фильм'), false);
   } finally {
     fixture.restore();
   }

@@ -1,0 +1,168 @@
+<section class="container section-spacing community-page">
+  <header class="community-hero">
+    <div class="community-hero__copy">
+      <div class="eyebrow">Сообщество NGLZZZ</div>
+      <h1>У чата есть свои легенды</h1>
+      <p>Смотри, кто чаще всех пишет и кто точнее угадывает ответы в играх. Каждое место ведёт в личный профиль участника.</p>
+    </div>
+    <div class="community-hero__mark" aria-hidden="true">
+      <span>✦</span>
+      <strong>Чат<br>в деле</strong>
+      <i>✦</i>
+    </div>
+  </header>
+
+  {{#if community.available}}
+    {{#if community.error}}
+      <p class="notice notice--warning" role="alert">{{community.error}}</p>
+    {{/if}}
+    <section class="community-stats" aria-label="Статистика сообщества">
+      <article class="community-stat">
+        <span class="community-stat__icon" aria-hidden="true">♟</span>
+        <div><strong>{{community.stats.totalPlayers}}</strong><span>участников в рейтинге</span></div>
+      </article>
+      <article class="community-stat">
+        <span class="community-stat__icon" aria-hidden="true">💬</span>
+        <div><strong>{{community.stats.totalMessages}}</strong><span>сообщений в истории</span></div>
+      </article>
+      <article class="community-stat">
+        <span class="community-stat__icon" aria-hidden="true">🧠</span>
+        <div><strong>{{community.stats.totalAnswers}}</strong><span>верных ответов</span></div>
+      </article>
+      <article class="community-stat">
+        <span class="community-stat__icon" aria-hidden="true">🎬</span>
+        <div><strong>{{community.stats.activeStreams}}</strong><span>стримов в истории</span></div>
+      </article>
+    </section>
+
+    <section class="community-controls" aria-label="Поиск и фильтры рейтинга">
+      <form class="community-filter" method="get" action="/community">
+        <div class="community-filter__fields">
+          <div class="community-field">
+            <label for="community-board">Рейтинг</label>
+            <select id="community-board" name="board">
+              {{#each community.boards}}
+                <option value="{{value}}" {{#eq ../community.selectedBoard value}}selected{{/eq}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class="community-field">
+            <label for="community-mode">Режим игры</label>
+            <select id="community-mode" name="mode">
+              {{#each community.modes}}
+                <option value="{{value}}" {{#eq ../community.selectedMode value}}selected{{/eq}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </div>
+        </div>
+        <button class="button button--primary community-filter__submit" type="submit">Показать рейтинг <span aria-hidden="true">→</span></button>
+      </form>
+
+      <form class="community-search" method="get" action="/community">
+        <label for="community-user">Найти участника</label>
+        <div class="community-search__row">
+          <span aria-hidden="true">⌕</span>
+          <input id="community-user" type="search" name="user" value="{{community.selectedUser}}" placeholder="Например, twitchник" autocomplete="off" spellcheck="false" required>
+          <button class="button button--ghost" type="submit">Профиль</button>
+        </div>
+        <p>Откроем профиль участника по Twitch-нику.</p>
+      </form>
+    </section>
+
+    {{#if community.modeHistoryNote}}
+      <p class="community-data-note"><span aria-hidden="true">ⓘ</span>{{community.modeHistoryNote}}</p>
+    {{/if}}
+
+    {{#if community.hasPlayers}}
+      {{#if community.podium.length}}
+        <section class="community-podium-section" aria-labelledby="community-podium-title">
+          <div class="community-section-heading">
+            <div><div class="eyebrow">На вершине</div><h2 id="community-podium-title">Лучшие участники</h2></div>
+            <span class="community-section-heading__meta">{{community.players.length}} в таблице</span>
+          </div>
+          <ol class="community-podium">
+            {{#each community.podium}}
+              <li class="community-podium__place community-podium__place--{{position}}">
+                <a class="community-podium__card" href="{{href}}" aria-label="Открыть профиль {{displayName}}, место {{position}}">
+                  <span class="community-podium__crown" aria-hidden="true">{{#eq position 1}}♛{{else}}✦{{/eq}}</span>
+                  <span class="community-podium__rank">{{position}}<span> место</span></span>
+                  <span class="community-podium__avatar community-avatar" aria-hidden="true">
+                    <span class="community-avatar__initial">{{initial}}</span>
+                    {{#if avatarUrl}}<img class="community-avatar__image" src="{{avatarUrl}}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-community-avatar>{{/if}}
+                  </span>
+                  <strong class="community-podium__name">{{displayName}}</strong>
+                  <span class="community-podium__score">{{score}} <small>{{scoreLabel}}</small></span>
+                </a>
+              </li>
+            {{/each}}
+          </ol>
+        </section>
+      {{/if}}
+
+      <section class="community-leaderboard" aria-labelledby="community-leaderboard-title">
+        <div class="community-section-heading">
+          <div><div class="eyebrow">Таблица лидеров</div><h2 id="community-leaderboard-title">{{community.leaderboardTitle}}</h2></div>
+          <span class="community-section-heading__meta">Обновляется вместе с данными бота</span>
+        </div>
+        <div class="community-table-wrap">
+          <ol class="community-table" aria-label="Места участников">
+            {{#each community.players}}
+              <li class="community-row">
+                <span class="community-row__position community-row__position--{{position}}" aria-label="Место {{position}}">{{position}}</span>
+                <a class="community-row__user" href="{{href}}">
+                  <span class="community-row__avatar community-avatar" aria-hidden="true">
+                    <span class="community-avatar__initial">{{initial}}</span>
+                    {{#if avatarUrl}}<img class="community-avatar__image" src="{{avatarUrl}}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-community-avatar>{{/if}}
+                  </span>
+                  <span><strong>{{displayName}}</strong><small>@{{login}}</small></span>
+                </a>
+                <span class="community-row__score"><strong>{{score}}</strong><small>{{scoreLabel}}</small></span>
+                <a class="community-row__link" href="{{href}}" aria-label="Профиль {{displayName}}">Профиль <span aria-hidden="true">↗</span></a>
+              </li>
+            {{/each}}
+          </ol>
+        </div>
+      </section>
+    {{else}}
+      <section class="community-empty" aria-live="polite">
+        <span class="community-empty__icon" aria-hidden="true">✧</span>
+        <div class="eyebrow">Пока тихо</div>
+        <h2>У этого рейтинга ещё нет участников</h2>
+        <p>Напиши в чат или сыграй в викторину на стриме — первые результаты появятся здесь.</p>
+        <a class="button button--primary" href="https://www.twitch.tv/nglzzz" target="_blank" rel="noreferrer">Заглянуть на Twitch <span aria-hidden="true">↗</span></a>
+      </section>
+    {{/if}}
+
+    <section class="community-recent-section" aria-labelledby="community-recent-title">
+      <div class="community-section-heading">
+        <div><div class="eyebrow">Свежие события</div><h2 id="community-recent-title">Недавно открытые достижения</h2></div>
+        {{#if community.recentAchievements.length}}<span class="community-section-heading__meta">Последние {{community.recentAchievements.length}}</span>{{/if}}
+      </div>
+      {{#if community.recentAchievements.length}}
+        <ol class="community-recent-list">
+          {{#each community.recentAchievements}}
+            <li class="community-recent-item">
+              <a class="community-recent-item__avatar community-avatar" href="{{profileHref}}" aria-label="Профиль {{displayName}}">
+                <span class="community-avatar__initial">{{initial}}</span>
+                {{#if avatarUrl}}<img class="community-avatar__image" src="{{avatarUrl}}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-community-avatar>{{/if}}
+              </a>
+              <span class="community-recent-item__icon" aria-hidden="true">{{icon}}</span>
+              <div class="community-recent-item__copy"><strong><a href="{{profileHref}}">{{displayName}}</a> получил(а) «{{title}}»</strong><span>{{earnedAtLabel}}{{#if isHistorical}} · восстановлено по статистике{{/if}}</span></div>
+              <a class="community-recent-item__arrow" href="{{profileHref}}" aria-label="Открыть профиль {{displayName}}">↗</a>
+            </li>
+          {{/each}}
+        </ol>
+      {{else}}
+        <p class="community-recent-empty">Когда кто-нибудь откроет достижение, событие появится здесь.</p>
+      {{/if}}
+    </section>
+  {{else}}
+    <section class="community-empty community-empty--error" role="status">
+      <span class="community-empty__icon" aria-hidden="true">◌</span>
+      <div class="eyebrow">Рейтинг на паузе</div>
+      <h2>Не удалось загрузить данные сообщества</h2>
+      <p>{{community.errorMessage}}</p>
+      <a class="button button--ghost" href="/community">Попробовать снова</a>
+    </section>
+  {{/if}}
+</section>

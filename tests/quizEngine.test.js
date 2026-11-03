@@ -87,6 +87,7 @@ const broadcaster = () => ({
 
 test('normalizes case, surrounding whitespace, and ё/е consistently', () => {
   assert.equal(normalizeAnswer('  БЕРЕЗА '), normalizeAnswer('берёза'));
+  assert.equal(normalizeAnswer('Counter-Strike: GO!'), 'counter strike go');
 });
 
 test('a viewer can start only while live; broadcaster can start while offline', async () => {
@@ -247,7 +248,7 @@ test('concurrent manual starts and auto ticks create one game for a stream', asy
     fixture.engine.tick(),
   ]);
 
-  assert.equal(fixture.messages.filter((message) => /запускаем викторину/i.test(message)).length, 1);
+  assert.equal(fixture.messages.filter((message) => /запускаем игру «Викторина»/i.test(message)).length, 1);
   assert.equal(fixture.engine.getState().streamId, 'race-stream');
 });
 
@@ -290,10 +291,11 @@ test('uses generated questions, reveals only the clue before the answer, and awa
     source: 'ai',
   };
   const requests = [];
-  const provider = makeQuestionProvider(async ({ streamId, count }) => {
-    requests.push({ streamId, count });
+  const provider = makeQuestionProvider(async ({ streamId, count, mode }) => {
+    requests.push({ streamId, count, mode });
     assert.equal(streamId, 'stream-1');
     assert.equal(count, 2);
+    assert.equal(mode, 'quiz');
     return [generatedQuestion];
   });
   const fixture = setup({ roundCount: 2, questionProvider: provider });
@@ -303,11 +305,62 @@ test('uses generated questions, reveals only the clue before the answer, and awa
   assert.ok(fixture.engine.getState());
   assert.ok(fixture.messages.some((message) => message.includes(generatedQuestion.clue)));
   assert.ok(fixture.messages.every((message) => !message.includes('секретное слово')));
-  assert.deepEqual(requests, [{ streamId: 'stream-1', count: 2 }]);
+  assert.deepEqual(requests, [{ streamId: 'stream-1', count: 2, mode: 'quiz' }]);
   assert.deepEqual(fixture.streamRequests, [{}, { force: true }]);
 
   fixture.engine.guess(viewer(), 'СЕКРЕТНОЕ СЛОВО');
   assert.equal(fixture.repository.getScore('user-1'), 1);
+});
+
+test('manual anagram game uses the shared score and marks the stream so auto quiz stays off after restart', async () => {
+  const first = setup({ roundCount: 1, words: [{ clue: 'скрепка', answers: ['скрепка'] }] });
+  await first.engine.command(viewer(), '!в анаграммы');
+
+  assert.equal(first.engine.getState().mode, 'anagram');
+  assert.match(first.engine.getState().clue, /^Анаграмма: /);
+  assert.ok(!first.messages.some((message) => message.includes('СКРЕПКА')));
+  const displayedLetters = first.engine.getState().clue.replace('Анаграмма: ', '').replace(/\s/g, '').toLowerCase();
+  assert.deepEqual([...displayedLetters].sort(), [...'скрепка'].sort());
+  assert.ok(first.startedStreams.has('stream-1'));
+
+  const next = setup({ startedStreams: Array.from(first.startedStreams) });
+  await next.engine.tick();
+  assert.equal(next.engine.getState(), null);
+});
+
+test('emoji game modes accept punctuation and English aliases and award the same points', async () => {
+  const fixture = setup({ roundCount: 1, words: [{ clue: '🧱 ⛏️ 💎', answers: ['Контр-Страйк', 'Counter-Strike'] }] });
+  await fixture.engine.command(viewer(), '!в игра');
+  assert.equal(fixture.engine.getState().mode, 'game');
+  assert.equal(fixture.engine.getState().clue, '🧱 ⛏️ 💎');
+  assert.ok(!fixture.messages.some((message) => message.includes('Counter-Strike')));
+
+  fixture.engine.guess(viewer(), 'COUNTER STRIKE!');
+  assert.equal(fixture.repository.getScore('user-1'), 1);
+
+  const film = setup({ roundCount: 1, words: [{ clue: '🚢 🧊 💔', answers: ['Титаник', 'Titanic'] }] });
+  await film.engine.command(viewer(), '!в фильм');
+  assert.equal(film.engine.getState().mode, 'movie');
+  assert.equal(film.engine.guess(viewer(), 'TITANIC!!!'), true);
+  assert.equal(film.repository.getScore('user-1'), 1);
+});
+
+test('all game modes keep broadcaster-only offline activation and share one active-game lock', async () => {
+  for (const mode of ['quiz', 'anagram', 'game', 'movie']) {
+    const offlineViewer = setup({ stream: null, roundCount: 1, words: birchWord });
+    assert.equal(await offlineViewer.engine.start(viewer(), mode), false);
+    assert.equal(offlineViewer.engine.getState(), null);
+
+    const offlineStreamer = setup({ stream: null, roundCount: 1, words: birchWord });
+    assert.equal(await offlineStreamer.engine.start(broadcaster(), mode), true);
+    assert.equal(offlineStreamer.engine.getState().mode, mode);
+  }
+
+  const fixture = setup({ roundCount: 1, words: birchWord });
+  await fixture.engine.start(viewer(), 'game');
+  await fixture.engine.start(viewer(), 'movie');
+  assert.equal(fixture.engine.getState().mode, 'game');
+  assert.equal(fixture.messages.filter((message) => /Запускаем игру/.test(message)).length, 1);
 });
 
 test('aborts generated questions if the live stream changes before generation completes', async () => {
@@ -395,6 +448,6 @@ test('concurrent manual starts invoke generation once and limit rounds to the ge
 
   assert.equal(calls, 1);
   assert.equal(fixture.engine.getState().roundCount, 1);
-  assert.equal(fixture.messages.filter((message) => /запускаем викторину/i.test(message)).length, 1);
+  assert.equal(fixture.messages.filter((message) => /запускаем игру «Викторина»/i.test(message)).length, 1);
 });
 

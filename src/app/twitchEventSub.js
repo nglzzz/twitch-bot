@@ -4,11 +4,18 @@ const config = require('../config');
 const Chat = require('./chat');
 const { updateRedemptionStatus } = require('../twitchApi/rewardRedemptions');
 const { getTwitchAccessToken } = require('../services/token.service');
+const { isDbReady } = require('./db');
+const communityRepo = require('../repositories/community.repo');
+const communityContributionsRepo = require('../repositories/communityContributions.repo');
 
 const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIBE_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
+const TOKEN_VALIDATE_URL = 'https://id.twitch.tv/oauth2/validate';
+const FOLLOW_READ_SCOPE = 'moderator:read:followers';
+const TOKEN_VALIDATE_TIMEOUT_MS = 10000;
 
 const REWARD_HANDLERS = {};
+let followSetupWarningLogged = false;
 
 // Active WebSocket connection — the one currently eligible to receive
 // notifications and whose session_id is used for subscriptions.
@@ -63,17 +70,17 @@ function registerReward(rewardId, handler) {
 /**
  * Subscribe to a Twitch EventSub event type
  */
-async function subscribe(type, version, condition) {
-  const token = await getTwitchAccessToken();
+async function subscribe(type, version, condition, accessToken = null, quietFailure = false) {
+  const token = accessToken || await getTwitchAccessToken();
 
   if (!token) {
-    console.error('[EventSub] Twitch access token is not configured');
-    return;
+    if (!quietFailure) console.error('[EventSub] Twitch access token is not configured');
+    return false;
   }
 
   if (!sessionId) {
-    console.error('[EventSub] No session ID available yet');
-    return;
+    if (!quietFailure) console.error('[EventSub] No session ID available yet');
+    return false;
   }
 
   try {
@@ -94,12 +101,16 @@ async function subscribe(type, version, condition) {
     });
     const sub = response.data && response.data.data && response.data.data[0];
     console.log(`[EventSub] Subscribed to ${type}: id=${sub ? sub.id : '?'}, status=${sub ? sub.status : '?'}`);
+    return true;
   } catch (error) {
-    if (error.response) {
-      console.error(`[EventSub] Subscription failed for ${type}:`, error.response.status, JSON.stringify(error.response.data));
-    } else {
-      console.error(`[EventSub] Subscription failed for ${type}:`, error.message);
+    if (!quietFailure) {
+      if (error.response) {
+        console.error(`[EventSub] Subscription failed for ${type}:`, error.response.status, JSON.stringify(error.response.data));
+      } else {
+        console.error(`[EventSub] Subscription failed for ${type}:`, error.message);
+      }
     }
+    return false;
   }
 }
 
@@ -117,6 +128,80 @@ async function subscribeAll() {
     '1',
     { broadcaster_user_id: config.BROADCASTER_ID }
   );
+
+  await subscribe(
+    'channel.channel_points_custom_reward_redemption.update',
+    '1',
+    { broadcaster_user_id: config.BROADCASTER_ID }
+  );
+
+  await subscribeToFollows();
+}
+
+function warnFollowSetup(message, error = null) {
+  if (followSetupWarningLogged) return;
+  followSetupWarningLogged = true;
+  if (error) {
+    console.warn(`[EventSub] Follow achievements are unavailable: ${message}`, error.message);
+    return;
+  }
+  console.warn(`[EventSub] Follow achievements are unavailable: ${message}`);
+}
+
+async function subscribeToFollows() {
+  if (!sessionId || !config.BROADCASTER_ID) return;
+
+  let token;
+  try {
+    token = await getTwitchAccessToken();
+  } catch (error) {
+    warnFollowSetup('could not resolve the Twitch access token.', error);
+    return;
+  }
+
+  if (!token) {
+    warnFollowSetup('the Twitch access token is not configured.');
+    return;
+  }
+
+  try {
+    const response = await axios.get(TOKEN_VALIDATE_URL, {
+      headers: { Authorization: `OAuth ${token}` },
+      timeout: TOKEN_VALIDATE_TIMEOUT_MS,
+    });
+    const validatedToken = response.data || {};
+    const scopes = new Set(Array.isArray(validatedToken.scopes) ? validatedToken.scopes : []);
+    const moderatorUserId = String(validatedToken.user_id || '').trim();
+
+    if (String(validatedToken.client_id || '') !== String(config.TWITCH_API_CLIENT_ID || '')) {
+      warnFollowSetup('the validated token belongs to a different Twitch application.');
+      return;
+    }
+    if (!moderatorUserId) {
+      warnFollowSetup('the token has no user identity; a user token is required.');
+      return;
+    }
+    if (!scopes.has(FOLLOW_READ_SCOPE)) {
+      warnFollowSetup(`the token needs the ${FOLLOW_READ_SCOPE} scope.`);
+      return;
+    }
+
+    const subscribed = await subscribe(
+      'channel.follow',
+      '2',
+      {
+        broadcaster_user_id: String(config.BROADCASTER_ID),
+        moderator_user_id: moderatorUserId,
+      },
+      token,
+      true
+    );
+    if (!subscribed) {
+      warnFollowSetup('Twitch rejected the subscription; check that the token owner can moderate this channel.');
+    }
+  } catch (error) {
+    warnFollowSetup('the token could not be validated or the subscription failed.', error);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -386,9 +471,38 @@ function handleNotification(payload) {
       break;
     }
 
+    case 'channel.channel_points_custom_reward_redemption.update': {
+      handleRedemptionUpdate(event);
+      break;
+    }
+
+    case 'channel.follow': {
+      handleFollow(event);
+      break;
+    }
+
     default: {
       console.log('[EventSub] Unhandled subscription type:', subscription.type);
     }
+  }
+}
+
+function handleFollow(event) {
+  if (!config.BROADCASTER_ID || !event.broadcaster_user_id
+      || String(event.broadcaster_user_id) !== String(config.BROADCASTER_ID)) {
+    return;
+  }
+  if (!isDbReady()) return;
+
+  try {
+    communityRepo.recordFollow({
+      userId: event.user_id,
+      username: event.user_login,
+      displayName: event.user_name,
+      followedAt: event.followed_at || Date.now(),
+    });
+  } catch (error) {
+    console.error('[EventSub] Could not record channel follow:', error.message);
   }
 }
 
@@ -396,61 +510,149 @@ function handleNotification(payload) {
  * Handle channel points redemption event
  */
 function handleRedemption(event) {
-  const rewardId = event.reward ? event.reward.id : undefined;
-  const handler = rewardId ? REWARD_HANDLERS[rewardId] : null;
+  const redemption = persistRedemptionEvent(event, 'unfulfilled');
+  if (!redemption) return Promise.resolve();
+
+  const rewardId = String(event.reward.id);
+  const handler = REWARD_HANDLERS[rewardId];
+  const rewardTitle = event.reward.title || '?';
+  const userName = event.user_name || event.user_login || event.user_id;
+  const redemptionId = String(event.id);
 
   if (!handler) {
     const registeredIds = Object.keys(REWARD_HANDLERS);
-    const rewardTitle = event.reward ? event.reward.title : '?';
     console.warn(
-      `[EventSub] Ignored redemption for reward "${rewardTitle}" (ID: ${rewardId}): no handler registered. ` +
+      `[EventSub] Recorded redemption for reward "${rewardTitle}" (ID: ${rewardId}) without a handler. ` +
       `Registered IDs: [${registeredIds.join(', ')}]`
     );
     return Promise.resolve();
   }
 
-  const userName = event.user_name;
-  const redemptionId = event.id;
-  const broadcasterId = config.BROADCASTER_ID;
-  const rewardTitle = event.reward ? event.reward.title : '?';
+  if (redemption.status !== 'unfulfilled') {
+    return Promise.resolve();
+  }
+
+  let claimed;
+  try {
+    claimed = communityContributionsRepo.claimRedemption(redemptionId);
+  } catch (error) {
+    console.error('[EventSub] Could not claim redemption before running its handler:', error.message);
+    return Promise.resolve();
+  }
+  if (!claimed) return Promise.resolve();
 
   console.log(`[EventSub] Reward redeemed: "${rewardTitle}" by ${userName}`);
 
-  return handler()
-    .then(async resultMessage => {
-      // Handler succeeded — mark redemption as FULFILLED
+  return Promise.resolve()
+    .then(() => handler())
+    .then(async (resultMessage) => {
       try {
         await updateRedemptionStatus({
-          broadcasterId,
+          broadcasterId: config.BROADCASTER_ID,
           rewardId,
           redemptionId,
-          status: 'FULFILLED'
+          status: 'FULFILLED',
         });
+        persistRedemptionStatus(redemptionId, 'fulfilled');
       } catch (patchError) {
-        // Reward already executed successfully, only log the status update failure
+        // The handler already ran; leave the ledger pending until Twitch confirms a status update.
         console.error('[EventSub] Reward succeeded but failed to mark as FULFILLED:', patchError.message);
       }
 
       if (resultMessage) {
-        Chat.handleMessageResult(resultMessage, '#' + config.CHANNEL);
+        try {
+          Chat.handleMessageResult(resultMessage, '#' + config.CHANNEL);
+        } catch (chatError) {
+          console.error('[EventSub] Could not send reward result to chat:', chatError.message);
+        }
       }
-    })
-    .catch(async error => {
-      // Handler failed — cancel redemption to refund channel points
+    }, async (error) => {
       console.error(`[EventSub] Reward handler failed for "${rewardTitle}" by ${userName}:`, error.message);
 
       try {
         await updateRedemptionStatus({
-          broadcasterId,
+          broadcasterId: config.BROADCASTER_ID,
           rewardId,
           redemptionId,
-          status: 'CANCELED'
+          status: 'CANCELED',
         });
+        persistRedemptionStatus(redemptionId, 'canceled');
         console.log(`[EventSub] Redemption ${redemptionId} canceled, points refunded to ${userName}`);
       } catch (cancelError) {
         console.error('[EventSub] Failed to cancel redemption:', cancelError.message);
       }
     });
+}
+
+/**
+ * Store a redemption status notification without executing its reward handler.
+ */
+function handleRedemptionUpdate(event) {
+  persistRedemptionEvent(event, 'unfulfilled');
+}
+
+function persistRedemptionEvent(event, fallbackStatus) {
+  if (!config.BROADCASTER_ID || !event.broadcaster_user_id
+      || String(event.broadcaster_user_id) !== String(config.BROADCASTER_ID)) {
+    return null;
+  }
+  if (!isDbReady()) {
+    console.warn('[EventSub] Cannot record channel points redemption while SQLite is unavailable.');
+    return null;
+  }
+
+  const reward = event.reward || {};
+  const cost = Number(reward.cost);
+  const redemptionId = String(event.id || '').trim();
+  const userId = String(event.user_id || '').trim();
+  const rewardId = String(reward.id || '').trim();
+  if (!redemptionId || !userId || !rewardId || !Number.isSafeInteger(cost) || cost < 0) {
+    console.warn('[EventSub] Ignored invalid channel points redemption payload.');
+    return null;
+  }
+
+  const username = String(event.user_login || event.user_name || userId).trim();
+  const displayName = String(event.user_name || event.user_login || userId).trim();
+  const status = normalizeRedemptionStatus(event.status) || fallbackStatus;
+
+  try {
+    const recorded = communityContributionsRepo.recordRedemption({
+      id: redemptionId,
+      userId,
+      username,
+      displayName,
+      cost,
+      rewardId,
+      status,
+      redeemedAt: event.redeemed_at || Date.now(),
+    });
+    if (!recorded) {
+      console.error(`[EventSub] Could not persist redemption ${redemptionId}.`);
+      return null;
+    }
+    return {
+      ...recorded,
+      id: recorded.id || redemptionId,
+      status: normalizeRedemptionStatus(recorded.status) || 'unknown',
+    };
+  } catch (error) {
+    console.error(`[EventSub] Could not persist redemption ${redemptionId}:`, error.message);
+    return null;
+  }
+}
+
+function normalizeRedemptionStatus(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'cancelled') return 'canceled';
+  return ['unfulfilled', 'fulfilled', 'canceled'].includes(normalized) ? normalized : null;
+}
+
+function persistRedemptionStatus(redemptionId, status) {
+  try {
+    communityContributionsRepo.setRedemptionStatus(redemptionId, status);
+  } catch (error) {
+    console.error(`[EventSub] Could not persist redemption ${redemptionId} status:`, error.message);
+  }
 }
 
 // ---------------------------------------------------------------------------

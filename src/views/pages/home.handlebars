@@ -185,7 +185,7 @@
     <div class="panel">
       <div class="panel__head">
         <h3>🏆 Топ чаттеров</h3>
-        <a class="panel__link" href="/stats">Вся статистика →</a>
+        <a class="panel__link" href="/community?board=chat">Рейтинги и профили →</a>
       </div>
       {{#if chatStats.hasTopChatters}}
         <ol class="leaderboard">
@@ -194,7 +194,7 @@
               <li class="leaderboard__item">
                 <span class="leaderboard__pos leaderboard__pos--{{position}}">{{position}}</span>
                 <div class="leaderboard__info">
-                  <strong>{{displayName}}</strong>
+                  <strong><a href="/users/{{user}}">{{displayName}}</a></strong>
                   <span>{{messagesCountLabel}} сообщений</span>
                 </div>
               </li>

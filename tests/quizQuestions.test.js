@@ -20,6 +20,21 @@ function generatedQuestion(index) {
   };
 }
 
+function generatedTitleQuestion(index, mode = 'game') {
+  const games = [
+    ['🧱 ⛏️ 💎', 'Майнкрафт', 'Minecraft'],
+    ['🎩 🐇 🕳️', 'Алиса в стране чудес', 'Alice in Wonderland'],
+    ['🚗 🏁 🏎️', 'Марио Карт', 'Mario Kart'],
+  ];
+  const movies = [
+    ['🚢 🧊 💔', 'Титаник', 'Titanic'],
+    ['🦁 👑 🌅', 'Король Лев', 'The Lion King'],
+    ['🧙 💍 🌋', 'Властелин колец', 'The Lord of the Rings'],
+  ];
+  const [question, answer, alias] = (mode === 'movie' ? movies : games)[index % 3];
+  return { question, answer, aliases: [alias] };
+}
+
 function createRepository() {
   const rows = new Map();
   const usedByStream = new Map();
@@ -31,34 +46,34 @@ function createRepository() {
 
   return {
     rows,
-    saveQuestions(questions, source) {
+    saveQuestions(questions, source, mode = 'quiz') {
       let inserted = 0;
       for (const question of questions) {
         const key = answerKey(question.answers);
-        if ([...rows.values()].some((row) => row.answerKey === key)) continue;
+        if ([...rows.values()].some((row) => row.mode === mode && row.answerKey === key)) continue;
         const id = `question-${nextId++}`;
-        rows.set(id, { id, ...question, source, answerKey: key });
+        rows.set(id, { id, ...question, source, answerKey: key, mode });
         inserted += 1;
       }
       return inserted;
     },
-    findUnused(streamId, limit) {
-      const used = usedByStream.get(streamId) || new Set();
+    findUnused(streamId, limit, mode = 'quiz') {
+      const used = usedByStream.get(`${streamId}:${mode}`) || new Set();
       return [...rows.values()]
-        .filter((row) => !used.has(row.id))
+        .filter((row) => row.mode === mode && !used.has(row.id))
         .sort((left, right) => (left.source === right.source ? 0 : left.source === 'ai' ? -1 : 1))
         .slice(0, limit);
     },
-    markUsed(streamId, questions) {
-      let used = usedByStream.get(streamId);
+    markUsed(streamId, questions, mode = 'quiz') {
+      let used = usedByStream.get(`${streamId}:${mode}`);
       if (!used) {
         used = new Set();
-        usedByStream.set(streamId, used);
+        usedByStream.set(`${streamId}:${mode}`, used);
       }
       questions.forEach((question) => used.add(question.id));
     },
-    getRecentAnswers(streamId) {
-      const used = usedByStream.get(streamId) || new Set();
+    getRecentAnswers(streamId, limit, mode = 'quiz') {
+      const used = usedByStream.get(`${streamId}:${mode}`) || new Set();
       return [...used].map((id) => rows.get(id)?.answerKey).filter(Boolean);
     },
   };
@@ -117,7 +132,7 @@ test('loads AI questions into a persistent pool, uses them first and does not re
   assert.equal(generationCount, 1);
   assert.equal(firstGame.length, 10);
   assert.ok(firstGame.every((question) => question.source === 'ai'));
-  assert.match(prompt, /не используй эти уже заданные ответы/i);
+  assert.match(prompt, /не используй эти уже показанные ответы/i);
   assert.ok(repository.rows.size >= 22, 'bundled questions remain as fallback');
 
   provider.markUsed('stream-1', firstGame);
@@ -190,4 +205,77 @@ test('serializes concurrent reservations for the same stream and shares one gene
   assert.equal(first.length, 10);
   assert.equal(second.length, 10);
   assert.equal(new Set([...first, ...second].map((question) => question.id)).size, 20);
+});
+
+test('accepts multiword English and Russian aliases for emoji game and film clues', () => {
+  const games = parseGeneratedQuestions(JSON.stringify({ questions: [generatedTitleQuestion(1)] }), 'game');
+  assert.deepEqual(games, [{
+    clue: '🎩 🐇 🕳️',
+    answers: ['Алиса в стране чудес', 'Alice in Wonderland'],
+  }]);
+
+  const movies = parseGeneratedQuestions(JSON.stringify({ questions: [generatedTitleQuestion(2, 'movie')] }), 'movie');
+  assert.deepEqual(movies, [{
+    clue: '🧙 💍 🌋',
+    answers: ['Властелин колец', 'The Lord of the Rings'],
+  }]);
+});
+
+test('rejects title-revealing emoji clues, text, URLs, and too few emoji', () => {
+  const parsed = parseGeneratedQuestions(JSON.stringify({ questions: [
+    { question: '🧱 Minecraft ⛏️', answer: 'Майнкрафт', aliases: ['Minecraft'] },
+    { question: '🚢 Титаник 🧊', answer: 'Титаник', aliases: ['Titanic'] },
+    { question: '🚢 https://example.com 🧊', answer: 'Титаник', aliases: ['Titanic'] },
+    { question: '🚢', answer: 'Титаник', aliases: ['Titanic'] },
+    { question: '🚢 🧊 💔', answer: 'Титаник', aliases: ['Titanic'] },
+  ] }), 'movie');
+
+  assert.deepEqual(parsed, [{ clue: '🚢 🧊 💔', answers: ['Титаник', 'Titanic'] }]);
+});
+
+test('anagram mode accepts only useful Cyrillic words and stores answers for later scrambling', () => {
+  const parsed = parseGeneratedQuestions(JSON.stringify({ questions: [
+    { answer: 'микроскоп' },
+    { answer: 'ааааа' },
+    { answer: 'компьютер42' },
+    { answer: 'computer' },
+    { answer: 'микроскоп' },
+  ] }), 'anagram');
+
+  assert.deepEqual(parsed, [{ clue: 'anagram:микроскоп', answers: ['микроскоп'] }]);
+});
+
+test('provider keeps mode pools separate and reserves reused answers by stream and mode', async () => {
+  const repository = createRepository();
+  const fallbackSets = {
+    quiz: fallbackWords,
+    anagram: [{ clue: 'слово', answers: ['пирамидка'] }],
+    game: [{ clue: '🎮 🧱 ⛏️', answers: ['Майнкрафт', 'Minecraft'] }],
+    movie: [{ clue: '🚢 🧊 💔', answers: ['Титаник', 'Titanic'] }],
+  };
+  let generatedModes = [];
+  const provider = createQuizQuestionProvider({
+    repository,
+    fallbackSets,
+    batchSize: 20,
+    generate: async (prompt) => {
+      const mode = /видеоигр/u.test(prompt) ? 'game' : /полнометражных фильмов/u.test(prompt) ? 'movie' : /анаграмм/u.test(prompt) ? 'anagram' : 'quiz';
+      generatedModes.push(mode);
+      if (mode === 'anagram') return JSON.stringify({ questions: [{ answer: 'словарь' }, { answer: 'грамматика' }] });
+      return JSON.stringify({ questions: Array.from({ length: 3 }, (_, index) => generatedTitleQuestion(index, mode)) });
+    },
+  });
+
+  const game = await provider.getQuestions({ streamId: 'shared-stream', count: 1, mode: 'game' });
+  const movie = await provider.getQuestions({ streamId: 'shared-stream', count: 1, mode: 'movie' });
+  const anagram = await provider.getQuestions({ streamId: 'shared-stream', count: 1, mode: 'anagram' });
+  assert.equal(game[0].source, 'ai');
+  assert.equal(movie[0].source, 'ai');
+  assert.equal(anagram[0].source, 'ai');
+  assert.deepEqual(generatedModes, ['game', 'movie', 'anagram']);
+  assert.equal(repository.findUnused('shared-stream', 20, 'movie').some((question) => question.id === movie[0].id), false);
+  const nextMovieBatch = await provider.getQuestions({ streamId: 'shared-stream', count: 5, mode: 'movie' });
+  assert.ok(nextMovieBatch.length > 0);
+  assert.ok(nextMovieBatch.every((question) => repository.rows.get(question.id).mode === 'movie'));
+  assert.ok(!nextMovieBatch.some((question) => question.id === movie[0].id));
 });

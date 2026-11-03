@@ -43,15 +43,16 @@ const MODEL_REGISTRY = Object.freeze({
     aliases: ['openrouter/free'],
     requestModelEnvNames: ['OPENROUTER_MODEL'],
     defaultRequestModels: [
-      'poolside/laguna-s-2.1:free',
+      'openai/gpt-oss-120b',
       'openrouter:free',
+      'qwen/qwen3.7-flash',
     ],
     fallbackModels: ['deepseek'],
   },
   'deepseek': {
     provider: 'deepseek',
     aliases: ['deepseek', 'deepseek-chat'],
-    defaultRequestModel: 'deepseek-v4-flash',
+    defaultRequestModel: 'deepseek-flash',
     fallbackModels: ['gpt-5-nano'],
   },
   'gpt-5-nano': {

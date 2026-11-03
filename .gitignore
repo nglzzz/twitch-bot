@@ -110,6 +110,7 @@ data/
 !src/data/
 src/data/*
 !src/data/quizWords.js
+!src/data/achievements.js
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

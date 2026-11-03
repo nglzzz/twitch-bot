@@ -1,0 +1,245 @@
+<section class="container section-spacing community-profile-page">
+  <a class="community-back-link" href="/community"><span aria-hidden="true">←</span> Все рейтинги сообщества</a>
+
+  {{#if userProfile.available}}
+    {{#if userProfile.found}}
+      <header class="community-profile-hero">
+        <div class="community-profile-hero__identity">
+          <span class="community-profile-hero__avatar community-avatar" aria-hidden="true">
+            <span class="community-avatar__initial">{{userProfile.initial}}</span>
+            {{#if userProfile.avatarUrl}}<img class="community-avatar__image" src="{{userProfile.avatarUrl}}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-community-avatar>{{/if}}
+          </span>
+          <div class="community-profile-hero__name">
+            <div class="eyebrow">Профиль участника</div>
+            <h1>{{userProfile.displayName}}</h1>
+            <span class="community-profile-hero__login">@{{userProfile.login}}</span>
+          </div>
+        </div>
+        <div class="community-profile-hero__level">
+          <span aria-hidden="true">✦</span>
+          <div><small>Уровень участника</small><strong>{{userProfile.level}}</strong></div>
+          <small class="community-profile-hero__xp">{{userProfile.experience}} опыта</small>
+        </div>
+        <div class="community-profile-hero__shine" aria-hidden="true"></div>
+      </header>
+
+      <nav class="community-profile-jump" aria-label="На этой странице">
+        <a href="#community-profile-follow">Фоллоу</a>
+        <a href="#community-profile-contributions">Вклад в эфир</a>
+        <a href="#community-profile-achievements">Достижения</a>
+        <a href="#community-profile-history">Сообщения</a>
+      </nav>
+
+      <section class="community-profile-intro" aria-label="Характеристика участника">
+        <div>
+          <div class="eyebrow">Характеристика</div>
+          <h2>{{userProfile.title}}</h2>
+          <p>{{userProfile.characterization}}</p>
+        </div>
+        {{#if userProfile.twitchUrl}}
+          <a class="button button--ghost community-profile-intro__twitch" href="{{userProfile.twitchUrl}}" target="_blank" rel="noreferrer">Twitch <span aria-hidden="true">↗</span></a>
+        {{/if}}
+      </section>
+
+      <section class="community-profile-stats" aria-label="Статистика участника">
+        <article class="community-profile-stat community-profile-stat--purple">
+          <span aria-hidden="true">💬</span><small>Сообщений</small><strong>{{userProfile.stats.totalMessages}}</strong>
+        </article>
+        <article class="community-profile-stat community-profile-stat--cyan">
+          <span aria-hidden="true">🎬</span><small>Стримов вместе</small><strong>{{userProfile.stats.streamsAttended}}</strong>
+        </article>
+        <article class="community-profile-stat community-profile-stat--pink">
+          <span aria-hidden="true">⚡</span><small>За один стрим</small><strong>{{userProfile.stats.maxMessagesPerStream}}</strong>
+        </article>
+        <article class="community-profile-stat community-profile-stat--amber">
+          <span aria-hidden="true">🧠</span><small>Верных ответов</small><strong>{{userProfile.stats.quizAnswers}}</strong>
+        </article>
+      </section>
+
+      <div class="community-profile-columns">
+        <section class="community-profile-card community-profile-card--details" aria-labelledby="community-profile-details-title">
+          <div class="community-profile-card__heading">
+            <div><div class="eyebrow">Путь в комьюнити</div><h2 id="community-profile-details-title">Знакомы давно</h2></div>
+            <span class="community-profile-card__glyph" aria-hidden="true">⌁</span>
+          </div>
+          <dl class="community-profile-facts">
+            <div><dt>Впервые замечен</dt><dd>{{userProfile.firstSeenAtLabel}}</dd></div>
+            <div><dt>Последняя активность</dt><dd>{{userProfile.lastSeenAtLabel}}</dd></div>
+            <div>
+              <dt>Место в чате</dt>
+              <dd>{{#if userProfile.stats.chatRank}}#{{userProfile.stats.chatRank}}{{else}}—{{/if}}</dd>
+            </div>
+            <div>
+              <dt>Место в играх</dt>
+              <dd>{{#if userProfile.stats.gameRank}}#{{userProfile.stats.gameRank}}{{else}}—{{/if}}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="community-profile-card" aria-labelledby="community-profile-games-title">
+          <div class="community-profile-card__heading">
+            <div><div class="eyebrow">Игровой профиль</div><h2 id="community-profile-games-title">Режимы и победы</h2></div>
+            <span class="community-profile-card__glyph" aria-hidden="true">♧</span>
+          </div>
+          {{#if userProfile.gameModes.length}}
+            <ul class="community-game-modes">
+              {{#each userProfile.gameModes}}
+                <li><span class="community-game-modes__icon" aria-hidden="true">{{icon}}</span><span>{{label}}</span><strong>{{wins}} <small>{{winsLabel}}</small></strong></li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="community-profile-card__empty">Игровая история появится после первого верного ответа.</p>
+          {{/if}}
+        </section>
+      </div>
+
+      <section class="community-profile-card community-profile-card--follow" id="community-profile-follow" aria-labelledby="community-profile-follow-title">
+        <div class="community-profile-card__heading">
+          <div><div class="eyebrow">Связь с каналом</div><h2 id="community-profile-follow-title">Фоллоу</h2></div>
+          <span class="community-profile-card__glyph" aria-hidden="true">💜</span>
+        </div>
+        <div class="community-follow-overview">
+          <p class="community-follow-status {{#if userProfile.followStatusClass}}{{userProfile.followStatusClass}}{{/if}}">{{userProfile.followStatusLabel}}</p>
+          {{#if userProfile.currentFollowedAtLabel}}
+            <dl class="community-follow-details">
+              <div><dt>Фоллоу с</dt><dd>{{userProfile.currentFollowedAtLabel}}</dd></div>
+              {{#if userProfile.followDurationLabel}}<div><dt>Продолжительность</dt><dd>{{userProfile.followDurationLabel}}</dd></div>{{/if}}
+            </dl>
+          {{else}}
+            {{#if userProfile.followedAtLabel}}
+              <dl class="community-follow-details"><div><dt>Первый подтверждённый фоллоу</dt><dd>{{userProfile.followedAtLabel}}</dd></div></dl>
+            {{else}}
+              <p class="community-profile-card__empty">Дата появится после подтверждения фоллоу через Twitch.</p>
+            {{/if}}
+          {{/if}}
+        </div>
+        {{#if userProfile.followSourceNote}}<p class="community-follow-note">{{userProfile.followSourceNote}}</p>{{/if}}
+      </section>
+
+      <section class="community-contributions-section" id="community-profile-contributions" aria-labelledby="community-profile-contributions-title">
+        <div class="community-section-heading">
+          <div><div class="eyebrow">Поддержка канала</div><h2 id="community-profile-contributions-title">Вклад в эфир</h2></div>
+        </div>
+        <div class="community-profile-stats community-contribution-stats">
+          <article class="community-profile-stat community-profile-stat--amber">
+            <span aria-hidden="true">🎁</span><small>Баллов на выполненные награды</small><strong>{{userProfile.contributions.pointsSpent}}</strong>
+          </article>
+          <article class="community-profile-stat community-profile-stat--purple">
+            <span aria-hidden="true">😂</span><small>Мемов подтверждено</small><strong>{{userProfile.contributions.memesSent}}</strong>
+          </article>
+          <article class="community-profile-stat community-profile-stat--pink">
+            <span aria-hidden="true">💜</span><small>Донатов подтверждено</small><strong>{{userProfile.contributions.donationsCount}}</strong>
+          </article>
+          <article class="community-profile-stat community-profile-stat--cyan">
+            <span aria-hidden="true">✨</span><small>Накоплено баллов</small><strong>{{#if userProfile.contributions.hasPointsBalance}}{{userProfile.contributions.pointsBalance}}{{else}}Недоступно{{/if}}</strong>
+          </article>
+        </div>
+        <p class="community-contributions-note">Здесь учтены только подтверждённые события, связанные с этим Twitch-профилем. Учёт потраченных баллов начинается с запуска отслеживания. Twitch не предоставляет боту достоверный баланс накопленных баллов.</p>
+      </section>
+
+      <section class="community-achievements-section" id="community-profile-achievements" aria-labelledby="community-achievements-title">
+        <div class="community-section-heading">
+          <div><div class="eyebrow">Коллекция достижений</div><h2 id="community-achievements-title">Маленькие поводы для гордости</h2></div>
+          <div class="community-achievements-total"><strong>{{userProfile.earnedAchievements}}</strong><span>из {{userProfile.achievementCount}} открыто</span></div>
+        </div>
+        <ol class="community-achievements">
+          {{#each userProfile.achievements}}
+            <li class="community-achievement {{#if unlocked}}is-unlocked{{else}}is-locked{{/if}}">
+              <div class="community-achievement__topline">
+                <span class="community-achievement__icon" aria-hidden="true">{{icon}}</span>
+                {{#if unlocked}}
+                  <span class="community-achievement__state">Открыто <span aria-hidden="true">✓</span></span>
+                {{else}}
+                  <span class="community-achievement__state">В процессе</span>
+                {{/if}}
+              </div>
+              <h3>{{title}}</h3>
+              <p>{{description}}</p>
+              {{#if unlocked}}
+                <div class="community-achievement__progress-label"><span>{{#if isHistorical}}Восстановлено{{else}}Получено{{/if}}</span><span>{{progressLabel}}</span></div>
+                {{#if earnedAtLabel}}<time class="community-achievement__earned-at">{{earnedAtLabel}}</time>{{/if}}
+              {{else}}
+                <div class="community-achievement__progress-label"><span>Прогресс</span><span>{{progressLabel}}</span></div>
+                <progress value="{{progress}}" max="{{target}}" aria-label="{{title}}: {{progressLabel}}"></progress>
+              {{/if}}
+            </li>
+          {{/each}}
+        </ol>
+      </section>
+
+      <section class="community-profile-recent-section" aria-labelledby="community-profile-recent-title">
+        <div class="community-section-heading">
+          <div><div class="eyebrow">История наград</div><h2 id="community-profile-recent-title">Последние достижения</h2></div>
+        </div>
+        {{#if userProfile.recentAchievements.length}}
+          <ol class="community-recent-list community-recent-list--personal">
+            {{#each userProfile.recentAchievements}}
+              <li class="community-recent-item">
+                <span class="community-recent-item__icon" aria-hidden="true">{{icon}}</span>
+                <div class="community-recent-item__copy"><strong>{{title}}</strong><span>{{earnedAtLabel}}{{#if isHistorical}} · восстановлено по статистике{{/if}}</span></div>
+                <span class="community-recent-item__arrow" aria-hidden="true">✓</span>
+              </li>
+            {{/each}}
+          </ol>
+        {{else}}
+          <p class="community-recent-empty">Пока нет открытых достижений.</p>
+        {{/if}}
+      </section>
+
+      <section class="community-history-section" id="community-profile-history" aria-labelledby="community-profile-history-title">
+        <div class="community-section-heading">
+          <div><div class="eyebrow">Летопись общения</div><h2 id="community-profile-history-title">Сообщения в чате</h2></div>
+          <span class="community-section-heading__meta">Последние сообщения, новые сверху</span>
+        </div>
+        {{#if userProfile.history.hasMessages}}
+          <ol class="community-message-list">
+            {{#each userProfile.history.messages}}
+              <li class="community-message">
+                <div class="community-message__meta">
+                  <time>{{createdAtLabel}}</time>
+                  {{#if streamTitle}}
+                    {{#if streamHref}}<a href="{{streamHref}}">{{streamTitle}}</a>{{else}}<span>{{streamTitle}}</span>{{/if}}
+                  {{else}}<span>Чат канала</span>{{/if}}
+                </div>
+                <p>{{text}}</p>
+              </li>
+            {{/each}}
+          </ol>
+          {{#if (or userProfile.history.hasMore userProfile.history.nextHref userProfile.history.previousHref)}}
+            <nav class="community-history-pagination" aria-label="Страницы сообщений">
+              {{#if userProfile.history.nextHref}}<a class="button button--ghost" href="{{userProfile.history.nextHref}}">← Более ранние</a>{{/if}}
+              <span>Архив сообщений</span>
+              {{#if userProfile.history.previousHref}}<a class="button button--ghost" href="{{userProfile.history.previousHref}}">К последним →</a>{{/if}}
+            </nav>
+          {{/if}}
+        {{else}}
+          <p class="community-recent-empty">Сохранённых сообщений пока нет. Здесь появятся обычные сообщения, которые бот записал в чат.</p>
+        {{/if}}
+        {{#if userProfile.history.note}}<p class="community-data-note"><span aria-hidden="true">ⓘ</span>{{userProfile.history.note}}</p>{{/if}}
+      </section>
+
+      {{#if userProfile.notes.length}}
+        <aside class="community-profile-notes" aria-label="О данных профиля">
+          <span class="community-profile-notes__icon" aria-hidden="true">ⓘ</span>
+          <div><strong>Как читать профиль</strong><ul>{{#each userProfile.notes}}<li>{{this}}</li>{{/each}}</ul></div>
+        </aside>
+      {{/if}}
+    {{else}}
+      <section class="community-empty community-empty--profile" role="status">
+        <span class="community-empty__icon" aria-hidden="true">⌕</span>
+        <div class="eyebrow">Профиль не найден</div>
+        <h1>Пока не знаем этого участника</h1>
+        <p>Проверь написание Twitch-ника или вернись к рейтингам, чтобы выбрать профиль из списка.</p>
+        <a class="button button--primary" href="/community">Открыть рейтинги <span aria-hidden="true">→</span></a>
+      </section>
+    {{/if}}
+  {{else}}
+    <section class="community-empty community-empty--error community-empty--profile" role="status">
+      <span class="community-empty__icon" aria-hidden="true">◌</span>
+      <div class="eyebrow">Профиль на паузе</div>
+      <h1>Не удалось загрузить данные участника</h1>
+      <p>{{userProfile.errorMessage}}</p>
+      <a class="button button--ghost" href="/community">Вернуться к рейтингам</a>
+    </section>
+  {{/if}}
+</section>
