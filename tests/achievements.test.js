@@ -15,6 +15,8 @@ const communityRepo = require('../src/repositories/community.repo');
 const achievementRepo = require('../src/repositories/achievement.repo');
 const achievementService = require('../src/services/achievements.service');
 const quizRepo = require('../src/repositories/quiz.repo');
+const paidSubscriptionRepo = require('../src/repositories/communityPaidSubscriptions.repo');
+const { createBoostyCommunityService } = require('../src/services/boostyCommunity.service');
 const { ACHIEVEMENTS, DAY_MS, makeAchievements } = require('../src/services/achievementRules');
 
 after(() => {
@@ -180,9 +182,77 @@ test('achievement cards retain persisted earned state after a current follow end
   assert.equal(catalog.find((entry) => entry.id === 'follow_days_30').unlocked, false);
 });
 
-test('achievement catalogue has 35 definitions with follow tenure milestones', () => {
-  assert.equal(ACHIEVEMENTS.length, 35);
+test('achievement catalogue has 37 definitions with follow tenure milestones', () => {
+  assert.equal(ACHIEVEMENTS.length, 37);
   assert.deepEqual(ACHIEVEMENTS.filter((entry) => entry.id.startsWith('follow_days_')).map((entry) => entry.target), [7, 30, 90, 180, 365]);
+});
+
+test('confirmed Twitch paid subscription unlocks its achievement once', () => {
+  const now = Date.now();
+  const user = { userId: 'subscriber-user', username: 'subscriber_user', displayName: 'Subscriber' };
+  communityRepo.recordChat({ ...user, message: 'hello', messageId: 'subscriber-before', createdAt: now });
+
+  const subscriptions = require('../src/repositories/communityPaidSubscriptions.repo');
+  assert.equal(subscriptions.recordTwitchSubscription({ ...user, confirmedAt: now + 1 }), true);
+  assert.equal(subscriptions.recordTwitchSubscription({ ...user, confirmedAt: now + 2 }), false);
+  const earned = achievementService.getEarned(user.userId);
+  assert.equal(earned.filter((entry) => entry.achievementId === 'twitch_paid_sub_1').length, 1);
+  assert.equal(subscriptions.getStats(user.userId).twitchPaidSubscription, true);
+});
+
+test('confirmed Boosty link is scoped to the verified external subscriber ID', () => {
+  const now = Date.now();
+  const user = { userId: 'boosty-user', username: 'boosty_user', displayName: 'Boosty User' };
+  communityRepo.recordChat({ ...user, message: 'hello', messageId: 'boosty-before', createdAt: now });
+
+  const subscriptions = require('../src/repositories/communityPaidSubscriptions.repo');
+  assert.equal(subscriptions.recordBoostySubscription({ ...user, externalSubscriberId: 'boosty-123', confirmedBy: 'admin-1', confirmedAt: now + 1 }), true);
+  assert.equal(subscriptions.recordBoostySubscription({ ...user, externalSubscriberId: 'boosty-123', confirmedBy: 'admin-1', confirmedAt: now + 2 }), false);
+  assert.equal(achievementService.getEarned(user.userId).filter((entry) => entry.achievementId === 'boosty_paid_sub_1').length, 1);
+  assert.throws(() => subscriptions.recordBoostySubscription({
+    userId: 'other-boosty-user', username: 'other_boosty_user', externalSubscriberId: 'boosty-123', confirmedBy: 'admin-1', confirmedAt: now + 3,
+  }), /already linked/);
+});
+
+test('automatic Boosty nickname matching awards once and preserves an existing manual link', async () => {
+  const now = Date.now();
+  const automaticUser = { userId: 'boosty-auto-user', username: 'auto_supporter', displayName: 'Auto Supporter' };
+  const manualUser = { userId: 'boosty-manual-user', username: 'manual_supporter', displayName: 'Manual Supporter' };
+  communityRepo.recordChat({ ...automaticUser, message: 'hello', messageId: 'boosty-auto-before', createdAt: now });
+  communityRepo.recordChat({ ...manualUser, message: 'hello', messageId: 'boosty-manual-before', createdAt: now });
+  const lastSeenBefore = db.prepare('SELECT last_seen_at FROM community_user WHERE user_id = ?').get(automaticUser.userId).last_seen_at;
+  paidSubscriptionRepo.recordBoostySubscription({
+    ...manualUser, externalSubscriberId: 'manual-original-id', confirmedBy: 'admin-1', confirmedAt: now + 1,
+  });
+
+  const service = createBoostyCommunityService({
+    tokenProvider: async () => 'private-token',
+    clientFactory: () => ({ getSubscriberRecords: async () => [
+      { id: 'auto-id', name: 'AUTO_SUPPORTER', price: 100, subscribed: true },
+      { id: 'different-manual-id', name: 'manual_supporter', price: 100, subscribed: true },
+      { id: 'duplicate-id-one', name: 'ambiguous_name', price: 100, subscribed: true },
+      { id: 'duplicate-id-two', name: 'AMBIGUOUS_NAME', price: 50, subscribed: false },
+    ] }),
+  });
+
+  const first = await service.syncMatchingSubscribers({ confirmedAt: now + 2 });
+  assert.deepEqual(first, { linked: 1, ambiguousBoosty: 1, missingTwitch: 0, alreadyLinked: 1 });
+  assert.equal(achievementService.getEarned(automaticUser.userId)
+    .filter((entry) => entry.achievementId === 'boosty_paid_sub_1').length, 1);
+  assert.deepEqual(db.prepare(`SELECT external_subscriber_id, confirmed_by
+    FROM community_paid_subscription WHERE user_id = ? AND provider = 'boosty'`).get(automaticUser.userId), {
+    external_subscriber_id: 'auto-id', confirmed_by: 'automatic-boosty-nickname-match',
+  });
+  assert.equal(db.prepare('SELECT last_seen_at FROM community_user WHERE user_id = ?').get(automaticUser.userId).last_seen_at, lastSeenBefore);
+
+  const second = await service.syncMatchingSubscribers({ confirmedAt: now + 3 });
+  assert.deepEqual(second, { linked: 0, ambiguousBoosty: 1, missingTwitch: 0, alreadyLinked: 2 });
+  assert.equal(achievementService.getEarned(automaticUser.userId)
+    .filter((entry) => entry.achievementId === 'boosty_paid_sub_1').length, 1);
+  assert.deepEqual(db.prepare(`SELECT external_subscriber_id, confirmed_by
+    FROM community_paid_subscription WHERE user_id = ? AND provider = 'boosty'`).get(manualUser.userId), {
+    external_subscriber_id: 'manual-original-id', confirmed_by: 'admin-1',
+  });
 });
 
 test('scheduled checks grant a follow anniversary without another message or website visit', () => {

@@ -108,6 +108,8 @@ const refreshCommunityFollowers = async () => {
 refreshCommunityFollowers();
 setInterval(refreshCommunityFollowers, 60 * 1000);
 
+require('../services/boostyCommunity.service').startAutoLinkWorker({ isDbReady });
+
 // Start meme alerts polling (every 2 minutes by default)
 startPolling();
 

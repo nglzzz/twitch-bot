@@ -24,7 +24,7 @@ function createCommunityRouter({
     ...data,
   });
   const filters = (query) => {
-    const board = query.board === undefined ? 'games' : query.board;
+    const board = query.board === undefined ? 'chat' : query.board;
     const mode = query.mode === undefined ? 'all' : query.mode;
     if (!['games', 'chat'].includes(board) || !['all', 'quiz', 'anagram', 'game', 'movie'].includes(mode)) return null;
     return { board, mode: board === 'chat' ? 'all' : mode };

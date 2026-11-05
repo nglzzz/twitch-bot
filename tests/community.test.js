@@ -50,7 +50,7 @@ test('real community service renders linked leaderboards and all profile achieve
     assert.equal(profile.status, 200);
     const profileHtml = await profile.text();
     assert.match(profileHtml, /Маленькие поводы для гордости/);
-    assert.equal((profileHtml.match(/<li class="community-achievement /g) || []).length, 35);
+    assert.equal((profileHtml.match(/<li class="community-achievement /g) || []).length, 37);
     assert.match(profileHtml, /Private message body/);
     assert.doesNotMatch(profileHtml, /http-viewer-id/);
     const api = await fetch(`${base}/api/community/users/http_viewer`);
@@ -255,7 +255,7 @@ test('schema upgrade preserves old chat rows and safely adds identity columns on
   }
 });
 
-test('all 35 achievement thresholds unlock at the boundary and stay locked below it', () => {
+test('all 37 achievement thresholds unlock at the boundary and stay locked below it', () => {
   function metricsFor(achievement, current) {
     const stats = {
       totalMessages: 0,
@@ -275,6 +275,8 @@ test('all 35 achievement thresholds unlock at the boundary and stay locked below
         stats.currentFollowedAt = Date.now() - current * 86400000;
         stats.followCheckedAt = Date.now();
         break;
+      case 'twitchPaidSubscription': stats.twitchPaidSubscription = current > 0; break;
+      case 'boostyPaidSubscription': stats.boostyPaidSubscription = current > 0; break;
       case 'quizAnswers': stats.quizAnswers = current; break;
       case 'pointsSpent': stats.pointsSpent = current; break;
       case 'memesSent': stats.memesSent = current; break;
@@ -288,7 +290,7 @@ test('all 35 achievement thresholds unlock at the boundary and stay locked below
     return { stats, modes };
   }
 
-  assert.equal(ACHIEVEMENTS.length, 35);
+  assert.equal(ACHIEVEMENTS.length, 37);
   for (const achievement of ACHIEVEMENTS) {
     const belowTarget = metricsFor(achievement, achievement.target - 1);
     const locked = communityService.makeAchievements(belowTarget.stats, belowTarget.modes)
@@ -302,4 +304,50 @@ test('all 35 achievement thresholds unlock at the boundary and stay locked below
     assert.equal(earned.progress, achievement.target);
     assert.equal(earned.percent, 100);
   }
+});
+
+test('community leaderboards, counts, and profile ranks exclude known bots', () => {
+  const baselineCounts = {
+    games: communityRepo.countPlayers('games'),
+    movies: communityRepo.countPlayers('mode', 'movie'),
+    chat: communityRepo.countPlayers('chat'),
+  };
+
+  quizRepo.addPoint({ userId: 'ranking-human-id', username: 'ranking_human', displayName: 'Ranking Human', mode: 'movie' });
+  quizRepo.addPoint({ userId: 'ranking-human-id', username: 'ranking_human', displayName: 'Ranking Human', mode: 'movie' });
+  for (let index = 0; index < 120; index += 1) {
+    chatLogRepo.insert({ user: 'ranking_human', displayName: 'Ranking Human', message: 'Привет' });
+  }
+
+  for (let index = 0; index < 3; index += 1) {
+    quizRepo.addPoint({ userId: 'ranking-nightbot-id', username: 'Nightbot', displayName: 'Nightbot', mode: 'movie' });
+  }
+  for (let index = 0; index < 160; index += 1) {
+    chatLogRepo.insert({ user: 'Nightbot', displayName: 'Nightbot', message: 'Сообщение бота' });
+  }
+  chatLogRepo.insert({ user: 'StreamElements', displayName: 'StreamElements', message: 'Старое сообщение бота без Twitch ID' });
+
+  const games = communityRepo.getLeaderboard({ board: 'games' });
+  const movies = communityRepo.getLeaderboard({ board: 'mode', mode: 'movie' });
+  const chatters = communityRepo.getLeaderboard({ board: 'chat' });
+  const humanGame = games.find((player) => player.login === 'ranking_human');
+  const humanMovie = movies.find((player) => player.login === 'ranking_human');
+  const humanChatter = chatters.find((player) => player.login === 'ranking_human');
+
+  assert.ok(humanGame);
+  assert.ok(humanMovie);
+  assert.ok(humanChatter);
+  const humanRanks = communityRepo.getProfileRanks({ userId: 'ranking-human-id', username: 'ranking_human' });
+  assert.equal(humanGame.position, humanRanks.gameRank);
+  assert.equal(humanChatter.position, humanRanks.chatRank);
+  assert.equal(games.some((player) => ['nightbot', 'streamelements'].includes(player.login)), false);
+  assert.equal(movies.some((player) => ['nightbot', 'streamelements'].includes(player.login)), false);
+  assert.equal(chatters.some((player) => ['nightbot', 'streamelements'].includes(player.login)), false);
+  assert.equal(communityRepo.countPlayers('games'), baselineCounts.games + 1);
+  assert.equal(communityRepo.countPlayers('mode', 'movie'), baselineCounts.movies + 1);
+  assert.equal(communityRepo.countPlayers('chat'), baselineCounts.chat + 1);
+  assert.deepEqual(communityRepo.getProfileRanks({ userId: 'ranking-nightbot-id', username: 'nightbot' }), {
+    chatRank: null,
+    gameRank: null,
+  });
 });

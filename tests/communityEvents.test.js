@@ -13,6 +13,7 @@ const dependencyPaths = {
   tokenService: require.resolve('../src/services/token.service'),
   db: require.resolve('../src/app/db'),
   communityRepo: require.resolve('../src/repositories/community.repo'),
+  paidSubscriptionRepo: require.resolve('../src/repositories/communityPaidSubscriptions.repo'),
   contributionsRepo: require.resolve('../src/repositories/communityContributions.repo'),
   websocket: require.resolve('ws'),
 };
@@ -34,6 +35,7 @@ function loadEventSub(options = {}) {
   const postCalls = [];
   const recordedFollows = [];
   const followsByUserId = new Map();
+  const recordedPaidSubscriptions = [];
   const warnings = [];
   let dbReady = options.dbReady ?? true;
 
@@ -62,8 +64,8 @@ function loadEventSub(options = {}) {
 
   const validatedToken = options.validatedToken || {
     client_id: 'test-client-id',
-    user_id: 'moderator-user-id',
-    scopes: ['moderator:read:followers'],
+    user_id: 'broadcaster-user-id',
+    scopes: ['moderator:read:followers', 'channel:read:subscriptions'],
   };
 
   const mockExports = {
@@ -96,6 +98,9 @@ function loadEventSub(options = {}) {
         if (!followsByUserId.has(follow.userId)) followsByUserId.set(follow.userId, follow);
       },
     },
+    [dependencyPaths.paidSubscriptionRepo]: {
+      recordTwitchSubscription: (subscription) => recordedPaidSubscriptions.push(subscription),
+    },
     [dependencyPaths.contributionsRepo]: {},
     [dependencyPaths.websocket]: FakeWebSocket,
   };
@@ -115,6 +120,7 @@ function loadEventSub(options = {}) {
     postCalls,
     recordedFollows,
     followsByUserId,
+    recordedPaidSubscriptions,
     warnings,
     setDbReady: (value) => { dbReady = value; },
     restore: () => {
@@ -160,11 +166,21 @@ test('follow subscription uses the validated token owner and follower scope', as
       version: '2',
       condition: {
         broadcaster_user_id: 'broadcaster-user-id',
-        moderator_user_id: 'moderator-user-id',
+        moderator_user_id: 'broadcaster-user-id',
       },
       transport: { method: 'websocket', session_id: 'test-session-id' },
     });
     assert.equal(followSubscription[2].headers.Authorization, 'Bearer test-access-token');
+
+    const paidSubscription = fixture.postCalls.find(([url, body]) => body.type === 'channel.subscribe');
+    assert.ok(paidSubscription, 'a channel.subscribe EventSub subscription should be created');
+    assert.deepEqual(paidSubscription[1], {
+      type: 'channel.subscribe',
+      version: '1',
+      condition: { broadcaster_user_id: 'broadcaster-user-id' },
+      transport: { method: 'websocket', session_id: 'test-session-id' },
+    });
+    assert.equal(paidSubscription[2].headers.Authorization, 'Bearer test-access-token');
   } finally {
     fixture.restore();
   }
@@ -174,7 +190,7 @@ test('missing follower scope skips that subscription while reward subscriptions 
   const fixture = loadEventSub({
     validatedToken: {
       client_id: 'test-client-id',
-      user_id: 'moderator-user-id',
+      user_id: 'broadcaster-user-id',
       scopes: [],
     },
   });
@@ -186,11 +202,31 @@ test('missing follower scope skips that subscription while reward subscriptions 
     assert.equal(fixture.postCalls[1][1].type, 'channel.channel_points_custom_reward_redemption.update');
     assert.equal(fixture.postCalls.some(([, body]) => body.type === 'channel.follow'), false);
     assert.equal(fixture.warnings.filter((message) => message.includes('moderator:read:followers')).length, 1);
+    assert.equal(fixture.warnings.filter((message) => message.includes('channel:read:subscriptions')).length, 1);
 
     socket.sendEvent('session_welcome', { session: { id: 'test-session-id-2' } });
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(fixture.warnings.filter((message) => message.includes('moderator:read:followers')).length, 1);
+    assert.equal(fixture.warnings.filter((message) => message.includes('channel:read:subscriptions')).length, 1);
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('paid-subscription EventSub requires the broadcaster identity and channel:read:subscriptions scope', async () => {
+  const fixture = loadEventSub({
+    validatedToken: {
+      client_id: 'test-client-id',
+      user_id: 'broadcaster-user-id',
+      scopes: ['moderator:read:followers'],
+    },
+  });
+  try {
+    await startSession(fixture);
+    assert.ok(fixture.postCalls.some(([, body]) => body.type === 'channel.follow'));
+    assert.equal(fixture.postCalls.some(([, body]) => body.type === 'channel.subscribe'), false);
+    assert.equal(fixture.warnings.filter((message) => message.includes('channel:read:subscriptions')).length, 1);
   } finally {
     fixture.restore();
   }
@@ -244,6 +280,35 @@ test('follow notifications record only this broadcaster and only while SQLite is
     assert.equal(fixture.recordedFollows.length, 2);
     assert.equal(fixture.followsByUserId.size, 1, 'the repository upsert is idempotent for duplicate follow events');
     assert.equal(fixture.followsByUserId.get('viewer-user-id').followedAt, '2026-10-31T12:34:56.000Z');
+  } finally {
+    fixture.restore();
+  }
+});
+
+test('subscription notifications confirm the recipient and ignore unrelated broadcasters or unavailable storage', async () => {
+  const fixture = loadEventSub();
+  try {
+    const socket = await startSession(fixture);
+    const event = {
+      broadcaster_user_id: 'broadcaster-user-id',
+      user_id: 'viewer-user-id',
+      user_login: 'viewer_login',
+      user_name: 'Viewer Name',
+      is_gift: true,
+      tier: '1000',
+    };
+
+    socket.sendEvent('notification', { subscription: { type: 'channel.subscribe' }, event });
+    socket.sendEvent('notification', {
+      subscription: { type: 'channel.subscribe' },
+      event: { ...event, broadcaster_user_id: 'someone-else' },
+    });
+    fixture.setDbReady(false);
+    socket.sendEvent('notification', { subscription: { type: 'channel.subscribe' }, event });
+
+    assert.deepEqual(fixture.recordedPaidSubscriptions, [{
+      userId: 'viewer-user-id', username: 'viewer_login', displayName: 'Viewer Name',
+    }]);
   } finally {
     fixture.restore();
   }

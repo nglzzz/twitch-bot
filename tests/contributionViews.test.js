@@ -32,7 +32,10 @@ const PRIVATE_SOURCE_IDS = [
 ];
 const VIEWS = path.resolve(__dirname, '../src/views');
 
-function makeAdminApp({ repository, community, authorize = true } = {}) {
+function makeAdminApp({ repository, community, boostyCommunity = {
+  getActiveSubscribers: async () => [],
+  linkActiveSubscriber: async () => false,
+}, authorize = true } = {}) {
   const app = express();
   app.engine('handlebars', handlebars({ defaultLayout: false }));
   app.set('view engine', 'handlebars');
@@ -55,6 +58,7 @@ function makeAdminApp({ repository, community, authorize = true } = {}) {
     navigation: () => [],
     repository,
     community,
+    boostyCommunity,
   }));
   return app;
 }
@@ -264,6 +268,48 @@ test('unassigned event names are never auto-linked to a Twitch profile by displa
   });
 });
 
+test('Boosty links require an authenticated admin, valid CSRF, existing Twitch ID, and manual exact-ID confirmation', async () => {
+  const links = [];
+  const lookups = [];
+  const community = {
+    normalizeLogin: (login) => typeof login === 'string' && /^[a-z0-9_]{1,25}$/i.test(login) ? login.toLowerCase() : null,
+    findProfileIdentity: (login) => {
+      lookups.push(login);
+      return login === 'alice' ? { userId: 'twitch-user-42', username: 'alice', displayName: 'Alice' } : null;
+    },
+  };
+  const boostyCommunity = {
+    getActiveSubscribers: async () => [{ id: 'boosty-123', name: 'Alice on Boosty' }],
+    linkActiveSubscriber: async (link) => { links.push(link); },
+  };
+
+  await withServer(makeAdminApp({ community, boostyCommunity }), async (baseUrl) => {
+    const page = await fetch(`${baseUrl}/admin/community-events`, { headers: { cookie: ADMIN_COOKIE } });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /name="subscriberId"/);
+    assert.match(html, /value="boosty-123">Alice on Boosty · ID boosty-123/);
+    assert.match(html, /name="_csrf" value="csrf-test-token-123"/);
+    assert.deepEqual(lookups, [], 'listing Boosty subscribers does not auto-match Twitch names');
+
+    const post = (fields, cookie = ADMIN_COOKIE) => fetch(`${baseUrl}/admin/community-events/link-boosty`, {
+      method: 'POST', redirect: 'manual',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...(cookie ? { cookie } : {}) },
+      body: form(fields),
+    });
+    assert.equal((await post({ _csrf: CSRF_TOKEN, subscriberId: 'boosty-123', twitchLogin: 'alice' }, '')).status, 302);
+    assert.equal((await post({ subscriberId: 'boosty-123', twitchLogin: 'alice' })).status, 403);
+    assert.equal((await post({ _csrf: CSRF_TOKEN, subscriberId: 'boosty-123', twitchLogin: 'missing' })).status, 302);
+    assert.equal((await post({ _csrf: CSRF_TOKEN, subscriberId: ['boosty-123', 'boosty-456'], twitchLogin: 'alice' })).status, 302);
+    assert.equal((await post({ _csrf: CSRF_TOKEN, subscriberId: 'boosty-123', twitchLogin: 'alice' })).status, 302);
+    assert.deepEqual(lookups, ['missing', 'alice']);
+    assert.deepEqual(links, [{
+      userId: 'twitch-user-42', username: 'alice', displayName: 'Alice',
+      subscriberId: 'boosty-123', adminId: 'admin-test-id',
+    }]);
+  });
+});
+
 test('admin community-event template escapes names and status and preserves exact CSRF and record IDs', () => {
   const template = fs.readFileSync(path.join(VIEWS, 'pages/admin-community-events.handlebars'), 'utf8');
   const render = Handlebars.compile(template);
@@ -289,7 +335,7 @@ test('profile service returns private contribution totals without exposing exter
   seedProfileContributions();
   const profile = communityService.getProfile('PROFILE_VIEWER');
   assert.ok(profile);
-  assert.equal(profile.achievements.length, 35);
+  assert.equal(profile.achievements.length, 37);
   assert.equal(profile.contributions.pointsSpent, 4500);
   assert.equal(profile.contributions.memesSent, 1);
   assert.equal(profile.contributions.donationsCount, 1);
@@ -324,7 +370,7 @@ test('public profile template renders the full achievement and contribution view
   const html = render({ userProfile: { ...profile, available: true, found: true } });
 
   assert.equal(profile.achievements.length, achievementData.length);
-  assert.equal(profile.achievements.length, 35);
+  assert.equal(profile.achievements.length, 37);
   assert.match(html, /Первые 1 000 в дело/);
   assert.match(html, /Накоплено баллов<\/small><strong>Недоступно<\/strong>/);
   assert.match(html, /Баллов на выполненные награды<\/small><strong>4500<\/strong>/);
@@ -335,3 +381,41 @@ test('public profile template renders the full achievement and contribution view
   for (const sourceId of PRIVATE_SOURCE_IDS) assert.doesNotMatch(html, new RegExp(sourceId));
 });
 
+
+test('community events page opens the first tab with pending items and keeps the tab after linking', async () => {
+  const repository = {
+    listUnassigned: ({ kind }) => kind === 'meme' ? [{ recordId: 'meme-1', displayName: 'alice', title: 'Sticker', eventAt: Date.now() }] : [],
+    assignSupportRecord: () => {},
+  };
+  const community = {
+    normalizeLogin: (login) => typeof login === 'string' && /^[a-z0-9_]{1,25}$/i.test(login) ? login.toLowerCase() : null,
+    findProfileIdentity: (login) => (login === 'alice' ? { userId: 'alice-id' } : null),
+  };
+  const panelHidden = (html, tab) => new RegExp(`data-panel="${tab}"\\s+hidden`).test(html);
+
+  await withServer(makeAdminApp({ repository, community }), async (baseUrl) => {
+    const auto = await (await fetch(`${baseUrl}/admin/community-events`, { headers: { cookie: ADMIN_COOKIE } })).text();
+    assert.equal(panelHidden(auto, 'memes'), false);
+    assert.equal(panelHidden(auto, 'donations'), true);
+    assert.equal(panelHidden(auto, 'boosty'), true);
+    assert.match(auto, /id="events-tab-memes"[^>]*aria-selected="true"/);
+
+    const chosen = await (await fetch(`${baseUrl}/admin/community-events?tab=boosty`, { headers: { cookie: ADMIN_COOKIE } })).text();
+    assert.equal(panelHidden(chosen, 'boosty'), false);
+    assert.equal(panelHidden(chosen, 'memes'), true);
+
+    const invalid = await (await fetch(`${baseUrl}/admin/community-events?tab=<x>`, { headers: { cookie: ADMIN_COOKIE } })).text();
+    assert.equal(panelHidden(invalid, 'memes'), false);
+
+    const post = (fields) => fetch(`${baseUrl}/admin/community-events/link`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { cookie: ADMIN_COOKIE, 'content-type': 'application/x-www-form-urlencoded' },
+      body: form({ _csrf: CSRF_TOKEN, ...fields }),
+    });
+    const linked = await post({ kind: 'meme', recordId: 'meme-1', twitchLogin: 'alice' });
+    assert.match(linked.headers.get('location'), /^\/admin\/community-events\?tab=memes&success=/);
+    const failed = await post({ kind: 'donation', recordId: 'donation-1', twitchLogin: 'nobody' });
+    assert.match(failed.headers.get('location'), /^\/admin\/community-events\?tab=donations&error=/);
+  });
+});

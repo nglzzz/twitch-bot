@@ -15,6 +15,7 @@
             {{#each navigation}}<a class="admin-nav__link {{#if isActive}}is-active{{/if}}" href="{{href}}">{{label}}</a>{{/each}}
           </nav>
           <div class="admin-sidebar__footer">
+            <a class="admin-service-link {{#if isServicePage}}is-active{{/if}}" href="/admin/donations" title="Служебный раздел">Служебное</a>
             <span>{{adminUser.displayName}}</span>
             <form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="{{csrfToken}}" /><button class="admin-link-button" type="submit">Выйти</button></form>
           </div>
@@ -22,5 +23,14 @@
       {{/if}}
       <main class="admin-main">{{{body}}}</main>
     </div>
+    {{#if isServicePage}}
+      <script>
+        document.addEventListener('keydown', function (event) {
+          if (event.key !== 'Escape') return;
+          document.querySelectorAll('details.admin-private[open]').forEach(function (item) { item.open = false; });
+          if (location.search) history.replaceState(null, '', location.pathname);
+        });
+      </script>
+    {{/if}}
   </body>
 </html>

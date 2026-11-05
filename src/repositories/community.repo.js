@@ -1,8 +1,15 @@
 'use strict';
 
 const { db, stmt, uuid } = require('./base');
+const { getBotList } = require('../helpers/arrayHelper');
+const config = require('../config');
 
 const GAME_MODES = new Set(['quiz', 'anagram', 'game', 'movie']);
+const BOT_LOGINS = [...new Set([...getBotList(), config.BOT_NAME]
+  .map((login) => String(login || '').trim().replace(/^@/, '').toLowerCase())
+  .filter((login) => /^[a-z0-9_]{1,25}$/.test(login)))];
+const BOT_LOGIN_PLACEHOLDERS = BOT_LOGINS.map(() => '?').join(', ');
+const BOT_LOGIN_PARAMETERS = () => [...BOT_LOGINS];
 const IDENTITY_FIELDS = `user_id AS userId, username, display_name AS displayName,
   first_seen_at AS firstSeenAt, last_seen_at AS lastSeenAt, followed_at AS followedAt,
   avatar_url AS avatarUrl, avatar_checked_at AS avatarCheckedAt,
@@ -136,6 +143,14 @@ function findIdentityByLogin(login) {
   return stmt(`SELECT ${IDENTITY_FIELDS}
     FROM community_user WHERE username = ? COLLATE NOCASE
     ORDER BY MAX(COALESCE(identity_checked_at, 0), last_seen_at) DESC, user_id DESC LIMIT 1`).get(username) || null;
+}
+
+function findUniqueIdentityByLogin(login) {
+  const username = normalizeLogin(login);
+  if (!username) return null;
+  const matches = stmt(`SELECT ${IDENTITY_FIELDS}
+    FROM community_user WHERE username = ? COLLATE NOCASE`).all(username);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function findIdentityById(userId) {
@@ -306,14 +321,15 @@ function getProfileRanks({ userId = null, username } = {}) {
     ), visible_scores AS (
       SELECT s.user_id, COALESCE(u.username, s.username) AS login, s.points
       FROM quiz_score s LEFT JOIN ranked_users u ON u.user_id = s.user_id
-      WHERE (u.user_id IS NULL AND NOT EXISTS (
+      WHERE ((u.user_id IS NULL AND NOT EXISTS (
           SELECT 1 FROM community_user owner WHERE lower(owner.username) = lower(s.username)
-        )) OR u.login_rank = 1
+        )) OR u.login_rank = 1)
+        AND lower(COALESCE(u.username, s.username)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
     ), ranked_scores AS (
       SELECT user_id, ROW_NUMBER() OVER (ORDER BY points DESC, login COLLATE NOCASE ASC) AS position
       FROM visible_scores
     )
-    SELECT position FROM ranked_scores WHERE user_id = ?`).get(String(userId)) : null;
+    SELECT position FROM ranked_scores WHERE user_id = ?`).get(...BOT_LOGIN_PARAMETERS(), String(userId)) : null;
 
   const chatRank = stmt(`WITH ranked_users AS (
       SELECT user_id, username, display_name,
@@ -327,7 +343,8 @@ function getProfileRanks({ userId = null, username } = {}) {
       LEFT JOIN ranked_users owner ON c.user_id = owner.user_id AND owner.login_rank = 1
       LEFT JOIN ranked_users legacy_owner
         ON c.user_id IS NULL AND lower(c.user) = lower(legacy_owner.username) AND legacy_owner.login_rank = 1
-      WHERE c.user_id IS NULL OR owner.user_id IS NOT NULL
+      WHERE (c.user_id IS NULL OR owner.user_id IS NOT NULL)
+        AND lower(COALESCE(owner.username, legacy_owner.username, c.user)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
       GROUP BY profile_key
     ), ranked AS (
       SELECT profile_key, ROW_NUMBER() OVER (ORDER BY score DESC, username COLLATE NOCASE ASC) AS position
@@ -335,7 +352,7 @@ function getProfileRanks({ userId = null, username } = {}) {
     )
     SELECT position FROM ranked WHERE profile_key IN (?, ?)
     ORDER BY CASE WHEN profile_key = ? THEN 0 ELSE 1 END LIMIT 1`)
-    .get(userId || `legacy:${login}`, `legacy:${login}`, userId || `legacy:${login}`);
+    .get(...BOT_LOGIN_PARAMETERS(), userId || `legacy:${login}`, `legacy:${login}`, userId || `legacy:${login}`);
 
   return {
     chatRank: chatRank ? Number(chatRank.position) : null,
@@ -359,11 +376,12 @@ function getLeaderboard({ board = 'games', mode = 'all', limit = 50 } = {}) {
         LEFT JOIN ranked_users owner ON c.user_id = owner.user_id AND owner.login_rank = 1
         LEFT JOIN ranked_users legacy_owner
           ON c.user_id IS NULL AND lower(c.user) = lower(legacy_owner.username) AND legacy_owner.login_rank = 1
-        WHERE c.user_id IS NULL OR owner.user_id IS NOT NULL
+        WHERE (c.user_id IS NULL OR owner.user_id IS NOT NULL)
+          AND lower(COALESCE(owner.username, legacy_owner.username, c.user)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
         GROUP BY profile_key
       )
       SELECT username AS login, display_name AS displayName, score
-      FROM grouped ORDER BY score DESC, username COLLATE NOCASE ASC LIMIT ?`).all(safeLimit)
+      FROM grouped ORDER BY score DESC, username COLLATE NOCASE ASC LIMIT ?`).all(...BOT_LOGIN_PARAMETERS(), safeLimit)
       .map((row, index) => ({ ...row, score: Number(row.score), position: index + 1 }));
   }
 
@@ -375,8 +393,10 @@ function getLeaderboard({ board = 'games', mode = 'all', limit = 50 } = {}) {
       )
       SELECT u.username AS login, u.display_name AS displayName, COUNT(w.id) AS score
       FROM ranked_users u JOIN community_game_win w ON w.user_id = u.user_id
-      WHERE w.mode = ? AND u.login_rank = 1 GROUP BY u.user_id
-      ORDER BY score DESC, u.username COLLATE NOCASE ASC LIMIT ?`).all(mode, safeLimit)
+      WHERE w.mode = ? AND u.login_rank = 1
+        AND lower(u.username) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
+      GROUP BY u.user_id
+      ORDER BY score DESC, u.username COLLATE NOCASE ASC LIMIT ?`).all(mode, ...BOT_LOGIN_PARAMETERS(), safeLimit)
       .map((row, index) => ({ ...row, score: Number(row.score), position: index + 1 }));
   }
 
@@ -390,10 +410,11 @@ function getLeaderboard({ board = 'games', mode = 'all', limit = 50 } = {}) {
       COALESCE(u.display_name, s.display_name, s.username) AS displayName,
       s.points AS score
     FROM quiz_score s LEFT JOIN ranked_users u ON u.user_id = s.user_id
-    WHERE (u.user_id IS NULL AND NOT EXISTS (
+    WHERE ((u.user_id IS NULL AND NOT EXISTS (
         SELECT 1 FROM community_user owner WHERE lower(owner.username) = lower(s.username)
-      )) OR u.login_rank = 1
-    ORDER BY s.points DESC, login COLLATE NOCASE ASC LIMIT ?`).all(safeLimit)
+      )) OR u.login_rank = 1)
+      AND lower(COALESCE(u.username, s.username)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
+    ORDER BY s.points DESC, login COLLATE NOCASE ASC LIMIT ?`).all(...BOT_LOGIN_PARAMETERS(), safeLimit)
     .map(({ userId, ...row }, index) => ({ ...row, score: Number(row.score), position: index + 1 }));
 }
 
@@ -424,26 +445,29 @@ function countPlayers(board = 'games', mode = 'all') {
       LEFT JOIN ranked_users owner ON c.user_id = owner.user_id AND owner.login_rank = 1
       LEFT JOIN ranked_users legacy_owner
         ON c.user_id IS NULL AND lower(c.user) = lower(legacy_owner.username) AND legacy_owner.login_rank = 1
-      WHERE c.user_id IS NULL OR owner.user_id IS NOT NULL
+      WHERE (c.user_id IS NULL OR owner.user_id IS NOT NULL)
+        AND lower(COALESCE(owner.username, legacy_owner.username, c.user)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})
       GROUP BY profile_key
-    )`).get().total;
+    )`).get(...BOT_LOGIN_PARAMETERS()).total;
   }
   if (board === 'mode' && GAME_MODES.has(mode)) {
     return stmt(`WITH ranked_users AS (
-      SELECT user_id, ROW_NUMBER() OVER (
+      SELECT user_id, username, ROW_NUMBER() OVER (
         PARTITION BY lower(username) ORDER BY MAX(COALESCE(identity_checked_at, 0), last_seen_at) DESC, user_id DESC
       ) AS login_rank FROM community_user
     ) SELECT COUNT(DISTINCT w.user_id) AS total FROM community_game_win w
-      JOIN ranked_users u ON u.user_id = w.user_id AND u.login_rank = 1 WHERE w.mode = ?`).get(mode).total;
+      JOIN ranked_users u ON u.user_id = w.user_id AND u.login_rank = 1
+      WHERE w.mode = ? AND lower(u.username) NOT IN (${BOT_LOGIN_PLACEHOLDERS})`).get(mode, ...BOT_LOGIN_PARAMETERS()).total;
   }
   return stmt(`WITH ranked_users AS (
       SELECT user_id, username, ROW_NUMBER() OVER (
         PARTITION BY lower(username) ORDER BY MAX(COALESCE(identity_checked_at, 0), last_seen_at) DESC, user_id DESC
       ) AS login_rank FROM community_user
     ) SELECT COUNT(*) AS total FROM quiz_score s LEFT JOIN ranked_users u ON u.user_id = s.user_id
-      WHERE (u.user_id IS NULL AND NOT EXISTS (
+      WHERE ((u.user_id IS NULL AND NOT EXISTS (
         SELECT 1 FROM community_user owner WHERE lower(owner.username) = lower(s.username)
-      )) OR u.login_rank = 1`).get().total;
+      )) OR u.login_rank = 1)
+      AND lower(COALESCE(u.username, s.username)) NOT IN (${BOT_LOGIN_PLACEHOLDERS})`).get(...BOT_LOGIN_PARAMETERS()).total;
 }
 
 module.exports = {
@@ -455,6 +479,7 @@ module.exports = {
   recordFollow,
   recordQuizWin,
   findIdentityByLogin,
+  findUniqueIdentityByLogin,
   findIdentityById,
   updateTwitchUser,
   setFollowState,

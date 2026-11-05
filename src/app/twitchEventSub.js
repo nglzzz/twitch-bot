@@ -12,10 +12,12 @@ const EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
 const SUBSCRIBE_URL = 'https://api.twitch.tv/helix/eventsub/subscriptions';
 const TOKEN_VALIDATE_URL = 'https://id.twitch.tv/oauth2/validate';
 const FOLLOW_READ_SCOPE = 'moderator:read:followers';
+const SUBSCRIPTION_READ_SCOPE = 'channel:read:subscriptions';
 const TOKEN_VALIDATE_TIMEOUT_MS = 10000;
 
 const REWARD_HANDLERS = {};
 let followSetupWarningLogged = false;
+let paidSubscriptionSetupWarningLogged = false;
 
 // Active WebSocket connection — the one currently eligible to receive
 // notifications and whose session_id is used for subscriptions.
@@ -135,7 +137,29 @@ async function subscribeAll() {
     { broadcaster_user_id: config.BROADCASTER_ID }
   );
 
-  await subscribeToFollows();
+  let access;
+  try {
+    const token = await getTwitchAccessToken();
+    if (token) {
+      const response = await axios.get(TOKEN_VALIDATE_URL, {
+        headers: { Authorization: `OAuth ${token}` },
+        timeout: TOKEN_VALIDATE_TIMEOUT_MS,
+      });
+      access = { token, validatedToken: response.data || {} };
+    }
+  } catch (error) {
+    warnFollowSetup('the token could not be validated.', error);
+    warnPaidSubscriptionSetup('the token could not be validated.', error);
+    return;
+  }
+  if (!access) {
+    warnFollowSetup('the Twitch access token is not configured.');
+    warnPaidSubscriptionSetup('the Twitch access token is not configured.');
+    return;
+  }
+
+  await subscribeToFollows(access);
+  await subscribeToPaidSubscriptions(access);
 }
 
 function warnFollowSetup(message, error = null) {
@@ -148,60 +172,74 @@ function warnFollowSetup(message, error = null) {
   console.warn(`[EventSub] Follow achievements are unavailable: ${message}`);
 }
 
-async function subscribeToFollows() {
+async function subscribeToFollows({ token, validatedToken }) {
   if (!sessionId || !config.BROADCASTER_ID) return;
+  const scopes = new Set(Array.isArray(validatedToken.scopes) ? validatedToken.scopes : []);
+  const moderatorUserId = String(validatedToken.user_id || '').trim();
 
-  let token;
-  try {
-    token = await getTwitchAccessToken();
-  } catch (error) {
-    warnFollowSetup('could not resolve the Twitch access token.', error);
+  if (String(validatedToken.client_id || '') !== String(config.TWITCH_API_CLIENT_ID || '')) {
+    warnFollowSetup('the validated token belongs to a different Twitch application.');
+    return;
+  }
+  if (!moderatorUserId) {
+    warnFollowSetup('the token has no user identity; a user token is required.');
+    return;
+  }
+  if (!scopes.has(FOLLOW_READ_SCOPE)) {
+    warnFollowSetup(`the token needs the ${FOLLOW_READ_SCOPE} scope.`);
     return;
   }
 
-  if (!token) {
-    warnFollowSetup('the Twitch access token is not configured.');
+  const subscribed = await subscribe(
+    'channel.follow',
+    '2',
+    {
+      broadcaster_user_id: String(config.BROADCASTER_ID),
+      moderator_user_id: moderatorUserId,
+    },
+    token,
+    true
+  );
+  if (!subscribed) {
+    warnFollowSetup('Twitch rejected the subscription; check that the token owner can moderate this channel.');
+  }
+}
+
+function warnPaidSubscriptionSetup(message, error = null) {
+  if (paidSubscriptionSetupWarningLogged) return;
+  paidSubscriptionSetupWarningLogged = true;
+  if (error) {
+    console.warn(`[EventSub] Paid subscription achievements are unavailable: ${message}`, error.message);
+    return;
+  }
+  console.warn(`[EventSub] Paid subscription achievements are unavailable: ${message}`);
+}
+
+async function subscribeToPaidSubscriptions({ token, validatedToken }) {
+  if (!sessionId || !config.BROADCASTER_ID) return;
+  const scopes = new Set(Array.isArray(validatedToken.scopes) ? validatedToken.scopes : []);
+
+  if (String(validatedToken.client_id || '') !== String(config.TWITCH_API_CLIENT_ID || '')) {
+    warnPaidSubscriptionSetup('the validated token belongs to a different Twitch application.');
+    return;
+  }
+  if (String(validatedToken.user_id || '') !== String(config.BROADCASTER_ID)) {
+    warnPaidSubscriptionSetup('the token must belong to the broadcaster.');
+    return;
+  }
+  if (!scopes.has(SUBSCRIPTION_READ_SCOPE)) {
+    warnPaidSubscriptionSetup(`the token needs the ${SUBSCRIPTION_READ_SCOPE} scope.`);
     return;
   }
 
-  try {
-    const response = await axios.get(TOKEN_VALIDATE_URL, {
-      headers: { Authorization: `OAuth ${token}` },
-      timeout: TOKEN_VALIDATE_TIMEOUT_MS,
-    });
-    const validatedToken = response.data || {};
-    const scopes = new Set(Array.isArray(validatedToken.scopes) ? validatedToken.scopes : []);
-    const moderatorUserId = String(validatedToken.user_id || '').trim();
-
-    if (String(validatedToken.client_id || '') !== String(config.TWITCH_API_CLIENT_ID || '')) {
-      warnFollowSetup('the validated token belongs to a different Twitch application.');
-      return;
-    }
-    if (!moderatorUserId) {
-      warnFollowSetup('the token has no user identity; a user token is required.');
-      return;
-    }
-    if (!scopes.has(FOLLOW_READ_SCOPE)) {
-      warnFollowSetup(`the token needs the ${FOLLOW_READ_SCOPE} scope.`);
-      return;
-    }
-
-    const subscribed = await subscribe(
-      'channel.follow',
-      '2',
-      {
-        broadcaster_user_id: String(config.BROADCASTER_ID),
-        moderator_user_id: moderatorUserId,
-      },
-      token,
-      true
-    );
-    if (!subscribed) {
-      warnFollowSetup('Twitch rejected the subscription; check that the token owner can moderate this channel.');
-    }
-  } catch (error) {
-    warnFollowSetup('the token could not be validated or the subscription failed.', error);
-  }
+  const subscribed = await subscribe(
+    'channel.subscribe',
+    '1',
+    { broadcaster_user_id: String(config.BROADCASTER_ID) },
+    token,
+    true
+  );
+  if (!subscribed) warnPaidSubscriptionSetup('Twitch rejected the subscription.');
 }
 
 // ---------------------------------------------------------------------------
@@ -481,9 +519,32 @@ function handleNotification(payload) {
       break;
     }
 
+    case 'channel.subscribe': {
+      handlePaidSubscription(event);
+      break;
+    }
+
     default: {
       console.log('[EventSub] Unhandled subscription type:', subscription.type);
     }
+  }
+}
+
+function handlePaidSubscription(event) {
+  if (!config.BROADCASTER_ID || !event.broadcaster_user_id
+      || String(event.broadcaster_user_id) !== String(config.BROADCASTER_ID)) {
+    return;
+  }
+  if (!isDbReady()) return;
+
+  try {
+    require('../repositories/communityPaidSubscriptions.repo').recordTwitchSubscription({
+      userId: event.user_id,
+      username: event.user_login,
+      displayName: event.user_name,
+    });
+  } catch (error) {
+    console.error('[EventSub] Could not record Twitch paid subscription:', error.message);
   }
 }
 

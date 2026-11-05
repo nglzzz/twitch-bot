@@ -9,10 +9,10 @@ const { createCommunityRouter } = require('../src/webserver/community.routes');
 
 const COMMUNITY_PAGE = {
   available: true,
-  selectedBoard: 'games',
+  selectedBoard: 'chat',
   selectedMode: 'all',
   selectedUser: '',
-  boards: [{ value: 'games', label: 'Знатоки игр' }, { value: 'chat', label: 'Голоса чата' }],
+  boards: [{ value: 'chat', label: 'Голоса чата' }, { value: 'games', label: 'Знатоки игр' }],
   modes: [{ value: 'all', label: 'Все игры' }, { value: 'quiz', label: 'Викторина' }],
   stats: { totalPlayers: 1, totalMessages: 18, totalAnswers: 7, activeStreams: 2 },
   hasPlayers: true,
@@ -45,7 +45,7 @@ function createApp({ ready = true, profile = PROFILE } = {}) {
   const service = {
     getCommunity(filters) {
       calls.getCommunity.push(filters);
-      return { ...COMMUNITY_PAGE, selectedBoard: filters?.board || 'games', selectedMode: filters?.mode || 'all' };
+      return { ...COMMUNITY_PAGE, selectedBoard: filters?.board || 'chat', selectedMode: filters?.mode || 'all' };
     },
     getProfile(login) {
       calls.getProfile.push(login);
@@ -105,6 +105,24 @@ test('community accepts supported board and game mode filters', async () => {
   assert.deepEqual(chat.instance.calls.getCommunity, [{ board: 'chat', mode: 'all' }]);
 });
 
+test('community defaults to the chat leaderboard and renders the board switch', async () => {
+  const { response, instance, body } = await request('/community');
+  assert.equal(response.status, 200);
+  assert.deepEqual(instance.calls.getCommunity, [{ board: 'chat', mode: 'all' }]);
+  assert.match(body, /<nav class="community-board-switch" aria-labelledby="community-board-label">/);
+  assert.match(body, /<a\b(?=[^>]*href="\/community\?board=chat&amp;mode=all")(?=[^>]*aria-current="page")[^>]*>Голоса чата<\/a>/);
+  assert.match(body, /<a\b(?=[^>]*href="\/community\?board=games&amp;mode=all")[^>]*>Знатоки игр<\/a>/);
+  assert.doesNotMatch(body, /<select id="community-board"/);
+  assert.doesNotMatch(body, /<input type="hidden" name="board" value="games"/);
+
+  const games = await request('/community?board=games&mode=quiz');
+  assert.equal(games.response.status, 200);
+  assert.deepEqual(games.instance.calls.getCommunity, [{ board: 'games', mode: 'quiz' }]);
+  assert.match(games.body, /<input type="hidden" name="board" value="games"\s*\/?\s*>/);
+  assert.match(games.body, /<select id="community-mode" name="mode">[\s\S]*?<option value="quiz" selected>Викторина<\/option>/);
+  assert.match(games.body, /<button class="button button--primary community-filter__submit" type="submit">/);
+});
+
 test('community search normalizes and redirects valid Twitch logins', async () => {
   const { response, instance } = await request('/community?user=%40AlIcE_123');
   assert.equal(response.status, 302);
@@ -160,6 +178,11 @@ test('profile page reports unavailable storage without querying the profile serv
 });
 
 test('leaderboard API validates filters, handles unavailable storage, and returns public data', async () => {
+  const defaultBoard = await request('/api/community/leaderboard');
+  assert.equal(defaultBoard.response.status, 200);
+  assert.deepEqual(defaultBoard.instance.calls.getCommunity, [{ board: 'chat', mode: 'all' }]);
+  assert.equal(JSON.parse(defaultBoard.body).selectedBoard, 'chat');
+
   const success = await request('/api/community/leaderboard?board=games&mode=quiz');
   assert.equal(success.response.status, 200);
   assert.deepEqual(success.instance.calls.getCommunity, [{ board: 'games', mode: 'quiz' }]);

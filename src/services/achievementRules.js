@@ -33,6 +33,8 @@ function metricValues(stats, gameModes, now = Date.now()) {
     streams: Number(stats.streamsAttended) || 0,
     follow: stats.followedAt ? 1 : 0,
     followDays: getFollowDays(stats, now),
+    twitchPaidSubscription: stats.twitchPaidSubscription ? 1 : 0,
+    boostyPaidSubscription: stats.boostyPaidSubscription ? 1 : 0,
     quizAnswers: Number(stats.quizAnswers) || 0,
     quizModeWins: Number(gameModes.quiz) || 0,
     anagramWins: Number(gameModes.anagram) || 0,

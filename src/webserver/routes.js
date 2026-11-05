@@ -8,6 +8,8 @@ const donationRepo = require('../repositories/donation.repo');
 const scheduledDonationRepo = require('../repositories/scheduledDonation.repo');
 const scheduledMemeRepo = require('../repositories/scheduledMeme.repo');
 const chatLogRepo = require('../repositories/chatLog.repo');
+const { buildDashboardData } = require('../services/adminDashboard.service');
+const { getRubRates } = require('../services/exchangeRates.service');
 const speech = require('../utils/speech');
 const {
   ensureInitialAdmin,
@@ -38,14 +40,16 @@ routes.use(require('./communityAdmin.routes').createCommunityAdminRouter({ requi
 function adminNavigation(currentPage) {
   return [
     { label: 'Обзор', href: '/admin', isActive: currentPage === 'dashboard' },
-    { label: 'Настройки', href: '/admin/settings', isActive: currentPage === 'settings' },
-    { label: 'Донаты по расписанию', href: '/admin/donations', isActive: currentPage === 'donations' },
-    { label: 'Все донаты', href: '/admin/donations/history', isActive: currentPage === 'donation-history' },
-    { label: 'Мемы по расписанию', href: '/admin/memes', isActive: currentPage === 'memes' },
     { label: 'События участников', href: '/admin/community-events', isActive: currentPage === 'community-events' },
+    { label: 'Все донаты', href: '/admin/donations/history', isActive: currentPage === 'donation-history' },
+    { label: 'Настройки', href: '/admin/settings', isActive: currentPage === 'settings' },
     { label: 'Пользователи', href: '/admin/users', isActive: currentPage === 'users' },
   ];
 }
+
+// Расписание донатов и мемов имитирует активность на стриме, поэтому эти страницы
+// не показываются в основном меню и открываются за «шторкой».
+const SERVICE_PAGES = new Set(['donations', 'memes']);
 
 function formatAdminDate(value) {
   if (!value) return '—';
@@ -78,12 +82,19 @@ function parseAmount(value) {
   return Math.round(amount * 100) / 100;
 }
 
+const QUEUE_STATUS_LABELS = { pending: 'ожидает', processing: 'отправляется', failed: 'ошибка', sent: 'отправлен', canceled: 'отменён' };
+
+function isServiceRevealed(req) {
+  return Boolean(req.query.success || req.query.error || req.query.open);
+}
+
 function adminPage(currentPage, data) {
   return {
     layout: 'admin',
     currentPage,
     navigation: adminNavigation(currentPage),
-    pageTitle: `Админка — ${currentPage}`,
+    isServicePage: SERVICE_PAGES.has(currentPage),
+    pageTitle: SERVICE_PAGES.has(currentPage) ? 'Админка — служебное' : `Админка — ${currentPage}`,
     ...data,
   };
 }
@@ -146,36 +157,13 @@ routes.post('/admin/change-password', adminForm, requireAdmin, requireCsrf, asyn
 
 routes.get('/admin', requireAdmin, async (req, res, next) => {
   try {
-    const recentDonations = donationRepo.findMany({ limit: 12 });
-    const pendingDonations = scheduledDonationRepo.countPending();
-    const pendingMemes = scheduledMemeRepo.countPending();
-    const totals = donationRepo.getSentTotals({});
     return res.render('pages/admin-dashboard', adminPage('dashboard', {
-      recentDonations: recentDonations.map((item) => ({ ...item, amountLabel: `${item.amount} ${item.currency}`, createdAtLabel: formatAdminDate(item.createdAt) })),
-      hasRecentDonations: recentDonations.length > 0,
-      totalDonations: totals.donationsCount,
-      totalAmount: totals.donationsAmount.toLocaleString('ru-RU'),
-      pendingDonations,
-      pendingMemes,
+      pageTitle: 'Админка — обзор',
+      ...buildDashboardData(Date.now(), { rates: await getRubRates() }),
       success: req.query.success || null,
       error: req.query.error || null,
     }));
   } catch (error) { return next(error); }
-});
-
-routes.post('/admin/test-donation', adminForm, requireAdmin, requireCsrf, async (req, res) => {
-  try {
-    await createAndSendDonation({
-      donorName: String(req.body.donorName || '').trim() || 'Anonymous',
-      donorId: `manual-${Date.now()}`,
-      amount: parseAmount(req.body.amount),
-      currency: String(req.body.currency || 'RUB').toUpperCase(),
-      message: String(req.body.message || '').trim(),
-    }, 'manual');
-    return res.redirect('/admin?success=Тестовый+донат+отправлен+в+StreamElements');
-  } catch (error) {
-    return res.redirect(`/admin?error=${encodeURIComponent(getFormError(error))}`);
-  }
 });
 
 routes.get('/admin/settings', requireAdmin, async (req, res, next) => {
@@ -199,7 +187,8 @@ routes.get('/admin/donations', requireAdmin, async (req, res, next) => {
   try {
     const items = scheduledDonationRepo.findByStatuses(['pending', 'processing', 'failed']);
     return res.render('pages/admin-donations', adminPage('donations', {
-      scheduledDonations: items.map((item) => ({ ...item, scheduledForLabel: formatAdminDate(item.scheduledFor), amountLabel: `${item.amount} ${item.currency}`, errorLabel: item.error || '' })),
+      scheduledDonations: items.map((item) => ({ ...item, statusLabel: QUEUE_STATUS_LABELS[item.status] || item.status, scheduledForLabel: formatAdminDate(item.scheduledFor), amountLabel: `${item.amount} ${item.currency}`, errorLabel: item.error || '' })),
+      revealed: isServiceRevealed(req),
       hasScheduledDonations: items.length > 0,
       defaultScheduledFor: toAdminDateInput(new Date(Date.now() + 10 * 60 * 1000)),
       success: req.query.success || null,
@@ -210,11 +199,18 @@ routes.get('/admin/donations', requireAdmin, async (req, res, next) => {
 
 routes.post('/admin/donations', adminForm, requireAdmin, requireCsrf, async (req, res) => {
   try {
-    scheduledDonationRepo.create({
+    const donation = {
       donorName: String(req.body.donorName || '').trim() || 'Anonymous',
       amount: parseAmount(req.body.amount),
-      currency: String(req.body.currency || 'RUB').toUpperCase(),
+      currency: String(req.body.currency || 'RUB').trim().toUpperCase().slice(0, 8) || 'RUB',
       message: String(req.body.message || '').trim().slice(0, 255),
+    };
+    if (req.body.mode === 'now') {
+      await createAndSendDonation({ ...donation, donorId: `manual-${Date.now()}` }, 'manual');
+      return res.redirect('/admin/donations?success=Донат+отправлен+в+StreamElements');
+    }
+    scheduledDonationRepo.create({
+      ...donation,
       scheduledFor: parseScheduledAt(req.body.scheduledFor),
       createdBy: req.adminUser._id,
     });
@@ -248,7 +244,8 @@ routes.post('/admin/donations/:id/delete', adminForm, requireAdmin, requireCsrf,
 
 routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
   try {
-    const filter = String(req.query.test || 'all');
+    // По умолчанию показываем только реальные донаты: страница может попасть в кадр.
+    const filter = ['all', 'no', 'yes'].includes(req.query.test) ? req.query.test : 'no';
     const isTestFilter = filter === 'yes' ? true : (filter === 'no' ? false : null);
     const donations = donationRepo.findMany({ isTest: isTestFilter, limit: 300 });
     return res.render('pages/admin-donation-history', adminPage('donation-history', {
@@ -285,7 +282,8 @@ routes.get('/admin/memes', requireAdmin, async (req, res, next) => {
       memeCatalogError = 'MEMEALERTS_JWT не настроен.';
     }
     return res.render('pages/admin-memes', adminPage('memes', {
-      scheduledMemes: items.map((item) => ({ ...item, selectionLabel: item.selection === 'random' ? 'случайный из каталога' : item.stickerId, senderLabel: (item.sender || 'test') === 'test' ? 'тестовый пользователь' : 'владелец канала', scheduledForLabel: formatAdminDate(item.scheduledFor), errorLabel: item.error || '' })),
+      revealed: isServiceRevealed(req),
+      scheduledMemes: items.map((item) => ({ ...item, statusLabel: QUEUE_STATUS_LABELS[item.status] || item.status, selectionLabel: item.selection === 'random' ? 'случайный из каталога' : item.stickerId, senderLabel: (item.sender || 'test') === 'test' ? 'тестовый пользователь' : 'владелец канала', scheduledForLabel: formatAdminDate(item.scheduledFor), errorLabel: item.error || '' })),
       hasScheduledMemes: items.length > 0,
       memeOptions,
       hasMemeOptions: memeOptions.length > 0,

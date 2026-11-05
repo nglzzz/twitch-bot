@@ -9,6 +9,7 @@ test('chat logger records real chat identities once and excludes commands, self,
     db: require.resolve('../src/app/db'),
     chat: require.resolve('../src/app/chat'),
     community: require.resolve('../src/repositories/community.repo'),
+    paidSubscriptions: require.resolve('../src/repositories/communityPaidSubscriptions.repo'),
     tracker: require.resolve('../src/services/streamTracker.service'),
     config: require.resolve('../src/config'),
   };
@@ -17,10 +18,12 @@ test('chat logger records real chat identities once and excludes commands, self,
   let ready = true;
   let failLink = false;
   const recorded = [];
+  const recordedSubscriptions = [];
   const dependencies = {
     db: { isDbReady: () => ready },
     chat: { getClient: () => ({ on: (event, callback) => { assert.equal(event, 'message'); listener = callback; } }) },
     community: { recordChat: (event) => recorded.push(event) },
+    paidSubscriptions: { recordTwitchSubscription: (event) => recordedSubscriptions.push(event) },
     tracker: { linkMessageToStream: async () => {
       if (failLink) throw new Error('stream unavailable');
       return 'stream-session';
@@ -34,7 +37,7 @@ test('chat logger records real chat identities once and excludes commands, self,
       require.cache[filename] = { id: filename, filename, loaded: true, exports: dependencies[name] };
     }
     require(loggerPath);
-    const tags = { username: 'Real_Viewer', 'user-id': 'twitch-id', 'display-name': 'Real Viewer', id: 'irc-id' };
+    const tags = { username: 'Real_Viewer', 'user-id': 'twitch-id', 'display-name': 'Real Viewer', id: 'irc-id', subscriber: '1' };
     await listener('#channel', tags, 'Привет!', false);
     assert.equal(recorded.length, 1);
     assert.deepEqual({ ...recorded[0], createdAt: 0 }, {
@@ -42,6 +45,11 @@ test('chat logger records real chat identities once and excludes commands, self,
       messageId: 'irc-id', streamSessionId: 'stream-session', createdAt: 0,
     });
     assert.ok(Number.isFinite(recorded[0].createdAt));
+    assert.equal(recordedSubscriptions.length, 1);
+    assert.deepEqual({ ...recordedSubscriptions[0], confirmedAt: 0 }, {
+      userId: 'twitch-id', username: 'real_viewer', displayName: 'Real Viewer', confirmedAt: 0,
+      identityAlreadyPrepared: true,
+    });
 
     await listener('#channel', tags, '!в очки', false);
     await listener('#channel', tags, 'Сообщение бота', true);

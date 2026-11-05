@@ -55,13 +55,15 @@ function addDonation(id, source, externalId, {
     .run(id, source, isTest ? 1 : 0, externalId, donorName, amount, status, now, now);
 }
 
-test('schema v5 adds contribution storage without changing old achievement IDs', () => {
-  assert.equal(db.prepare('SELECT version FROM schema_migrations WHERE version = 5').get()?.version, 5);
+test('schema v6 adds paid subscription links without changing old achievement IDs', () => {
+  assert.equal(db.prepare('SELECT version FROM schema_migrations WHERE version = 6').get()?.version, 6);
+  assert.equal(db.prepare("SELECT name FROM pragma_table_info('community_paid_subscription') WHERE name = 'external_subscriber_id'").get()?.name, 'external_subscriber_id');
+  assert.equal(db.prepare("SELECT name FROM pragma_table_info('community_paid_subscription') WHERE name = 'confirmed_by'").get()?.name, 'confirmed_by');
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('meme_log') WHERE name = 'community_user_id'").get()?.name, 'community_user_id');
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('donation') WHERE name = 'community_user_id'").get()?.name, 'community_user_id');
 
   const ids = ACHIEVEMENTS.map(({ id }) => id);
-  assert.equal(ids.length, 35);
+  assert.equal(ids.length, 37);
   for (const legacyId of ['messages_1', 'follow', 'quiz_100', 'mode_movie_25']) assert.ok(ids.includes(legacyId));
   assert.equal(new Set(ids).size, ids.length);
 });

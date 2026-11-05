@@ -4,8 +4,8 @@
     <label class="stats-filters__label" for="donation-test-filter">Показывать</label>
     <select class="stats-filters__select" name="test" id="donation-test-filter">
       <option value="all" {{#if (eq activeFilter 'all')}}selected{{/if}}>Все донаты</option>
-      <option value="no" {{#if (eq activeFilter 'no')}}selected{{/if}}>Только реальные</option>
-      <option value="yes" {{#if (eq activeFilter 'yes')}}selected{{/if}}>Только тестовые</option>
+      <option value="no" {{#if (eq activeFilter 'no')}}selected{{/if}}>из виджета</option>
+      <option value="yes" {{#if (eq activeFilter 'yes')}}selected{{/if}}>тестовые</option>
     </select>
     <button class="button button--primary button--small" type="submit">Применить</button>
   </form>

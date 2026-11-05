@@ -12,6 +12,7 @@ function collectStats(userId) {
   const chat = communityRepo.getChatStats({ userId, username: identity.username });
   const gameModes = communityRepo.getModeWins(userId);
   const contributions = require('../repositories/communityContributions.repo').getStats(userId);
+  const subscriptions = require('../repositories/communityPaidSubscriptions.repo').getStats(userId);
   const stats = {
     totalMessages: chat.totalMessages,
     maxMessagesPerStream: chat.maxMessagesPerStream,
@@ -22,6 +23,7 @@ function collectStats(userId) {
     currentFollowedAt: identity.currentFollowedAt,
     followCheckedAt: identity.followCheckedAt,
     ...contributions,
+    ...subscriptions,
   };
   return { identity, chat, stats, gameModes, contributions };
 }

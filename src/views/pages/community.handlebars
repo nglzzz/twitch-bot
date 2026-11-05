@@ -37,25 +37,30 @@
 
     <section class="community-controls" aria-label="Поиск и фильтры рейтинга">
       <form class="community-filter" method="get" action="/community">
-        <div class="community-filter__fields">
-          <div class="community-field">
-            <label for="community-board">Рейтинг</label>
-            <select id="community-board" name="board">
+        <div class="community-filter__fields {{#eq community.selectedBoard 'chat'}}community-filter__fields--chat{{/eq}}">
+          <div class="community-field community-field--board">
+            <span class="community-field__label" id="community-board-label">Рейтинг</span>
+            <nav class="community-board-switch" aria-labelledby="community-board-label">
               {{#each community.boards}}
-                <option value="{{value}}" {{#eq ../community.selectedBoard value}}selected{{/eq}}>{{label}}</option>
+                <a class="community-board-switch__option" href="/community?board={{value}}&amp;mode={{../community.selectedMode}}" {{#eq ../community.selectedBoard value}}aria-current="page"{{/eq}}>{{label}}</a>
               {{/each}}
-            </select>
+            </nav>
           </div>
-          <div class="community-field">
-            <label for="community-mode">Режим игры</label>
-            <select id="community-mode" name="mode">
-              {{#each community.modes}}
-                <option value="{{value}}" {{#eq ../community.selectedMode value}}selected{{/eq}}>{{label}}</option>
-              {{/each}}
-            </select>
-          </div>
+          {{#eq community.selectedBoard 'games'}}
+            <input type="hidden" name="board" value="games">
+            <div class="community-field">
+              <label for="community-mode">Режим игры</label>
+              <select id="community-mode" name="mode">
+                {{#each community.modes}}
+                  <option value="{{value}}" {{#eq ../community.selectedMode value}}selected{{/eq}}>{{label}}</option>
+                {{/each}}
+              </select>
+            </div>
+          {{/eq}}
         </div>
-        <button class="button button--primary community-filter__submit" type="submit">Показать рейтинг <span aria-hidden="true">→</span></button>
+        {{#eq community.selectedBoard 'games'}}
+          <button class="button button--primary community-filter__submit" type="submit">Показать рейтинг <span aria-hidden="true">→</span></button>
+        {{/eq}}
       </form>
 
       <form class="community-search" method="get" action="/community">

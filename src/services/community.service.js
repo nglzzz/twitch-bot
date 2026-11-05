@@ -25,8 +25,8 @@ const GAME_LABELS = {
 const GAME_ICONS = { quiz: '❓', anagram: '🔤', game: '🎮', movie: '🎬' };
 
 const BOARDS = [
-  { value: 'games', label: 'Знатоки игр' },
   { value: 'chat', label: 'Голоса чата' },
+  { value: 'games', label: 'Знатоки игр' },
 ];
 
 function getCharacterization(stats, gameModes) {
@@ -125,8 +125,10 @@ function getProfile(login, { before = null } = {}) {
   const quizAnswers = communityRepo.getQuizScore(identity.userId);
   const ranks = communityRepo.getProfileRanks({ userId: identity.userId, username: identity.username });
   const contributions = contributionsRepo.getStats(identity.userId);
+  const subscriptions = require('../repositories/communityPaidSubscriptions.repo').getStats(identity.userId);
   const stats = {
     ...contributions,
+    ...subscriptions,
     totalMessages: chat.totalMessages,
     streamsAttended: chat.streamsAttended,
     maxMessagesPerStream: chat.maxMessagesPerStream,
@@ -213,7 +215,7 @@ function getProfile(login, { before = null } = {}) {
   };
 }
 
-function getCommunity({ board = 'games', mode = 'all', limit = 50 } = {}) {
+function getCommunity({ board = 'chat', mode = 'all', limit = 50 } = {}) {
   const selectedBoard = board === 'chat' ? 'chat' : 'games';
   const selectedMode = MODES.some((item) => item.value === mode) ? mode : 'all';
   const repoBoard = selectedBoard === 'chat' ? 'chat' : selectedMode === 'all' ? 'games' : 'mode';

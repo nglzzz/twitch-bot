@@ -16,6 +16,8 @@ const ACHIEVEMENTS = [
   { id: 'follow_days_90', title: 'Свой среди своих', description: 'Оставаться фолловером канала не меньше 90 дней.', icon: '✨', category: 'community', metric: 'followDays', target: 90 },
   { id: 'follow_days_180', title: 'Полгода в эфире', description: 'Оставаться фолловером канала не меньше 180 дней.', icon: '💫', category: 'community', metric: 'followDays', target: 180 },
   { id: 'follow_days_365', title: 'Год вместе', description: 'Оставаться фолловером канала целый год.', icon: '🏅', category: 'community', metric: 'followDays', target: 365 },
+  { id: 'twitch_paid_sub_1', title: 'Поддержка в эфире', description: 'Получить подписку на канал Twitch — оформленную самостоятельно, через Prime или подаренную. Подписка подтверждена Twitch.', icon: '💜', category: 'community', metric: 'twitchPaidSubscription', target: 1 },
+  { id: 'boosty_paid_sub_1', title: 'Клубная поддержка', description: 'Подписаться на Boosty. Достижение открывается после подтверждения активной платной подписки.', icon: '🧡', category: 'community', metric: 'boostyPaidSubscription', target: 1 },
   { id: 'quiz_1', title: 'Первая разгадка', description: 'Правильно ответить в игре чата.', icon: '🧩', category: 'games', metric: 'quizAnswers', target: 1 },
   { id: 'quiz_100', title: 'Эрудит чата', description: 'Дать 100 правильных ответов.', icon: '🧠', category: 'games', metric: 'quizAnswers', target: 100 },
   { id: 'quiz_500', title: 'Кладезь ответов', description: 'Дать 500 правильных ответов.', icon: '📖', category: 'games', metric: 'quizAnswers', target: 500 },

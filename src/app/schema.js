@@ -11,7 +11,7 @@
 // из Mongo сохраняются исходные строковые ObjectId, поэтому связи по
 // stream_session_id / created_by остаются консистентными.
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const STATEMENTS = [
   // --- stream_session: центральная таблица (аналитический хаб) ---
@@ -73,6 +73,14 @@ const STATEMENTS = [
     updated_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_community_user_username ON community_user(username COLLATE NOCASE)`,
+  `CREATE TABLE IF NOT EXISTS community_paid_subscription (
+    user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+    provider TEXT NOT NULL CHECK (provider IN ('twitch', 'boosty')),
+    external_subscriber_id TEXT,
+    confirmed_by TEXT,
+    first_confirmed_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, provider)
+  )`,
   `CREATE TABLE IF NOT EXISTS community_game_win (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
@@ -333,6 +341,25 @@ function upgradeSchema(database) {
     database.prepare('PRAGMA table_info(community_user)').all().map((column) => column.name)
   );
   if (communityColumns.size > 0) {
+    database.exec(`CREATE TABLE IF NOT EXISTS community_paid_subscription (
+      user_id TEXT NOT NULL REFERENCES community_user(user_id) ON DELETE CASCADE,
+      provider TEXT NOT NULL CHECK (provider IN ('twitch', 'boosty')),
+      external_subscriber_id TEXT,
+      confirmed_by TEXT,
+      first_confirmed_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, provider)
+    )`);
+    const paidSubscriptionColumns = new Set(
+      database.prepare('PRAGMA table_info(community_paid_subscription)').all().map((column) => column.name)
+    );
+    if (!paidSubscriptionColumns.has('external_subscriber_id')) {
+      database.exec('ALTER TABLE community_paid_subscription ADD COLUMN external_subscriber_id TEXT');
+    }
+    if (!paidSubscriptionColumns.has('confirmed_by')) {
+      database.exec('ALTER TABLE community_paid_subscription ADD COLUMN confirmed_by TEXT');
+    }
+    database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_community_paid_subscription_external
+      ON community_paid_subscription(provider, external_subscriber_id) WHERE external_subscriber_id IS NOT NULL`);
     const userColumns = {
       current_followed_at: 'INTEGER',
       identity_checked_at: 'INTEGER',

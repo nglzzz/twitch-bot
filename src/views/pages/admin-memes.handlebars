@@ -1,3 +1,72 @@
-<section class="admin-page"><div class="admin-page__heading"><div><div class="eyebrow">Автоматизация</div><h1>Мемы по расписанию</h1></div></div>{{#if success}}<p class="form-notice form-notice--success">{{success}}</p>{{/if}}{{#if error}}<p class="form-notice form-notice--error">{{error}}</p>{{/if}}
-<div class="admin-grid"><article class="admin-card"><h2>Новая серия мемов</h2><p class="admin-card__hint">Можно запланировать сразу несколько отправок. При выборе случайного режима мем выбирается из каталога канала стримера и статического списка legacy-мемов.</p>{{#if memeCatalogError}}<p class="form-notice form-notice--error">Каталог сейчас недоступен: {{memeCatalogError}}. Случайный режим всё равно можно поставить в очередь.</p>{{/if}}<form method="post" action="/admin/memes" class="admin-form"><input type="hidden" name="_csrf" value="{{csrfToken}}" /><label>Отправитель<select name="sender"><option value="test">Тестовый пользователь</option><option value="owner">Владелец канала</option></select></label><label>Режим<select name="selection"><option value="random">Случайный мем из каталога</option><option value="sticker">Конкретный мем</option></select></label><label>Мем из каталога{{#if hasMemeOptions}}<select name="stickerId"><option value="">— не выбирать для случайного режима —</option>{{#each memeOptions}}<option value="{{id}}">{{name}} ({{id}})</option>{{/each}}</select>{{else}}<input name="stickerId" placeholder="Можно указать ID вручную" />{{/if}}</label><div class="admin-form__columns"><label>Количество<input name="quantity" type="number" min="1" max="200" value="1" required /></label><label>Интервал, минут<input name="intervalMinutes" type="number" min="1" max="1440" value="5" required /></label></div><label>Сообщение<textarea name="message" maxlength="255"></textarea></label><label class="admin-check"><input name="isSoundOnly" type="checkbox" /> Только звук</label><label>Первая дата и время<input name="scheduledFor" type="datetime-local" value="{{defaultScheduledFor}}" required /></label><button class="btn btn--primary" type="submit">Поставить серию в расписание</button></form></article>
-<article class="admin-card"><h2>Очередь</h2>{{#if hasScheduledMemes}}<div class="admin-list">{{#each scheduledMemes}}<div class="admin-list__row"><div><strong>{{selectionLabel}}</strong><span>{{senderLabel}} · {{message}}</span>{{#if errorLabel}}<span class="form-notice--error">Ошибка: {{errorLabel}}</span>{{/if}}</div><div><strong>{{scheduledForLabel}}</strong><span>{{status}}</span>{{#if (eq status 'pending')}}<form method="post" action="/admin/memes/{{_id}}/cancel"><input type="hidden" name="_csrf" value="{{../csrfToken}}" /><button class="admin-link-button" type="submit">Отменить</button></form>{{/if}}<form method="post" action="/admin/memes/{{_id}}/delete"><input type="hidden" name="_csrf" value="{{../csrfToken}}" /><button class="admin-link-button" type="submit">Удалить</button></form></div></div>{{/each}}</div>{{else}}<p class="empty-state">Очередь пуста.</p>{{/if}}</article></div></section>
+<section class="admin-page">
+  <div class="admin-page__heading"><div><div class="eyebrow">Служебное</div><h1>Служебный раздел</h1></div></div>
+  <details class="admin-private" {{#if revealed}}open{{/if}}>
+    <summary class="admin-private__curtain">
+      <span class="admin-private__text"><strong class="admin-private__show">Содержимое скрыто</strong><strong class="admin-private__hide">Раздел открыт</strong><small>Раздел открывается только по клику, чтобы случайно не попасть в кадр. Esc — скрыть снова.</small></span>
+      <span class="btn btn--ghost admin-private__toggle"><span class="admin-private__show">Показать</span><span class="admin-private__hide">Скрыть</span></span>
+    </summary>
+    <div class="admin-private__body">
+      <nav class="admin-tabs" aria-label="Служебные разделы">
+        <a class="admin-tabs__link" href="/admin/donations?open=1">Донаты</a>
+        <a class="admin-tabs__link is-active" href="/admin/memes?open=1" aria-current="page">Мемы</a>
+      </nav>
+      {{#if success}}<p class="form-notice form-notice--success" role="status">{{success}}</p>{{/if}}
+      {{#if error}}<p class="form-notice form-notice--error" role="alert">{{error}}</p>{{/if}}
+      <div class="admin-grid">
+        <article class="admin-card">
+          <h2>Новая серия мемов</h2>
+          <p class="admin-card__hint">Можно запланировать сразу несколько отправок. В случайном режиме мем выбирается из каталога канала и статического списка legacy-мемов.</p>
+          {{#if memeCatalogError}}<p class="form-notice form-notice--error">Каталог сейчас недоступен: {{memeCatalogError}}. Случайный режим всё равно можно поставить в очередь.</p>{{/if}}
+          <form method="post" action="/admin/memes" class="admin-form">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+            <div class="admin-form__columns">
+              <label>Отправитель<select name="sender"><option value="test">Тестовый пользователь</option><option value="owner">Владелец канала</option></select></label>
+              <label>Режим<select name="selection"><option value="random">Случайный мем</option><option value="sticker">Конкретный мем</option></select></label>
+            </div>
+            <label>Мем из каталога <small>для режима «Конкретный мем»</small>
+              {{#if hasMemeOptions}}
+                <select name="stickerId"><option value="">— не выбран —</option>{{#each memeOptions}}<option value="{{id}}">{{name}} ({{id}})</option>{{/each}}</select>
+              {{else}}
+                <input name="stickerId" placeholder="Можно указать ID вручную" />
+              {{/if}}
+            </label>
+            <div class="admin-form__columns">
+              <label>Количество<input name="quantity" type="number" min="1" max="200" value="1" required /></label>
+              <label>Интервал, минут<input name="intervalMinutes" type="number" min="1" max="1440" value="5" required /></label>
+            </div>
+            <label>Сообщение<textarea name="message" maxlength="255"></textarea></label>
+            <label class="admin-check"><input name="isSoundOnly" type="checkbox" /> Только звук</label>
+            <label>Первая отправка<input name="scheduledFor" type="datetime-local" value="{{defaultScheduledFor}}" required /></label>
+            <div class="admin-form__actions"><button class="btn btn--primary" type="submit">Запланировать серию</button></div>
+          </form>
+        </article>
+        <article class="admin-card">
+          <h2>Очередь</h2>
+          {{#if hasScheduledMemes}}
+            <div class="admin-list">
+              {{#each scheduledMemes}}
+                <div class="admin-list__row">
+                  <div>
+                    <strong>{{selectionLabel}}</strong>
+                    <span>{{senderLabel}}{{#if message}} · {{message}}{{/if}}</span>
+                    {{#if errorLabel}}<span class="admin-list__error">Ошибка: {{errorLabel}}</span>{{/if}}
+                  </div>
+                  <div>
+                    <strong>{{scheduledForLabel}}</strong>
+                    <span class="admin-status admin-status--{{status}}">{{statusLabel}}</span>
+                    <div class="admin-list__actions">
+                      {{#if (eq status 'pending')}}<form method="post" action="/admin/memes/{{_id}}/cancel"><input type="hidden" name="_csrf" value="{{../csrfToken}}" /><button class="admin-link-button" type="submit">Отменить</button></form>{{/if}}
+                      <form method="post" action="/admin/memes/{{_id}}/delete"><input type="hidden" name="_csrf" value="{{../csrfToken}}" /><button class="admin-link-button admin-link-button--danger" type="submit">Удалить</button></form>
+                    </div>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="empty-state">Очередь пуста.</p>
+          {{/if}}
+        </article>
+      </div>
+    </div>
+  </details>
+</section>
