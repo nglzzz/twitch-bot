@@ -408,12 +408,32 @@
       }
     }
 
+    var dragRow = null; // строка, которую сейчас перетаскивают
+    var pendingQueue = null; // очередь, пришедшая во время перетаскивания
+
+    function moveButton(label, path, delta) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'music-dock__move';
+      button.dataset.move = String(delta);
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      button.innerHTML = '<svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '"/></svg>';
+      return button;
+    }
+
     function renderNext(queue) {
-      var items = (Array.isArray(queue) ? queue : []).slice(0, 10);
+      if (dragRow) { pendingQueue = queue; return; }
+      var items = Array.isArray(queue) ? queue : [];
       els.nextList.textContent = '';
       items.forEach(function (item, index) {
         var li = document.createElement('li');
         li.className = 'music-dock__next-item';
+        li.dataset.id = item.id;
+        var handle = document.createElement('span');
+        handle.className = 'music-dock__handle';
+        handle.title = 'Перетащите, чтобы изменить порядок';
+        handle.innerHTML = '<svg class="music-ic music-ic--solid" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
         var num = document.createElement('span');
         num.className = 'music-dock__next-num';
         num.textContent = String(index + 1);
@@ -442,6 +462,13 @@
         dur.className = 'music-dock__next-duration';
         dur.textContent = item.playLabel || MusicClient.formatTime(item.playSec || item.durationSec);
         right.appendChild(dur);
+        var up = moveButton('Выше', 'M6 15l6-6 6 6', -1);
+        var down = moveButton('Ниже', 'M6 9l6 6 6-6', 1);
+        up.disabled = index === 0;
+        down.disabled = index === items.length - 1;
+        right.appendChild(up);
+        right.appendChild(down);
+        li.appendChild(handle);
         li.appendChild(num);
         li.appendChild(info);
         li.appendChild(right);
@@ -449,6 +476,82 @@
       });
       els.nextEmpty.hidden = items.length > 0;
     }
+
+    // ---------- порядок очереди ----------
+
+    function queueRows() {
+      return Array.prototype.slice.call(els.nextList.querySelectorAll('.music-dock__next-item'));
+    }
+
+    function renumber() {
+      var rows = queueRows();
+      rows.forEach(function (row, index) {
+        row.querySelector('.music-dock__next-num').textContent = String(index + 1);
+        row.querySelector('[data-move="-1"]').disabled = index === 0;
+        row.querySelector('[data-move="1"]').disabled = index === rows.length - 1;
+      });
+    }
+
+    function sendOrder() {
+      renumber();
+      control('reorder', queueRows().map(function (row) { return row.dataset.id; }));
+    }
+
+    els.nextList.addEventListener('click', function (event) {
+      var button = event.target.closest('.music-dock__move');
+      if (!button || button.disabled) return;
+      var row = button.closest('.music-dock__next-item');
+      var rows = queueRows();
+      var target = rows.indexOf(row) + Number(button.dataset.move);
+      if (target < 0 || target >= rows.length) return;
+      if (target < rows.indexOf(row)) els.nextList.insertBefore(row, rows[target]);
+      else els.nextList.insertBefore(row, rows[target].nextSibling);
+      sendOrder();
+      var again = row.querySelector('[data-move="' + button.dataset.move + '"]');
+      if (again && !again.disabled) again.focus();
+    });
+
+    // Перетаскивание за ручку на pointer-событиях: HTML5 drag-and-drop во встроенном браузере OBS ненадёжен.
+    els.nextList.addEventListener('pointerdown', function (event) {
+      var handle = event.target.closest('.music-dock__handle');
+      if (!handle || event.button !== 0) return;
+      event.preventDefault();
+      dragRow = handle.closest('.music-dock__next-item');
+      dragRow.classList.add('is-dragging');
+      // Слушаем документ, а не ручку: при перестановке строки браузер снимает захват указателя.
+      var startOrder = queueRows().map(function (row) { return row.dataset.id; }).join(',');
+
+      function onMove(moveEvent) {
+        var rows = queueRows();
+        for (var i = 0; i < rows.length; i += 1) {
+          var row = rows[i];
+          if (row === dragRow) continue;
+          var rect = row.getBoundingClientRect();
+          if (moveEvent.clientY >= rect.top && moveEvent.clientY <= rect.bottom) {
+            if (moveEvent.clientY < rect.top + rect.height / 2) els.nextList.insertBefore(dragRow, row);
+            else els.nextList.insertBefore(dragRow, row.nextSibling);
+            renumber();
+            break;
+          }
+        }
+      }
+
+      function onEnd() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onEnd);
+        document.removeEventListener('pointercancel', onEnd);
+        dragRow.classList.remove('is-dragging');
+        dragRow = null;
+        var changed = queueRows().map(function (row) { return row.dataset.id; }).join(',') !== startOrder;
+        if (changed) sendOrder();
+        else if (pendingQueue) renderNext(pendingQueue);
+        pendingQueue = null;
+      }
+
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onEnd);
+      document.addEventListener('pointercancel', onEnd);
+    });
 
     function applyState(state) {
       renderNow(state);

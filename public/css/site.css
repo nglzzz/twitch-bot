@@ -2504,7 +2504,17 @@ a.admin-rank__name:hover { color: var(--primary-bright); }
 /* Далее в очереди */
 .music-dock__next-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: .45rem; }
 .music-dock__next-list { list-style: none; display: grid; gap: .3rem; }
-.music-dock__next-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .6rem; padding: .4rem .55rem; border-radius: var(--radius-xs); background: rgba(26, 21, 48, .55); }
+.music-dock__next-item { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: .5rem; padding: .35rem .45rem; border-radius: var(--radius-xs); background: rgba(26, 21, 48, .55); }
+.music-dock__next-item.is-dragging { opacity: .6; outline: 1px dashed var(--primary); }
+.music-dock__handle { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 32px; color: var(--muted); cursor: grab; touch-action: none; }
+.music-dock__handle:hover { color: var(--text); }
+.music-dock__next-item.is-dragging .music-dock__handle { cursor: grabbing; }
+.music-dock__handle .music-ic { width: 16px; height: 16px; }
+.music-dock__move { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--panel-border); border-radius: var(--radius-xs); background: rgba(7, 6, 15, .45); color: var(--text-soft); cursor: pointer; }
+.music-dock__move .music-ic { width: 15px; height: 15px; }
+.music-dock__move:hover:not(:disabled) { color: #fff; border-color: var(--primary); }
+.music-dock__move:focus-visible { outline: 2px solid var(--primary-bright); outline-offset: 1px; }
+.music-dock__move:disabled { opacity: .3; cursor: default; }
 .music-dock__next-num { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
 .music-dock__next-info { display: grid; gap: .1rem; min-width: 0; }
 .music-dock__next-title-link { color: var(--text); font-weight: 600; text-decoration: none; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

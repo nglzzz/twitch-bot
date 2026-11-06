@@ -176,6 +176,7 @@ function createMusicRouter({ requireAdmin, requireCsrf, adminPage }) {
       case 'skip': return music.skip('skipped');
       case 'volume': return music.setVolume(value);
       case 'seek': return music.seek(value);
+      case 'reorder': return Array.isArray(value) ? music.reorder(value.slice(0, 500)) : { ok: false, message: 'Нужен список заявок' };
       default: return { ok: false, message: 'Неизвестное действие' };
     }
   }
