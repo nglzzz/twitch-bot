@@ -56,7 +56,7 @@ function addDonation(id, source, externalId, {
 }
 
 test('schema v6 adds paid subscription links without changing old achievement IDs', () => {
-  assert.equal(db.prepare('SELECT version FROM schema_migrations WHERE version = 6').get()?.version, 6);
+  assert.ok(db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version >= 6);
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('community_paid_subscription') WHERE name = 'external_subscriber_id'").get()?.name, 'external_subscriber_id');
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('community_paid_subscription') WHERE name = 'confirmed_by'").get()?.name, 'confirmed_by');
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('meme_log') WHERE name = 'community_user_id'").get()?.name, 'community_user_id');

@@ -43,9 +43,9 @@ const MODEL_REGISTRY = Object.freeze({
     aliases: ['openrouter/free'],
     requestModelEnvNames: ['OPENROUTER_MODEL'],
     defaultRequestModels: [
-      'openai/gpt-oss-120b',
-      'openrouter:free',
       'qwen/qwen3.7-flash',
+      'openrouter:free',
+      'openai/gpt-oss-120b',
     ],
     fallbackModels: ['deepseek'],
   },

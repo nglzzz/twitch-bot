@@ -100,6 +100,9 @@ async function createAndSendDonation(data, source) {
     donation = donationRepo.update(existing._id, { ...donationData, status: 'pending', error: null });
   } else {
     donation = donationRepo.create({ ...donationData, status: 'pending', error: null });
+    // Заказ музыки из текста доната не зависит от пересылки алерта в StreamElements.
+    require('./music').handleDonationForMusic(donation)
+      .catch((error) => console.error('[Music] Donation request failed:', error.message));
   }
 
   try {

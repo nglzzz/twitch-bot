@@ -11,7 +11,7 @@
 // из Mongo сохраняются исходные строковые ObjectId, поэтому связи по
 // stream_session_id / created_by остаются консистентными.
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const STATEMENTS = [
   // --- stream_session: центральная таблица (аналитический хаб) ---
@@ -297,6 +297,56 @@ const STATEMENTS = [
     PRIMARY KEY (stream_id, question_id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_quiz_question_use_question ON quiz_question_use(question_id)`,
+
+  // --- music: заказ музыки (song requests) ---
+  `CREATE TABLE IF NOT EXISTS music_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS music_request (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    author TEXT,
+    duration_sec INTEGER NOT NULL DEFAULT 0,
+    thumbnail TEXT,
+    url TEXT,
+    requested_by TEXT NOT NULL,
+    requested_by_display TEXT,
+    requested_by_id TEXT,
+    source TEXT NOT NULL,
+    is_paid INTEGER NOT NULL DEFAULT 0,
+    amount REAL,
+    currency TEXT,
+    amount_rub REAL,
+    donation_id TEXT,
+    start_sec INTEGER NOT NULL DEFAULT 0,
+    play_limit_sec INTEGER,
+    position REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'queued',
+    status_reason TEXT,
+    created_at INTEGER NOT NULL,
+    started_at INTEGER,
+    finished_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_music_request_status_position ON music_request(status, position)`,
+  `CREATE INDEX IF NOT EXISTS idx_music_request_finished ON music_request(finished_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_music_request_requester ON music_request(lower(requested_by), status)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_music_request_donation ON music_request(donation_id) WHERE donation_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS music_blacklist_track (
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    title TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (provider, external_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS music_blacklist_user (
+    login TEXT PRIMARY KEY COLLATE NOCASE,
+    created_at INTEGER NOT NULL
+  )`,
 
   // --- schema_migrations: контроль версий схемы ---
   `CREATE TABLE IF NOT EXISTS schema_migrations (

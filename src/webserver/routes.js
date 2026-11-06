@@ -36,11 +36,13 @@ const {
 const adminForm = express.urlencoded({ extended: false, limit: '32kb' });
 routes.use(require('./community.routes').createCommunityRouter({ enrichment: require('../services/twitchCommunity.service') }));
 routes.use(require('./communityAdmin.routes').createCommunityAdminRouter({ requireAdmin, requireCsrf, navigation: adminNavigation }));
+routes.use(require('./music.routes').createMusicRouter({ requireAdmin, requireCsrf, adminPage }));
 
 function adminNavigation(currentPage) {
   return [
     { label: 'Обзор', href: '/admin', isActive: currentPage === 'dashboard' },
     { label: 'События участников', href: '/admin/community-events', isActive: currentPage === 'community-events' },
+    { label: 'Музыка', href: '/admin/music', isActive: currentPage === 'music' },
     { label: 'Все донаты', href: '/admin/donations/history', isActive: currentPage === 'donation-history' },
     { label: 'Настройки', href: '/admin/settings', isActive: currentPage === 'settings' },
     { label: 'Пользователи', href: '/admin/users', isActive: currentPage === 'users' },
@@ -444,6 +446,7 @@ routes.get('/speak', (req, res) => {
       { label: 'Главная', href: '/', isActive: false },
       { label: 'Статистика', href: '/stats', isActive: false },
       { label: 'Сообщество', href: '/community', isActive: false },
+      { label: 'Музыка', href: '/music', isActive: false },
       { label: 'Озвучка', href: '/speak', isActive: true },
     ],
     websocketPort: config.DOCKER_WEBSOCKET_PORT || config.WEBSOCKET_PORT

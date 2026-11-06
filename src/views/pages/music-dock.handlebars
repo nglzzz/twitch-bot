@@ -1,0 +1,466 @@
+<style>
+  html, body { background: #121218 !important; margin: 0; }
+  /* Перемотка: прозрачный range поверх полосы прогресса + ползунок при наведении. */
+  .music-dock .music-bar { overflow: visible; height: 6px; }
+  .music-dock .music-bar__fill { transition: none; }
+  .music-dock .music-bar__fill::after { content: ''; position: absolute; right: -7px; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); transform: translateY(-50%) scale(0); transition: transform .15s ease; }
+  .music-dock .music-bar:hover .music-bar__fill::after,
+  .music-dock .music-bar:focus-within .music-bar__fill::after,
+  .music-dock .music-bar.is-seeking .music-bar__fill::after { transform: translateY(-50%) scale(1); }
+  .music-dock__seek { position: absolute; left: 0; right: 0; top: -9px; width: 100%; height: 24px; margin: 0; opacity: 0; cursor: pointer; }
+  .music-dock .music-bar:focus-within { outline: 2px solid rgba(255,255,255,.6); outline-offset: 6px; border-radius: 999px; }
+  @media (prefers-reduced-motion: reduce) { .music-dock .music-bar__fill::after { transition: none; } }
+</style>
+
+<div class="music-dock" id="music-dock">
+  <div class="music-dock__banner" id="music-dock-banner" hidden>
+    <span>Плеер активен в другом окне</span>
+    <button class="btn btn--primary btn--compact" id="music-dock-takeover" type="button">Играть здесь</button>
+  </div>
+
+  <button class="music-dock__unmute" id="music-dock-unmute" type="button" hidden>
+    <svg class="music-ic music-ic--solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    Нажмите, чтобы включить звук
+  </button>
+
+  <div class="music-dock__controls">
+    <button class="music-dock__btn music-dock__btn--play" id="music-dock-toggle" type="button" aria-label="Играть / пауза">
+      <svg class="music-ic music-ic--solid music-ic--play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <svg class="music-ic music-ic--solid music-ic--pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+    </button>
+    <button class="music-dock__btn" id="music-dock-skip" type="button" aria-label="Следующий трек">
+      <svg class="music-ic music-ic--solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14l9-7L6 5zM16.5 5H19v14h-2.5z"/></svg>
+    </button>
+    <label class="music-dock__volume">
+      <svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+      <input type="range" id="music-dock-volume" min="0" max="100" step="1" value="50" aria-label="Громкость" />
+    </label>
+  </div>
+
+  <section class="music-dock__now" id="music-dock-now" aria-label="Сейчас играет">
+    <div class="music-dock__now-bg" aria-hidden="true"></div>
+    <div class="music-dock__art" aria-hidden="true"></div>
+    <div class="music-dock__meta">
+      <div class="music-hero__label music-dock__label">
+        <span class="music-eq" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span id="music-dock-status">Сейчас ничего не играет</span>
+      </div>
+      <a class="music-dock__title" id="music-dock-title" target="_blank" rel="noreferrer" hidden></a>
+      <div class="music-dock__sub" id="music-dock-sub" hidden>
+        <span id="music-dock-author"></span>
+        <span class="music-chip" id="music-dock-chip" hidden></span>
+        <span class="music-chip music-chip--paid" id="music-dock-paid" hidden>Донат</span>
+        <span class="music-chip music-chip--src" id="music-dock-src" hidden>Админка</span>
+      </div>
+      <div class="music-progress" id="music-dock-progress" hidden>
+        <span class="music-progress__time" id="music-dock-pos">0:00</span>
+        <span class="music-bar" id="music-dock-bar">
+          <span class="music-bar__fill" id="music-dock-fill"></span>
+          <input class="music-dock__seek" id="music-dock-seek" type="range" min="0" max="0" step="1" value="0" aria-label="Перемотка" />
+        </span>
+        <span class="music-progress__time" id="music-dock-len">0:00</span>
+      </div>
+      <div class="music-dock__votes" id="music-dock-votes" hidden></div>
+    </div>
+  </section>
+
+  <section class="music-dock__next" aria-label="Далее в очереди">
+    <h2 class="music-dock__next-title">Далее</h2>
+    <ol class="music-dock__next-list" id="music-dock-next-list"></ol>
+    <p class="music-dock__next-empty" id="music-dock-next-empty">Очередь пуста.</p>
+  </section>
+
+  <div class="music-dock__top">
+    <button class="music-dock__video-toggle" id="music-dock-video-toggle" type="button" aria-expanded="false">Показать видео</button>
+    <div class="music-dock__video-wrap is-collapsed" id="music-dock-video-wrap">
+      <div id="music-dock-yt"></div>
+    </div>
+  </div>
+
+  <div class="music-dock__status">
+    <span class="music-dot" id="music-dock-ws" aria-hidden="true"></span>
+    <span id="music-dock-ws-label">Подключение…</span>
+    <span class="music-dock__status-sep" aria-hidden="true">·</span>
+    <span class="music-dock__active" id="music-dock-active">Неактивен</span>
+  </div>
+</div>
+
+<script src="/js/music-client.js"></script>
+<script>
+  (function () {
+    'use strict';
+    var root = document.getElementById('music-dock');
+    if (!root) return;
+    var TOKEN = '{{token}}';
+    var PLAYER_ID = 'dock-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
+    var el = function (id) { return document.getElementById(id); };
+    var els = {
+      videoWrap: el('music-dock-video-wrap'), videoToggle: el('music-dock-video-toggle'),
+      banner: el('music-dock-banner'), takeover: el('music-dock-takeover'), unmute: el('music-dock-unmute'),
+      toggle: el('music-dock-toggle'), skip: el('music-dock-skip'), volume: el('music-dock-volume'),
+      now: el('music-dock-now'), nowBg: root.querySelector('.music-dock__now-bg'), art: root.querySelector('.music-dock__art'),
+      status: el('music-dock-status'), title: el('music-dock-title'), sub: el('music-dock-sub'),
+      author: el('music-dock-author'), chip: el('music-dock-chip'), paid: el('music-dock-paid'), src: el('music-dock-src'),
+      progress: el('music-dock-progress'), pos: el('music-dock-pos'), len: el('music-dock-len'),
+      fill: el('music-dock-fill'), votes: el('music-dock-votes'),
+      bar: el('music-dock-bar'), seek: el('music-dock-seek'),
+      nextList: el('music-dock-next-list'), nextEmpty: el('music-dock-next-empty'),
+      ws: el('music-dock-ws'), wsLabel: el('music-dock-ws-label'), active: el('music-dock-active'),
+    };
+
+    var ytPlayer = null;
+    var ytReady = false;
+    var loadedId = null;
+    var endedReportedId = null;
+    var errorReportedId = null;
+    var registered = false;
+    var isActive = false;
+    var playCheckTimer = null;
+    var volumeTimer = null;
+    var lastId = null;
+    var appliedSeek = null; // seekSeq, уже применённый к YouTube-плееру
+    var seeking = false;
+
+    function post(path, body) {
+      return fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Music-Token': TOKEN },
+        body: JSON.stringify(body || {}),
+      }).then(function (response) {
+        return response.ok ? response.json() : null;
+      }).catch(function () { return null; });
+    }
+
+    function report(payload) {
+      var body = { playerId: PLAYER_ID, event: payload.event, requestId: payload.requestId || '', position: payload.position, seekSeq: appliedSeek };
+      if (payload.errorCode !== undefined) body.errorCode = payload.errorCode;
+      return post('/api/music/player/report', body).then(function (data) {
+        if (data && data.active === false) deactivate();
+        return data;
+      });
+    }
+
+    function register() {
+      return post('/api/music/player/register', { playerId: PLAYER_ID }).then(function (data) {
+        if (data && data.state) {
+          registered = true;
+          isActive = Boolean(data.state.player && data.state.player.activeId === PLAYER_ID);
+          els.banner.hidden = isActive;
+          if (isActive) {
+            applyState(data.state);
+            setActiveUi();
+          }
+        }
+        return data;
+      });
+    }
+
+    function deactivate() {
+      if (!registered) return;
+      isActive = false;
+      els.banner.hidden = false;
+      setActiveUi();
+      try { if (ytReady) ytPlayer.pauseVideo(); } catch (error) { /* ignore */ }
+    }
+
+    function setActiveUi() {
+      els.active.textContent = isActive ? 'Этот плеер активен' : 'Неактивен';
+      els.active.classList.toggle('is-on', isActive);
+    }
+
+    // ---------- YouTube ----------
+
+    function askPlay() {
+      if (!ytReady) return;
+      ytPlayer.playVideo();
+      clearTimeout(playCheckTimer);
+      playCheckTimer = setTimeout(function () {
+        if (!ytReady || !isActive) return;
+        // Кнопка нужна только если сервер всё ещё ждёт воспроизведения, а браузер его не дал.
+        var state = client.getState();
+        if (!state || state.status !== 'playing' || !state.current) return;
+        var st = ytPlayer.getPlayerState();
+        if (st !== 1 && st !== 3) els.unmute.hidden = false;
+      }, 2500);
+    }
+
+    function stopPlayCheck() {
+      clearTimeout(playCheckTimer);
+      els.unmute.hidden = true;
+    }
+
+    /** Декларативная синхронизация: сервер — источник истины, док — источник позиции. */
+    function syncPlayer(state) {
+      if (!ytReady || !state) return;
+      var activeNow = Boolean(state.player && state.player.activeId === PLAYER_ID);
+      if (!activeNow) return;
+      var track = state.current;
+      if (!track || track.provider !== 'youtube') {
+        stopPlayCheck();
+        if (loadedId) { loadedId = null; ytPlayer.stopVideo(); }
+        return;
+      }
+      if (track.id !== loadedId) {
+        loadedId = track.id;
+        endedReportedId = null;
+        errorReportedId = null;
+        appliedSeek = state.seekSeq;
+        ytPlayer.loadVideoById({ videoId: track.externalId, startSeconds: state.positionSec, endSeconds: track.endSec || undefined });
+      } else if (state.seekSeq !== appliedSeek) {
+        appliedSeek = state.seekSeq;
+        ytPlayer.seekTo(state.positionSec, true);
+      }
+      if (state.status === 'playing') askPlay();
+      else {
+        stopPlayCheck();
+        ytPlayer.pauseVideo();
+      }
+      ytPlayer.setVolume(Math.max(0, Math.min(100, Number(state.volume) || 0)));
+      ytPlayer.unMute();
+    }
+
+    window.onYouTubeIframeAPIReady = function () {
+      ytPlayer = new YT.Player('music-dock-yt', {
+        width: '100%',
+        height: '100%',
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, rel: 0, playsinline: 1, iv_load_policy: 3, origin: location.origin, widget_referrer: location.origin },
+        events: {
+          onReady: function () {
+            ytReady = true;
+            syncPlayer(client.getState());
+          },
+          onStateChange: function (event) {
+            if (event.data === 0) {
+              els.unmute.hidden = true;
+              if (loadedId && endedReportedId !== loadedId) {
+                endedReportedId = loadedId;
+                report({ event: 'ended', requestId: loadedId });
+              }
+            } else if (event.data === 1) {
+              els.unmute.hidden = true;
+            }
+          },
+          onError: function (event) {
+            if (loadedId && errorReportedId !== loadedId) {
+              errorReportedId = loadedId;
+              report({ event: 'error', requestId: loadedId, errorCode: event.data });
+            }
+          },
+        },
+      });
+    };
+    var apiScript = document.createElement('script');
+    apiScript.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(apiScript);
+
+    // ---------- отображение ----------
+
+    function artUrl(track, square) {
+      if (!track) return '';
+      if (track.provider === 'youtube') return 'https://i.ytimg.com/vi/' + track.externalId + (square ? '/mqdefault.jpg' : '/hqdefault.jpg');
+      return track.thumbnail ? String(track.thumbnail).replace(/"/g, '%22') : '';
+    }
+
+    function chipText(track) {
+      return track.isBackup ? 'Плейлист' : '@' + (track.requestedBy || '');
+    }
+
+    function appendBadge(row, className, text) {
+      var badge = document.createElement('span');
+      badge.className = className;
+      badge.textContent = text;
+      row.appendChild(badge);
+    }
+
+    function renderNow(state) {
+      var track = state && state.current;
+      els.now.classList.toggle('is-playing', Boolean(track) && state.status === 'playing');
+      if (!track) {
+        lastId = null;
+        els.title.hidden = true;
+        els.sub.hidden = true;
+        els.progress.hidden = true;
+        els.status.textContent = 'Сейчас ничего не играет';
+        els.votes.hidden = true;
+        return;
+      }
+      els.title.hidden = false;
+      els.sub.hidden = false;
+      els.progress.hidden = false;
+      if (track.id !== lastId) {
+        lastId = track.id;
+        var art = 'url("' + artUrl(track, false) + '")';
+        var artSq = 'url("' + artUrl(track, true) + '")';
+        els.now.style.setProperty('--music-art', art);
+        els.now.style.setProperty('--music-art-sq', artSq);
+        els.title.textContent = track.title;
+        if (track.url) els.title.href = track.url;
+        else els.title.removeAttribute('href');
+        els.author.textContent = track.author || '';
+        els.chip.hidden = false;
+        els.chip.textContent = chipText(track);
+        els.paid.hidden = !track.isPaid;
+        els.src.hidden = track.source !== 'admin';
+        els.len.textContent = MusicClient.formatTime(track.playSec || track.durationSec);
+      }
+      els.status.textContent = state.status === 'waiting' ? 'Скоро следующий' : (state.status === 'playing' ? 'Играет' : 'Пауза');
+      var votes = state.votes;
+      if (votes && votes.enabled && votes.voters > 0) {
+        els.votes.hidden = false;
+        els.votes.textContent = 'Голоса за скип: ' + votes.total + '/' + votes.needed;
+      } else {
+        els.votes.hidden = true;
+      }
+    }
+
+    function renderNext(queue) {
+      var items = (Array.isArray(queue) ? queue : []).slice(0, 10);
+      els.nextList.textContent = '';
+      items.forEach(function (item, index) {
+        var li = document.createElement('li');
+        li.className = 'music-dock__next-item';
+        var num = document.createElement('span');
+        num.className = 'music-dock__next-num';
+        num.textContent = String(index + 1);
+        var info = document.createElement('div');
+        info.className = 'music-dock__next-info';
+        var title = document.createElement(item.url ? 'a' : 'span');
+        title.className = 'music-dock__next-title-link';
+        title.textContent = item.title;
+        if (item.url) { title.href = item.url; title.target = '_blank'; title.rel = 'noreferrer'; }
+        var sub = document.createElement('div');
+        sub.className = 'music-dock__next-sub';
+        if (item.author) {
+          var author = document.createElement('span');
+          author.className = 'music-dock__next-author';
+          author.textContent = item.author;
+          sub.appendChild(author);
+        }
+        appendBadge(sub, 'music-chip', chipText(item));
+        if (item.isPaid) appendBadge(sub, 'music-chip music-chip--paid', 'Донат');
+        if (item.source === 'admin') appendBadge(sub, 'music-chip music-chip--src', 'Админка');
+        info.appendChild(title);
+        info.appendChild(sub);
+        var right = document.createElement('span');
+        right.className = 'music-dock__next-right';
+        var dur = document.createElement('span');
+        dur.className = 'music-dock__next-duration';
+        dur.textContent = item.playLabel || MusicClient.formatTime(item.playSec || item.durationSec);
+        right.appendChild(dur);
+        li.appendChild(num);
+        li.appendChild(info);
+        li.appendChild(right);
+        els.nextList.appendChild(li);
+      });
+      els.nextEmpty.hidden = items.length > 0;
+    }
+
+    function applyState(state) {
+      renderNow(state);
+      syncPlayer(state);
+      if (document.activeElement !== els.volume) els.volume.value = Math.max(0, Math.min(100, Number(state.volume) || 0));
+      els.toggle.classList.toggle('is-playing', state.status === 'playing');
+    }
+
+    function tick() {
+      var state = client.getState();
+      var track = state && state.current;
+      if (track) {
+        var total = track.playSec || track.durationSec || 0;
+        var elapsed = seeking ? Number(els.seek.value) : Math.max(0, client.position() - (track.startSec || 0));
+        els.pos.textContent = MusicClient.formatTime(elapsed);
+        els.fill.style.width = (total > 0 ? Math.min(100, (elapsed / total) * 100) : 0) + '%';
+        if (!seeking) {
+          els.seek.max = String(Math.max(0, Math.floor(total) - 1));
+          els.seek.value = String(Math.floor(elapsed));
+          els.seek.setAttribute('aria-valuetext', MusicClient.formatTime(elapsed) + ' из ' + MusicClient.formatTime(total));
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // ---------- управление ----------
+
+    function control(action, value) {
+      var body = { action: action };
+      if (value !== undefined) body.value = value;
+      return post('/api/music/control', body).then(function (data) {
+        if (data && data.state) applyState(data.state);
+        return data;
+      });
+    }
+
+    els.toggle.addEventListener('click', function () {
+      var state = client.getState();
+      control(state && state.status === 'playing' ? 'pause' : 'play');
+    });
+    els.skip.addEventListener('click', function () { control('skip'); });
+    els.seek.addEventListener('input', function () {
+      seeking = true;
+      els.bar.classList.add('is-seeking');
+    });
+    els.seek.addEventListener('change', function () {
+      var track = client.getState() && client.getState().current;
+      var target = Number(els.seek.value);
+      if (!track) { seeking = false; els.bar.classList.remove('is-seeking'); return; }
+      control('seek', (track.startSec || 0) + target).then(function () {
+        seeking = false;
+        els.bar.classList.remove('is-seeking');
+      });
+    });
+    els.volume.addEventListener('input', function () {
+      clearTimeout(volumeTimer);
+      volumeTimer = setTimeout(function () { control('volume', Number(els.volume.value)); }, 300);
+    });
+
+    // Клик нужен браузеру как жест пользователя для звука. Воспроизведение всё равно
+    // идёт через сервер: если там пауза, просим сервер запустить плеер.
+    els.unmute.addEventListener('click', function () {
+      els.unmute.hidden = true;
+      if (!ytReady) return;
+      var state = client.getState();
+      try {
+        ytPlayer.unMute();
+        ytPlayer.setVolume(Math.max(0, Math.min(100, Number(state && state.volume) || 0)));
+      } catch (error) { /* ignore */ }
+      if (state && state.status === 'playing') askPlay();
+      else control('play');
+    });
+
+    els.takeover.addEventListener('click', function () { register(); });
+
+    els.videoToggle.addEventListener('click', function () {
+      var collapsed = els.videoWrap.classList.toggle('is-collapsed');
+      els.videoToggle.textContent = collapsed ? 'Показать видео' : 'Скрыть видео';
+      els.videoToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+
+    // Шлём прогресс каждые 2 секунды, пока этот док активен (даже на паузе —
+    // сервер видит, что плеер онлайн; requestId может быть пустым).
+    setInterval(function () {
+      if (!registered || !isActive) return;
+      var state = client.getState();
+      var track = state && state.current;
+      var position = 0;
+      if (ytReady && track && track.id === loadedId) {
+        try { position = ytPlayer.getCurrentTime() || 0; } catch (error) { position = 0; }
+      }
+      report({ event: 'progress', requestId: track ? track.id : '', position: position });
+    }, 2000);
+
+    var client = MusicClient.connect({
+      initial: {{{initialJson}}},
+      websocketPort: '{{websocketPort}}',
+      onState: applyState,
+      onQueue: renderNext,
+      onConnection: function (online) {
+        els.ws.classList.toggle('is-on', online);
+        els.wsLabel.textContent = online ? 'Подключено' : 'Нет связи';
+      },
+    });
+
+    setActiveUi();
+    register();
+    requestAnimationFrame(tick);
+  })();
+</script>

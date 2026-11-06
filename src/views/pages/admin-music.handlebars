@@ -1,0 +1,1071 @@
+<section class="admin-page admin-music">
+  <div class="admin-page__heading">
+    <div><div class="eyebrow">Стрим</div><h1>Заказ музыки</h1></div>
+  </div>
+
+  <nav class="admin-tabs admin-tabs--events" aria-label="Разделы музыки">
+    {{#each tabs}}<a class="admin-tabs__link{{#if isActive}} is-active{{/if}}" href="{{href}}">{{label}}</a>{{/each}}
+  </nav>
+  <script>
+    (function () {
+      var active = document.querySelector('.admin-music .admin-tabs__link.is-active');
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+    })();
+  </script>
+
+  {{#if success}}<p class="form-notice form-notice--success" role="status">{{success}}</p>{{/if}}
+  {{#if error}}<p class="form-notice form-notice--error" role="alert">{{error}}</p>{{/if}}
+
+  {{#if isPlayerTab}}
+  <div class="music-admin" id="music-admin">
+    <div class="music-admin__left">
+      <article class="admin-card music-now is-empty" id="music-now">
+        <div class="music-now__bg" aria-hidden="true"></div>
+        <div class="music-now__eyebrow">
+          <span class="music-dock-state" id="music-dock-state" role="status"><i aria-hidden="true"></i><span>Подключаем док</span></span>
+        </div>
+        <div class="music-now__art music-cover" aria-hidden="true"></div>
+        <div class="music-now__body">
+          <div class="music-now__meta">
+            <div class="music-hero__label music-now__state-label">
+              <span class="music-eq" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="music-now-status">Сейчас ничего не играет</span>
+            </div>
+            <a class="music-now__title" id="music-now-title" target="_blank" rel="noreferrer" hidden></a>
+            <div class="music-display-artist" id="music-now-author" hidden></div>
+            <p class="music-now__empty" id="music-now-empty">Очередь ждёт первого трека.<br /><span>Добавьте музыку ниже или дождитесь заказа из чата.</span></p>
+            <div class="music-requester" id="music-now-sub" hidden>
+              <span class="music-requester__avatar" id="music-now-avatar" aria-hidden="true"></span>
+              <span class="music-chip music-now__requester" id="music-now-chip" hidden></span>
+              <span class="music-chip music-chip--paid" id="music-now-paid" hidden>Донат</span>
+              <span class="music-chip music-chip--src" id="music-now-src" hidden>Админка</span>
+              <button class="music-requester__action" id="music-now-blacklist-requester" type="button" aria-label="Заблокировать трек" title="Заблокировать трек">
+                <svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></svg>
+              </button>
+            </div>
+            <div class="music-progress" id="music-now-progress" hidden>
+              <span class="music-progress__time" id="music-now-pos">0:00</span>
+              <span class="music-bar music-seek-bar">
+                <span class="music-bar__fill" id="music-now-fill"></span>
+                <input class="music-seek-input" id="music-now-seek" type="range" min="0" max="0" step="1" value="0" aria-label="Позиция трека" aria-valuetext="0:00" disabled />
+              </span>
+              <span class="music-progress__time" id="music-now-len">0:00</span>
+            </div>
+            <div class="music-now__votes" id="music-now-votes" hidden></div>
+          </div>
+        </div>
+        <div class="music-now__actions">
+          <div class="music-now__transport">
+            <label class="music-volume">
+              <span class="music-control-label">Громкость</span>
+              <svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+              <input type="range" id="music-now-volume" min="0" max="100" step="1" value="{{settings.player.volume}}" aria-label="Громкость" />
+            </label>
+            <button class="music-control music-control--primary" id="music-now-toggle" type="button" aria-label="Играть" title="Играть">
+              <svg class="music-ic music-ic--solid music-ic--play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              <svg class="music-ic music-ic--solid music-ic--pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+              <span class="music-control-label" id="music-now-toggle-label">Играть</span>
+            </button>
+            <button class="music-control music-control--skip" id="music-now-skip" type="button" aria-label="Следующий трек" title="Следующий трек">
+              <svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l10 7-10 7V5zM19 5v14"/></svg>
+            </button>
+            <details class="music-menu music-now__menu">
+              <summary class="music-menu__summary music-control music-control--menu" aria-label="Действия с текущим треком" title="Действия с текущим треком">
+                <svg class="music-ic music-ic--solid" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+              </summary>
+              <div class="music-menu__pop">
+                <button class="music-menu__item music-menu__item--warn" id="music-now-blacklist" type="button" hidden>В чёрный список</button>
+                <button class="music-menu__item music-menu__item--danger" id="music-now-remove" type="button" hidden>Удалить из очереди</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </article>
+
+      <p class="form-notice form-notice--error" id="music-player-offline" hidden>Нет связи с плеером — откройте <a href="/admin/music?tab=obs">ссылку дока из вкладки OBS</a> (док в OBS или вкладка браузера).</p>
+      <p class="form-notice" id="music-admin-message" hidden></p>
+
+      <article class="admin-card music-add-card">
+        <div class="music-section-kicker">БЫСТРЫЙ ДОСТУП</div>
+        <h2>Добавить трек</h2>
+        <p class="admin-card__hint">Ссылка на YouTube, ID видео или название — трек встанет в очередь от вашего имени.</p>
+        <form class="music-add" id="music-add-form">
+          <input aria-label="Ссылка, ID видео или название трека" class="admin-input" id="music-add-input" placeholder="Например, https://www.youtube.com/watch?v=…" autocomplete="off" required />
+          <button class="btn btn--primary btn--compact" type="submit">Добавить</button>
+        </form>
+      </article>
+    </div>
+
+    <div class="music-admin__right">
+      <article class="admin-card music-queue-card">
+        <div class="admin-card__head">
+          <div><div class="music-section-kicker">ДАЛЬШЕ ПО ПЛАНУ</div><h2>Очередь</h2></div>
+          <span class="admin-card__meta" id="music-queue-count"></span>
+        </div>
+        <p class="admin-card__hint">Перетаскивайте треки за ручку слева, чтобы менять порядок, или пользуйтесь кнопками <span class="music-nowrap">↑/↓</span>.</p>
+        <div class="music-aqueue" id="music-queue-list"></div>
+        <p class="empty-state" id="music-queue-empty">Очередь пуста.</p>
+      </article>
+    </div>
+  </div>
+  <script src="/js/music-client.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var root = document.getElementById('music-admin');
+      if (!root) return;
+      var CSRF = '{{csrfToken}}';
+      var el = function (id) { return document.getElementById(id); };
+      var els = {
+        now: el('music-now'), status: el('music-now-status'), title: el('music-now-title'),
+        sub: el('music-now-sub'), author: el('music-now-author'), avatar: el('music-now-avatar'), chip: el('music-now-chip'),
+        paid: el('music-now-paid'), src: el('music-now-src'), progress: el('music-now-progress'), pos: el('music-now-pos'),
+        len: el('music-now-len'), fill: el('music-now-fill'), seek: el('music-now-seek'), votes: el('music-now-votes'),
+        toggle: el('music-now-toggle'), toggleLabel: el('music-now-toggle-label'), skip: el('music-now-skip'), volume: el('music-now-volume'),
+        empty: el('music-now-empty'), dock: el('music-dock-state'),
+        blacklist: el('music-now-blacklist'), blacklistRequester: el('music-now-blacklist-requester'), remove: el('music-now-remove'), offline: el('music-player-offline'), message: el('music-admin-message'),
+        addForm: el('music-add-form'), addInput: el('music-add-input'),
+        queueList: el('music-queue-list'), queueEmpty: el('music-queue-empty'), queueCount: el('music-queue-count'),
+      };
+      var ICONS = {
+        up: '<path d="M6 14l6-6 6 6"/>',
+        down: '<path d="M6 10l6 6 6-6"/>',
+        grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
+        more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+      };
+      var lastId = null;
+      var dragId = null;
+      var volumeTimer = null;
+      var messageTimer = null;
+      var isScrubbing = false;
+      var scrubTrack = null;
+      var pointerGestureActive = false;
+      var pointerScrubBlocked = false;
+
+      function icon(name, solid) {
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'music-ic' + (solid ? ' music-ic--solid' : ''));
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.innerHTML = ICONS[name];
+        return svg;
+      }
+
+      function artUrl(track, square) {
+        if (!track) return '';
+        var videoId = String(track.externalId || '');
+        if (track.provider === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+          return 'https://i.ytimg.com/vi/' + videoId + (square ? '/mqdefault.jpg' : '/hqdefault.jpg');
+        }
+        return '';
+      }
+
+      function chipText(track) {
+        return track.isBackup ? 'Плейлист' : '@' + (track.requestedBy || '');
+      }
+
+      function trackStart(track) {
+        var start = Number(track && track.startSec);
+        return Number.isFinite(start) ? Math.max(0, start) : 0;
+      }
+
+      function trackTotal(track) {
+        var playSec = Number(track && track.playSec);
+        if (track && track.playSec !== undefined && track.playSec !== null && Number.isFinite(playSec) && playSec >= 0) return playSec;
+        var durationSec = Number(track && track.durationSec);
+        return Number.isFinite(durationSec) ? Math.max(0, durationSec - trackStart(track)) : 0;
+      }
+
+      function syncScrubTrack(track) {
+        if (!isScrubbing || !scrubTrack) return;
+        if (!track || track.id !== scrubTrack.id
+          || trackStart(track) !== scrubTrack.startSec
+          || trackTotal(track) !== scrubTrack.total) cancelScrub();
+      }
+
+      function appendBadge(row, className, text) {
+        var badge = document.createElement('span');
+        badge.className = className;
+        badge.textContent = text;
+        row.appendChild(badge);
+      }
+
+      function api(url, payload) {
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(Object.assign({ _csrf: CSRF }, payload || {})),
+        }).then(function (response) {
+          var isJson = (response.headers.get('content-type') || '').indexOf('json') !== -1;
+          if (!isJson) {
+            if (response.status === 403) throw new Error('Сессия устарела, обновите страницу');
+            throw new Error('Сервер недоступен, попробуйте позже');
+          }
+          return response.json();
+        });
+      }
+
+      function showNotice(text, ok) {
+        clearTimeout(messageTimer);
+        els.message.hidden = false;
+        els.message.className = 'form-notice ' + (ok ? 'form-notice--success' : 'form-notice--error');
+        els.message.textContent = text;
+        if (ok) messageTimer = setTimeout(function () { els.message.hidden = true; }, 6000);
+      }
+
+      function renderNow(state) {
+        var track = state && state.current;
+        syncScrubTrack(track);
+        var online = Boolean(state && state.player && state.player.online);
+        els.now.classList.toggle('is-playing', Boolean(track) && state.status === 'playing');
+        els.now.classList.toggle('is-paused', Boolean(track) && state.status !== 'playing');
+        els.now.classList.toggle('is-empty', !track);
+        els.offline.hidden = online;
+        els.dock.classList.toggle('is-online', online);
+        els.dock.classList.toggle('is-offline', !online);
+        els.dock.lastElementChild.textContent = online ? 'Док подключён' : 'Док отключён';
+        els.toggle.classList.toggle('is-playing', state.status === 'playing');
+        els.toggleLabel.textContent = state.status === 'playing' ? 'Пауза' : 'Играть';
+        var toggleAction = state.status === 'playing' ? 'Пауза' : 'Играть';
+        els.toggle.setAttribute('aria-label', toggleAction);
+        els.toggle.title = toggleAction;
+        els.blacklist.hidden = !track;
+        els.remove.hidden = !track;
+        if (document.activeElement !== els.volume) els.volume.value = Math.max(0, Math.min(100, Number(state.volume) || 0));
+        if (!track) {
+          cancelScrub();
+          lastId = null;
+          els.now.style.removeProperty('--music-art');
+          els.now.style.removeProperty('--music-art-sq');
+          els.title.hidden = true;
+          els.sub.hidden = true;
+          els.progress.hidden = true;
+          els.empty.hidden = false;
+          els.status.textContent = 'Сейчас ничего не играет';
+          els.votes.hidden = true;
+          els.author.textContent = '';
+          els.author.hidden = true;
+          els.avatar.hidden = true;
+          els.avatar.removeAttribute('src');
+          els.title.style.removeProperty('--music-title-size');
+          return;
+        }
+        els.title.hidden = false;
+        els.sub.hidden = false;
+        els.progress.hidden = false;
+        els.empty.hidden = true;
+        if (track.id !== lastId) {
+          cancelScrub();
+          lastId = track.id;
+          els.now.style.setProperty('--music-art', 'url("' + artUrl(track, false) + '")');
+          els.now.style.setProperty('--music-art-sq', 'url("' + artUrl(track, true) + '")');
+          var split = MusicClient.splitTitle(track);
+          var headline = split.title;
+          var artist = split.artist;
+          els.title.textContent = headline;
+          var titleSize = Math.max(2.4, Math.min(16, 140 / Math.max(Array.from(headline).length, 1)));
+          els.title.style.setProperty('--music-title-size', titleSize + 'cqi');
+          if (track.url) els.title.href = track.url;
+          else els.title.removeAttribute('href');
+          els.author.textContent = artist;
+          els.author.hidden = !artist;
+          els.chip.hidden = false;
+          els.chip.textContent = chipText(track);
+          els.avatar.textContent = track.isBackup ? '♫' : String(track.requestedBy || '?').trim().charAt(0).toUpperCase();
+          els.paid.hidden = !track.isPaid;
+          els.src.hidden = track.source !== 'admin';
+          els.len.textContent = MusicClient.formatTime(trackTotal(track));
+        }
+        var label = state.status === 'waiting' ? 'Скоро следующий' : (state.status === 'playing' ? 'Играет' : 'Пауза');
+        if (!online) label = 'Нет связи с плеером';
+        els.status.textContent = label;
+        var votes = state.votes;
+        if (votes && votes.enabled && votes.voters > 0) {
+          els.votes.hidden = false;
+          els.votes.textContent = 'Голоса за скип: ' + votes.total + '/' + votes.needed;
+        } else {
+          els.votes.hidden = true;
+        }
+      }
+
+      function buildQueueRow(item, index) {
+        var row = document.createElement('div');
+        row.className = 'music-aqueue__row' + (item.isPaid ? ' is-paid' : '') + (index === 0 ? ' is-next' : '');
+        row.draggable = true;
+        row.dataset.id = item.id;
+
+        var handle = document.createElement('span');
+        handle.className = 'music-aqueue__handle';
+        handle.setAttribute('aria-hidden', 'true');
+        handle.appendChild(icon('grip', true));
+
+        var num = document.createElement('span');
+        num.className = 'music-aqueue__num';
+        num.textContent = String(index + 1);
+
+        var art = document.createElement('img');
+        art.className = 'music-aqueue__art';
+        art.alt = '';
+        art.loading = 'lazy';
+        if (artUrl(item, true)) art.src = artUrl(item, true);
+        else art.hidden = true;
+
+        var info = document.createElement('div');
+        info.className = 'music-aqueue__info';
+        var title = document.createElement(item.url ? 'a' : 'span');
+        title.className = 'music-aqueue__title';
+        title.textContent = item.title;
+        if (item.url) { title.href = item.url; title.target = '_blank'; title.rel = 'noreferrer'; }
+        var meta = document.createElement('div');
+        meta.className = 'music-aqueue__meta';
+        if (item.author) {
+          var author = document.createElement('span');
+          author.className = 'music-aqueue__author';
+          author.textContent = item.author;
+          meta.appendChild(author);
+        }
+        appendBadge(meta, 'music-chip', chipText(item));
+        if (item.isPaid) appendBadge(meta, 'music-chip music-chip--paid', 'Донат');
+        if (item.source === 'admin') appendBadge(meta, 'music-chip music-chip--src', 'Админка');
+        if (item.amountLabel) {
+          var amount = document.createElement('span');
+          amount.className = 'music-aqueue__amount';
+          amount.textContent = item.amountLabel;
+          meta.appendChild(amount);
+        }
+        var dur = document.createElement('span');
+        dur.className = 'music-aqueue__duration';
+        dur.textContent = item.playLabel || MusicClient.formatTime(item.playSec || item.durationSec);
+        meta.appendChild(dur);
+        info.appendChild(title);
+        info.appendChild(meta);
+
+        var actions = document.createElement('div');
+        actions.className = 'music-aqueue__actions';
+        function iconBtn(cls, aria, iconName, handler) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn--ghost btn--compact ' + cls;
+          btn.setAttribute('aria-label', aria);
+          btn.title = aria;
+          btn.appendChild(icon(iconName, false));
+          btn.addEventListener('click', handler);
+          return btn;
+        }
+        actions.appendChild(iconBtn('music-aqueue__btn--up', 'Передвинуть выше', 'up', function () { moveRow(row, -1); }));
+        actions.appendChild(iconBtn('music-aqueue__btn--down', 'Передвинуть ниже', 'down', function () { moveRow(row, 1); }));
+
+        var menu = document.createElement('details');
+        menu.className = 'music-menu music-aqueue__menu';
+        var summary = document.createElement('summary');
+        summary.className = 'music-menu__summary';
+        summary.setAttribute('aria-label', 'Ещё действия');
+        summary.title = 'Ещё действия';
+        summary.appendChild(icon('more', true));
+        var pop = document.createElement('div');
+        pop.className = 'music-menu__pop';
+        function menuItem(text, cls, handler) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'music-menu__item ' + cls;
+          btn.textContent = text;
+          btn.addEventListener('click', function () {
+            menu.open = false;
+            handler();
+          });
+          return btn;
+        }
+        pop.appendChild(menuItem('Удалить', 'music-menu__item--danger', function () {
+          api('/admin/music/api/remove', { id: item.id }).then(onApiResponse, onApiError);
+        }));
+        pop.appendChild(menuItem('В чёрный список', 'music-menu__item--warn', function () {
+          if (!window.confirm('Добавить трек «' + item.title + '» в чёрный список?')) return;
+          api('/admin/music/api/blacklist', { id: item.id }).then(onApiResponse, onApiError);
+        }));
+        menu.appendChild(summary);
+        menu.appendChild(pop);
+        actions.appendChild(menu);
+
+        row.appendChild(handle);
+        row.appendChild(num);
+        var artWrap = document.createElement('span');
+        artWrap.className = 'music-aqueue__art-wrap';
+        var fallback = document.createElement('span');
+        fallback.className = 'music-aqueue__art-fallback';
+        fallback.textContent = '♫';
+        fallback.setAttribute('aria-hidden', 'true');
+        artWrap.appendChild(fallback);
+        artWrap.appendChild(art);
+        art.addEventListener('error', function () { art.hidden = true; });
+        row.appendChild(artWrap);
+        row.appendChild(info);
+        row.appendChild(actions);
+        return row;
+      }
+
+      function renderQueue(queue) {
+        var items = Array.isArray(queue) ? queue : [];
+        els.queueList.textContent = '';
+        items.forEach(function (item, index) { els.queueList.appendChild(buildQueueRow(item, index)); });
+        els.queueEmpty.hidden = items.length > 0;
+        els.queueCount.textContent = items.length ? items.length + ' ' + plural(items.length, ['трек', 'трека', 'треков']) : '';
+      }
+
+      function plural(n, forms) {
+        var mod10 = n % 10;
+        var mod100 = n % 100;
+        if (mod10 === 1 && mod100 !== 11) return forms[0];
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+        return forms[2];
+      }
+
+      function onApiResponse(data) {
+        if (!data) return;
+        if (data.ok) {
+          if (data.state) renderNow(data.state);
+          if (data.queue) renderQueue(data.queue);
+          if (data.message) showNotice(data.message, true);
+        } else {
+          showNotice(data.message || 'Не удалось выполнить действие.', false);
+        }
+      }
+
+      function onApiError(error) {
+        showNotice(error && error.message ? error.message : 'Ошибка запроса.', false);
+      }
+
+      // Закрытие меню «⋯»: по клику мимо и по Escape.
+      document.addEventListener('click', function (event) {
+        root.querySelectorAll('.music-menu[open]').forEach(function (menu) {
+          if (!menu.contains(event.target)) menu.open = false;
+        });
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        root.querySelectorAll('.music-menu[open]').forEach(function (menu) { menu.open = false; });
+      });
+
+      // ---------- перетаскивание ----------
+
+      function currentIds() {
+        return Array.prototype.map.call(els.queueList.querySelectorAll('.music-aqueue__row'), function (row) { return row.dataset.id; });
+      }
+
+      function sendOrder() {
+        api('/admin/music/api/reorder', { ids: currentIds() }).then(onApiResponse, onApiError);
+      }
+
+      function moveRow(row, delta) {
+        var rows = Array.prototype.slice.call(els.queueList.querySelectorAll('.music-aqueue__row'));
+        var index = rows.indexOf(row);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= rows.length) return;
+        if (delta < 0) els.queueList.insertBefore(row, rows[target]);
+        else els.queueList.insertBefore(row, rows[target].nextSibling);
+        sendOrder();
+      }
+
+      els.queueList.addEventListener('dragstart', function (event) {
+        var row = event.target.closest('.music-aqueue__row');
+        if (!row) return;
+        dragId = row.dataset.id;
+        row.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        try { event.dataTransfer.setData('text/plain', dragId); } catch (error) { /* ignore */ }
+      });
+      els.queueList.addEventListener('dragover', function (event) {
+        if (!dragId) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        var row = event.target.closest('.music-aqueue__row');
+        Array.prototype.forEach.call(els.queueList.querySelectorAll('.music-aqueue__row'), function (item) {
+          item.classList.remove('is-drop-before', 'is-drop-after');
+        });
+        if (!row || row.dataset.id === dragId) return;
+        var rect = row.getBoundingClientRect();
+        row.classList.add(event.clientY < rect.top + rect.height / 2 ? 'is-drop-before' : 'is-drop-after');
+      });
+      els.queueList.addEventListener('drop', function (event) {
+        if (!dragId) return;
+        event.preventDefault();
+        var dragged = els.queueList.querySelector('.music-aqueue__row[data-id="' + CSS.escape(dragId) + '"]');
+        var row = event.target.closest('.music-aqueue__row');
+        if (dragged && row && row !== dragged) {
+          var rect = row.getBoundingClientRect();
+          if (event.clientY < rect.top + rect.height / 2) els.queueList.insertBefore(dragged, row);
+          else els.queueList.insertBefore(dragged, row.nextSibling);
+          sendOrder();
+        }
+      });
+      els.queueList.addEventListener('dragend', function () {
+        dragId = null;
+        Array.prototype.forEach.call(els.queueList.querySelectorAll('.music-aqueue__row'), function (item) {
+          item.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after');
+        });
+      });
+
+      // ---------- управление ----------
+
+      els.toggle.addEventListener('click', function () {
+        var state = client.getState();
+        api('/admin/music/api/control', { action: state && state.status === 'playing' ? 'pause' : 'play' }).then(onApiResponse, onApiError);
+      });
+      els.skip.addEventListener('click', function () {
+        api('/admin/music/api/control', { action: 'skip' }).then(onApiResponse, onApiError);
+      });
+      els.volume.addEventListener('input', function () {
+        clearTimeout(volumeTimer);
+        volumeTimer = setTimeout(function () {
+          api('/admin/music/api/control', { action: 'volume', value: Number(els.volume.value) }).then(onApiResponse, onApiError);
+        }, 300);
+      });
+      function updateSeekPreview(value) {
+        var state = client.getState();
+        var track = state && state.current;
+        var total = track ? trackTotal(track) : 0;
+        if (!track || !(total > 0 && Number.isFinite(total))) return;
+        var relative = Math.max(0, Math.min(total, Number(value) || 0));
+        els.seek.value = String(relative);
+        els.pos.textContent = MusicClient.formatTime(relative);
+        els.seek.setAttribute('aria-valuetext', MusicClient.formatTime(relative));
+        els.fill.style.width = (relative / total) * 100 + '%';
+      }
+
+      function cancelScrub() {
+        if (!isScrubbing) return;
+        isScrubbing = false;
+        scrubTrack = null;
+        if (pointerGestureActive) pointerScrubBlocked = true;
+        var state = client && client.getState();
+        var track = state && state.current;
+        if (!track) return;
+        var elapsed = Math.max(0, client.position() - trackStart(track));
+        updateSeekPreview(elapsed);
+      }
+
+      function commitSeek() {
+        if (!isScrubbing) return;
+        var target = scrubTrack;
+        isScrubbing = false;
+        scrubTrack = null;
+        var state = client.getState();
+        var track = state && state.current;
+        if (!track || !target || track.id !== target.id
+          || trackStart(track) !== target.startSec
+          || trackTotal(track) !== target.total) return;
+        var relative = Math.max(0, Math.min(target.total, Number(els.seek.value)));
+        if (!Number.isFinite(relative)) return;
+        api('/admin/music/api/control', { action: 'seek', value: trackStart(track) + relative }).then(onApiResponse, onApiError);
+      }
+
+      function beginScrub() {
+        if (isScrubbing) return;
+        if (pointerGestureActive && pointerScrubBlocked) return false;
+        var state = client.getState();
+        if (!state || !state.current || els.seek.disabled) return false;
+        isScrubbing = true;
+        scrubTrack = {
+          id: state.current.id,
+          startSec: trackStart(state.current),
+          total: trackTotal(state.current),
+        };
+        return true;
+      }
+
+      els.seek.addEventListener('pointerdown', function (event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        pointerGestureActive = true;
+        pointerScrubBlocked = false;
+        beginScrub();
+      });
+      els.seek.addEventListener('input', function () {
+        if (pointerGestureActive && pointerScrubBlocked) {
+          var state = client.getState();
+          var track = state && state.current;
+          if (track) updateSeekPreview(client.position() - trackStart(track));
+          return;
+        }
+        if (!isScrubbing) beginScrub();
+        if (isScrubbing) updateSeekPreview(els.seek.value);
+      });
+      els.seek.addEventListener('change', commitSeek);
+      els.seek.addEventListener('pointercancel', function () {
+        cancelScrub();
+        pointerGestureActive = false;
+        pointerScrubBlocked = false;
+      });
+      window.addEventListener('pointerup', function () {
+        commitSeek();
+        pointerGestureActive = false;
+        pointerScrubBlocked = false;
+      });
+      els.seek.addEventListener('keydown', function (event) {
+        if (isScrubbing) cancelScrub();
+        var state = client.getState();
+        var track = state && state.current;
+        var total = track ? trackTotal(track) : 0;
+        if (!track || !(total > 0 && Number.isFinite(total))) return;
+        var current = Number(els.seek.value) || 0;
+        var next;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = Math.min(total, current + 5);
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = Math.max(0, current - 5);
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = total;
+        else return;
+        event.preventDefault();
+        updateSeekPreview(next);
+        api('/admin/music/api/control', { action: 'seek', value: trackStart(track) + next }).then(onApiResponse, onApiError);
+      });
+      els.blacklist.addEventListener('click', function () {
+        var state = client.getState();
+        var track = state && state.current;
+        if (!track) return;
+        if (!window.confirm('Добавить трек «' + track.title + '» в чёрный список?')) return;
+        api('/admin/music/api/blacklist', { id: track.id }).then(onApiResponse, onApiError);
+      });
+      els.blacklistRequester.addEventListener('click', function () { els.blacklist.click(); });
+      els.remove.addEventListener('click', function () {
+        var state = client.getState();
+        var track = state && state.current;
+        if (!track) return;
+        if (!window.confirm('Удалить текущий трек из очереди?')) return;
+        root.querySelector('.music-now__menu').open = false;
+        api('/admin/music/api/remove', { id: track.id }).then(onApiResponse, onApiError);
+      });
+      els.addForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var input = els.addInput.value.trim();
+        if (!input) return;
+        els.addInput.value = '';
+        api('/admin/music/api/add', { input: input }).then(onApiResponse, onApiError);
+      });
+
+      function onQueueEvent() {
+        if (dragId) return;
+        fetch('/admin/music/api/queue', { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (data) { if (data && data.queue) renderQueue(data.queue); })
+          .catch(function () {});
+      }
+
+      function tick() {
+        var state = client.getState();
+        var track = state && state.current;
+        syncScrubTrack(track);
+        if (track) {
+          var elapsed = Math.max(0, client.position() - trackStart(track));
+          var total = trackTotal(track);
+          var safeElapsed = Math.min(total, elapsed);
+          els.len.textContent = MusicClient.formatTime(total);
+          els.seek.disabled = !(total > 0 && Number.isFinite(total));
+          els.seek.max = String(total > 0 && Number.isFinite(total) ? total : 0);
+          if (!isScrubbing) {
+            els.seek.value = String(Math.max(0, safeElapsed));
+            els.pos.textContent = MusicClient.formatTime(safeElapsed);
+          }
+          els.seek.setAttribute('aria-valuetext', MusicClient.formatTime(Number(els.seek.value) || 0));
+          var fillPosition = isScrubbing ? Number(els.seek.value) : safeElapsed;
+          els.fill.style.width = (total > 0 ? Math.min(100, Math.max(0, fillPosition) / total * 100) : 0) + '%';
+        } else {
+          els.seek.disabled = true;
+          els.seek.value = '0';
+          els.seek.max = '0';
+          els.seek.setAttribute('aria-valuetext', '0:00');
+        }
+        requestAnimationFrame(tick);
+      }
+
+      var client = MusicClient.connect({
+        initial: {{{initialJson}}},
+        websocketPort: '{{websocketPort}}',
+        onState: renderNow,
+        onQueue: onQueueEvent,
+      });
+      requestAnimationFrame(tick);
+    })();
+  </script>
+  {{/if}}
+
+  {{#if isHistoryTab}}
+  <article class="admin-card">
+    {{#if hasHistory}}
+    <div class="music-table-wrap">
+      <table class="music-table">
+        <thead>
+          <tr><th>Дата</th><th>Трек</th><th>Заказчик</th><th>Источник</th><th>Статус</th><th>Сумма</th></tr>
+        </thead>
+        <tbody>
+          {{#each history}}
+          <tr>
+            <td class="music-table__date" data-label="Дата">{{finishedAtLabel}}</td>
+            <td class="music-table__title" data-label="Трек"><a href="{{url}}" target="_blank" rel="noreferrer">{{title}}</a></td>
+            <td data-label="Заказчик">{{requestedBy}}</td>
+            <td data-label="Источник">{{sourceLabel}}</td>
+            <td data-label="Статус"><span class="music-pill music-pill--{{status}}">{{statusLabel}}</span>{{#if reasonLabel}} <small class="music-table__reason">({{reasonLabel}})</small>{{/if}}</td>
+            <td class="music-table__amount" data-label="Сумма">{{amountLabel}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    <div class="music-pager">
+      {{#if historyPrevHref}}<a class="btn btn--ghost btn--compact" href="{{historyPrevHref}}">← Назад</a>{{/if}}
+      <span class="music-pager__info">Страница {{historyPage}} из {{historyTotalPages}}</span>
+      {{#if historyNextHref}}<a class="btn btn--ghost btn--compact" href="{{historyNextHref}}">Вперёд →</a>{{/if}}
+    </div>
+    {{else}}
+    <p class="empty-state music-empty">История заказов пока пуста.</p>
+    {{/if}}
+  </article>
+  {{/if}}
+
+  {{#if isSettingsTab}}
+  <form method="post" action="/admin/music/settings" class="admin-form music-settings" id="music-settings-form">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_tab" value="settings" />
+    <input type="hidden" name="_section" value="general" />
+    <input type="hidden" name="_section" value="limits" />
+    <input type="hidden" name="_section" value="backup" />
+    <input type="hidden" name="_section" value="paid" />
+    <input type="hidden" name="_section" value="community" />
+    <input type="hidden" name="_section" value="player" />
+    <input type="hidden" name="_section" value="filters" />
+
+    <article class="admin-card">
+      <h2>Общие</h2>
+      <div class="admin-form__columns">
+        <label class="admin-check"><input type="checkbox" name="enabled" {{#if settings.enabled}}checked{{/if}} /> Принимать заказы</label>
+        <label>Какие заказы воспроизводить
+          <select name="playTypes">
+            {{#each playTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Лимиты заказов</h2>
+      <div class="music-set-group">
+        <div class="admin-form__columns">
+          <label>Макс. треков в очереди<input type="number" name="limits.maxQueue" min="1" max="1000" value="{{settings.limits.maxQueue}}" required /></label>
+          <span></span>
+        </div>
+      </div>
+      <div class="music-set-group">
+        <h3>Бесплатные заказы</h3>
+        <div class="admin-form__columns">
+          <label>На пользователя одновременно <input type="number" name="limits.maxFreePerUser" min="0" max="100" value="{{settings.limits.maxFreePerUser}}" required /><small>сколько треков может стоять в очереди</small></label>
+          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxFreeDurationMin" min="0.5" max="1440" step="0.5" value="{{maxFreeDurationMin}}" required /></label>
+        </div>
+      </div>
+      <div class="music-set-group">
+        <h3>Донатные заказы</h3>
+        <div class="admin-form__columns">
+          <label>На пользователя одновременно <input type="number" name="limits.maxPaidPerUser" min="0" max="100" value="{{settings.limits.maxPaidPerUser}}" required /><small>сколько треков может стоять в очереди</small></label>
+          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxPaidDurationMin" min="0.2" max="1440" step="0.5" value="{{maxPaidDurationMin}}" required /></label>
+        </div>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Бэкап-плейлист</h2>
+      <p class="admin-card__hint">Играет, когда очередь заказов пуста.{{#if backupInfo.count}} Загружено треков: {{backupInfo.count}}.{{/if}}</p>
+      <label>Ссылка на YouTube-плейлист<input type="url" name="backup.playlistUrl" value="{{settings.backup.playlistUrl}}" placeholder="https://www.youtube.com/playlist?list=…" autocomplete="off" /></label>
+      <div class="admin-form__columns">
+        <label class="admin-check"><input type="checkbox" name="backup.shuffle" {{#if settings.backup.shuffle}}checked{{/if}} /> Перемешать</label>
+        <label class="admin-check"><input type="checkbox" name="backup.interrupt" {{#if settings.backup.interrupt}}checked{{/if}} /> Прерывать бэкап, когда приходит заказ</label>
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--ghost btn--compact" type="submit" form="music-backup-reload-form">Перезагрузить плейлист</button>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Донатные заказы</h2>
+      <label class="admin-check"><input type="checkbox" name="paid.prioritize" {{#if settings.paid.prioritize}}checked{{/if}} /> Донатные заказы играют раньше бесплатных</label>
+      <div class="admin-form__columns">
+        <label>Минимальная сумма доната для заказа, ₽<input type="number" name="paid.minAmountRub" min="0" step="1" value="{{settings.paid.minAmountRub}}" /></label>
+        <span></span>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="paid.pricePerSecondEnabled" {{#if settings.paid.pricePerSecondEnabled}}checked{{/if}} /> Цена за секунду</label>
+      <div class="music-sub" data-dep="paid.pricePerSecondEnabled">
+        <div class="admin-form__columns">
+          <label>Стоимость секунды, ₽ <input type="number" name="paid.pricePerSecondRub" min="0.01" step="0.01" value="{{settings.paid.pricePerSecondRub}}" /><small>трек играет ровно столько секунд, сколько оплачено</small></label>
+          <span></span>
+        </div>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Сообщество</h2>
+      <p class="admin-card__hint">Кто может заказывать через !sr (через донат — все). !play и !pause доступны тем же ролям, что и мгновенный скип.</p>
+      <div class="music-checks">
+        {{#each requestRoleOptions}}<label class="admin-check music-checks__item"><input type="checkbox" name="community.requestRoles" value="{{value}}" {{#if checked}}checked{{/if}} /> {{label}}</label>{{/each}}
+      </div>
+      <div class="admin-form__columns">
+        <label>Кто может пропускать трек без голосования <small>от роли и выше</small>
+          <select name="community.skipRole">
+            {{#each skipRoleOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+        <span></span>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="community.voteSkipEnabled" {{#if settings.community.voteSkipEnabled}}checked{{/if}} /> Голосование за пропуск</label>
+      <div class="music-sub" data-dep="community.voteSkipEnabled">
+        <div class="admin-form__columns">
+          <label>Голосов для пропуска<input type="number" name="community.voteSkipThreshold" min="1" max="1000" value="{{settings.community.voteSkipThreshold}}" required /></label>
+          <span></span>
+        </div>
+        <div class="admin-form__columns">
+          <label>Вес голоса VIP<input type="number" name="community.vipVoteWeight" min="0" max="100" step="0.5" value="{{settings.community.vipVoteWeight}}" /></label>
+          <label>Вес голоса модератора<input type="number" name="community.modVoteWeight" min="0" max="100" step="0.5" value="{{settings.community.modVoteWeight}}" /></label>
+        </div>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Плеер</h2>
+      <label class="admin-check"><input type="checkbox" name="player.autoplay" {{#if settings.player.autoplay}}checked{{/if}} /> Автоматически включать следующий трек</label>
+      <div class="admin-form__columns">
+        <label>Пауза между треками, сек<input type="number" name="player.delaySec" min="0" max="600" value="{{settings.player.delaySec}}" /></label>
+        <span></span>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="player.announce" {{#if settings.player.announce}}checked{{/if}} /> После !skip из чата писать, какой трек заиграл</label>
+    </article>
+
+    <article class="admin-card">
+      <h2>Фильтры</h2>
+      <p class="admin-card__hint">Фильтры действуют и на донатные заказы.</p>
+      <div class="admin-form__columns">
+        <label>Минимум лайков, % <input type="number" name="filters.minLikePercent" min="0" max="100" step="0.1" value="{{settings.filters.minLikePercent}}" /><small>по данным Return YouTube Dislike; 0 — без фильтра</small></label>
+        <label>Минимум просмотров<input type="number" name="filters.minViews" min="0" max="1000000000000" step="1" value="{{settings.filters.minViews}}" /></label>
+      </div>
+      <label>Запрещённые теги — по одному в строке<textarea name="filters.blockedTags" placeholder="Например:&#10;nightcore&#10;phonk">{{blockedTagsText}}</textarea></label>
+    </article>
+
+    <div class="music-savebar">
+      <span class="music-savebar__hint" id="music-savebar-hint" hidden>Есть несохранённые изменения</span>
+      <button class="btn btn--primary" type="submit">Сохранить настройки</button>
+    </div>
+  </form>
+  <form method="post" action="/admin/music/backup/reload" id="music-backup-reload-form">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+  </form>
+  <script>
+    (function () {
+      'use strict';
+      var form = document.getElementById('music-settings-form');
+      if (!form) return;
+      var hint = document.getElementById('music-savebar-hint');
+      var markDirty = function () { if (hint) hint.hidden = false; };
+      form.addEventListener('input', markDirty);
+      form.addEventListener('change', markDirty);
+      form.querySelectorAll('.music-sub').forEach(function (wrap) {
+        var master = form.querySelector('[name="' + wrap.getAttribute('data-dep') + '"]');
+        if (!master) return;
+        var sync = function () {
+          var off = !master.checked;
+          wrap.classList.toggle('is-off', off);
+          wrap.querySelectorAll('input:not([type="checkbox"]), select, textarea').forEach(function (field) { field.disabled = off; });
+        };
+        master.addEventListener('change', sync);
+        sync();
+      });
+    })();
+  </script>
+  {{/if}}
+
+  {{#if isBlacklistTab}}
+  <div class="music-cards music-cards--two">
+    <article class="admin-card">
+      <div class="admin-card__head">
+        <h2>Чёрный список треков</h2>
+        {{#if blacklistedTracks}}<span class="admin-card__meta">Записей: {{blacklistedTracks.length}}</span>{{/if}}
+      </div>
+      <p class="admin-card__hint">Эти треки не примутся ни через чат, ни через донат.</p>
+      <form method="post" action="/admin/music/blacklist/track" class="music-add music-add--stack">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <div>
+          <label class="music-add__label" for="music-blacklist-track-input">Трек — ссылка, ID или название</label>
+          <input class="admin-input" id="music-blacklist-track-input" name="input" placeholder="https://www.youtube.com/watch?v=…" required autocomplete="off" />
+        </div>
+        <button class="btn btn--primary btn--compact" type="submit">Заблокировать трек</button>
+      </form>
+      {{#if blacklistedTracks}}
+      <ul class="music-blist">
+        {{#each blacklistedTracks}}
+        <li class="music-blist__row">
+          <div class="music-blist__info">
+            {{#if url}}<a href="{{url}}" target="_blank" rel="noreferrer">{{title}}</a>{{else}}<span>{{title}}</span>{{/if}}
+            <small>{{createdAtLabel}}</small>
+          </div>
+          <form method="post" action="/admin/music/blacklist/track">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="provider" value="{{provider}}" />
+            <input type="hidden" name="externalId" value="{{externalId}}" />
+            <button class="btn btn--ghost btn--compact" type="submit">Разблокировать</button>
+          </form>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="empty-state music-empty">Пусто — заблокированных треков нет</p>
+      {{/if}}
+    </article>
+
+    <article class="admin-card">
+      <div class="admin-card__head">
+        <h2>Чёрный список пользователей</h2>
+        {{#if blacklistedUsers}}<span class="admin-card__meta">Записей: {{blacklistedUsers.length}}</span>{{/if}}
+      </div>
+      <p class="admin-card__hint">Эти зрители не могут заказывать через чат.</p>
+      <form method="post" action="/admin/music/blacklist/user" class="music-add music-add--stack">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <div>
+          <label class="music-add__label" for="music-blacklist-user-input">Twitch-логин</label>
+          <input class="admin-input" id="music-blacklist-user-input" name="login" placeholder="viewer123" maxlength="25" required autocomplete="off" />
+        </div>
+        <button class="btn btn--primary btn--compact" type="submit">Заблокировать пользователя</button>
+      </form>
+      {{#if blacklistedUsers}}
+      <ul class="music-blist">
+        {{#each blacklistedUsers}}
+        <li class="music-blist__row">
+          <div class="music-blist__info">
+            <span>@{{login}}</span>
+            <small>{{createdAtLabel}}</small>
+          </div>
+          <form method="post" action="/admin/music/blacklist/user">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="login" value="{{login}}" />
+            <button class="btn btn--ghost btn--compact" type="submit">Разблокировать</button>
+          </form>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="empty-state music-empty">Пусто — заблокированных пользователей нет</p>
+      {{/if}}
+    </article>
+  </div>
+  {{/if}}
+
+  {{#if isObsTab}}
+  <div class="music-cards">
+    <article class="admin-card">
+      <h2>Оверлей — изображение</h2>
+      <p class="admin-card__hint">Источник → «Браузер». Оверлей подстраивается под любой размер источника; для вертикального — квадрат. Добавьте <code>&amp;idle=1</code> к ссылке, чтобы показывать подсказку, когда очередь пуста. Видео-режим без звука — звук идёт из дока.</p>
+      <div class="music-url-row">
+        <span class="music-url-row__label">Карточка трека — режим по умолчанию · 1000×260</span>
+        <div class="music-url-row__box">
+          <code class="music-url" data-music-url="{{overlayUrl}}">••••••••••••••••••••••••</code>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="toggle">Показать</button>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="copy">Копировать</button>
+        </div>
+        <p class="music-url-row__steps">OBS → Источники → «+» → Браузер → вставьте ссылку. Режим этой ссылки выбирается в блоке ниже.</p>
+      </div>
+      <div class="music-url-row">
+        <span class="music-url-row__label">Видео на фоне — прямой режим «Видео» · 1920×1080</span>
+        <div class="music-url-row__box">
+          <code class="music-url" data-music-url="{{overlayVideoUrl}}">••••••••••••••••••••••••</code>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="toggle">Показать</button>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="copy">Копировать</button>
+        </div>
+        <p class="music-url-row__steps">Тот же источник «Браузер», но ссылка сразу открывает видео-режим — параметр не зависит от настройки ниже.</p>
+      </div>
+      <div class="music-obs-default">
+        <form method="post" action="/admin/music/settings" class="music-obs-mode">
+          <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+          <input type="hidden" name="_section" value="obs" />
+          <input type="hidden" name="_tab" value="obs" />
+          <label>Режим по умолчанию для ссылки «Карточка трека»
+            <select name="obs.overlayMode">
+              {{#each overlayModeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+            </select>
+          </label>
+          <button class="btn btn--primary btn--compact" type="submit">Сохранить режим</button>
+        </form>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Док — звук и управление</h2>
+      <p class="admin-card__hint">Этот плеер воспроизводит звук (попадает в захват «Звук рабочего стола»). Одновременно активен только один плеер.</p>
+      <div class="music-url-row">
+        <span class="music-url-row__label">Ссылка дока</span>
+        <div class="music-url-row__box">
+          <code class="music-url" data-music-url="{{dockUrl}}">••••••••••••••••••••••••</code>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="toggle">Показать</button>
+          <button class="btn btn--ghost btn--compact" type="button" data-music-action="copy">Копировать</button>
+        </div>
+        <p class="music-url-row__steps">OBS → Док-панели → Пользовательские док-панели браузера → вставьте ссылку.</p>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Страница для зрителей</h2>
+      <p class="admin-card__hint">Публичная страница с текущим треком и очередью — её показывает команда !songlist.</p>
+      <a class="admin-card__link" href="{{publicUrl}}" target="_blank" rel="noreferrer">{{publicUrl}}</a>
+    </article>
+  </div>
+
+  <article class="admin-card music-maint">
+    <h2>Обслуживание ссылок</h2>
+    <p class="admin-card__hint">Перевыпуск делает текущую ссылку недействательной: старую ссылку потребуется заменить в OBS (источник оверлея или док-панель).</p>
+    <div class="music-maint__forms">
+      <form method="post" action="/admin/music/obs/regenerate" onsubmit="return confirm('Перевыпустить ссылку оверлея? Старая ссылка перестанет работать — обновите источник в OBS.')">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <input type="hidden" name="kind" value="overlay" />
+        <button class="btn btn--ghost btn--compact" type="submit">Перевыпустить ссылку оверлея</button>
+      </form>
+      <form method="post" action="/admin/music/obs/regenerate" onsubmit="return confirm('Перевыпустить ссылку дока? Старая ссылка перестанет работать — обновите док в OBS.')">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <input type="hidden" name="kind" value="dock" />
+        <button class="btn btn--ghost btn--compact" type="submit">Перевыпустить ссылку дока</button>
+      </form>
+    </div>
+  </article>
+  <script>
+    (function () {
+      'use strict';
+      var MASK = '••••••••••••••••••••••••';
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+        return new Promise(function (resolve, reject) {
+          var area = document.createElement('textarea');
+          area.value = text;
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          try { document.execCommand('copy') ? resolve() : reject(new Error('copy failed')); }
+          catch (error) { reject(error); }
+          finally { document.body.removeChild(area); }
+        });
+      }
+      document.querySelectorAll('[data-music-action]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var box = button.closest('.music-url-row__box');
+          var code = box ? box.querySelector('.music-url') : null;
+          if (!code) return;
+          var url = code.getAttribute('data-music-url') || '';
+          if (button.getAttribute('data-music-action') === 'toggle') {
+            var revealed = code.classList.toggle('is-revealed');
+            code.textContent = revealed ? url : MASK;
+            button.textContent = revealed ? 'Скрыть' : 'Показать';
+          } else {
+            copyText(url).then(function () {
+              var label = button.textContent;
+              button.textContent = 'Скопировано';
+              setTimeout(function () { button.textContent = label; }, 1500);
+            }).catch(function () {});
+          }
+        });
+      });
+    })();
+  </script>
+  {{/if}}
+</section>

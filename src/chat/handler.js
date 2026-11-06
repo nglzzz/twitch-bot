@@ -64,6 +64,10 @@ Chat.registerCommand('!паспорт', require('../commands/passport'), '!passp
 Chat.registerCommand('!fate', require('../commands/fate'), '!судьба');
 Chat.registerCommand('!суд', require('../commands/court'), '!приговор');
 
+// Заказ музыки
+require('../commands/music').registerMusicCommands(Chat);
+require('../services/music').getMusicService();
+
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));
 Chat.registerReward('b1341e46-1474-43f3-bd82-9b89182fef69', require('../rewards/memes'));

@@ -1,0 +1,272 @@
+<section class="container section-spacing music-page">
+  <header class="music-page__head">
+    <div>
+      <div class="music-page__overline"><span class="music-page__signal" aria-hidden="true"></span> LIVE SESSION <span class="music-page__overline-sep">/</span> МУЗЫКА СТРИМА</div>
+      <h1>Заказ музыки</h1>
+      <p class="music-page__lead">Что играет на стриме прямо сейчас и очередь заказов. Страница обновляется сама — звук идёт на стриме.</p>
+    </div>
+  </header>
+
+  {{#unless available}}<p class="form-notice form-notice--error" role="alert">Заказ музыки временно недоступен.</p>{{/unless}}
+
+  <section class="music-hero" id="music-hero" aria-label="Сейчас играет">
+    <div class="music-hero__bg" aria-hidden="true"></div>
+    <div class="music-hero__art music-cover" aria-hidden="true"></div>
+    <div class="music-hero__meta">
+      <a class="music-hero__title" id="music-hero-title" target="_blank" rel="noreferrer" hidden></a>
+      <div class="music-display-artist" id="music-hero-author" hidden></div>
+      <div class="music-hero__empty" id="music-hero-empty">
+        <div><strong>Тишина перед следующим треком</strong><span>Закажи музыку в чате командой <code>!sr</code></span></div>
+      </div>
+      <div class="music-requester" id="music-hero-sub" hidden>
+        <span class="music-requester__avatar" id="music-hero-avatar" aria-hidden="true"></span>
+        <span class="music-chip" id="music-hero-chip" hidden></span>
+        <span class="music-chip music-chip--paid" id="music-hero-paid" hidden>Донат</span>
+        <span class="music-chip music-chip--src" id="music-hero-src" hidden>Админка</span>
+      </div>
+      <div class="music-progress" id="music-hero-progress" hidden>
+        <span class="music-progress__time" id="music-hero-pos">0:00</span>
+        <span class="music-bar"><span class="music-bar__fill" id="music-hero-fill"></span></span>
+        <span class="music-progress__time" id="music-hero-len">0:00</span>
+      </div>
+      <div class="music-hero__label">
+        <span class="music-eq" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="music-hero__paused" aria-hidden="true"><svg class="music-ic music-ic--solid" viewBox="0 0 24 24" width="12" height="12"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></span>
+        <span id="music-hero-status">Сейчас ничего не играет</span>
+      </div>
+    </div>
+    <aside class="music-hero__next" id="music-hero-next" hidden aria-label="Следующий трек">
+      <span class="music-hero__next-label">ДАЛЬШЕ В ОЧЕРЕДИ</span>
+      <div class="music-hero__next-content"><span class="music-hero__next-art" id="music-hero-next-art" aria-hidden="true"></span><span class="music-hero__next-copy"><strong id="music-hero-next-title"></strong><span id="music-hero-next-author"></span></span></div>
+    </aside>
+  </section>
+
+  <section class="music-queue" aria-label="Очередь заказов">
+    <div class="music-queue__head">
+      <div><span class="music-section-kicker">СЛЕДУЮЩИЕ</span><h2>Очередь</h2></div>
+      <span class="music-queue__count" id="music-queue-count"></span>
+    </div>
+    <ol class="music-queue__list" id="music-queue-list"></ol>
+    <p class="empty-state" id="music-queue-empty">Очередь пуста — закажи трек командой <code>!sr</code> в чате.</p>
+  </section>
+
+  <section class="music-howto" aria-label="Как заказать трек">
+    <h2>Как заказать трек</h2>
+    <div class="music-howto__grid">
+      <article class="music-howto__card music-howto__card--primary">
+        <code class="music-howto__cmd">!sr &lt;ссылка, ID видео или название&gt;</code>
+        <p>Заказать трек — это главная команда, доступна всем. Алиас: <code>!ык</code>.</p>
+      </article>
+      <article class="music-howto__card music-howto__card--paid">
+        <code class="music-howto__cmd">Донат с треком</code>
+        <p>Оставь ссылку на YouTube в сообщении к донату, или напиши <code>!sr трек</code>, или <code>sr: трек</code>. Донатные заказы имеют приоритет.</p>
+      </article>
+    </div>
+    <div class="music-howto__list">
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">!song</code><span>Узнать, что играет прямо сейчас.</span></div>
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">!voteskip</code><span>Голос за пропуск трека. То же самое — <code>!skip</code>.</span></div>
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">!songlist</code><span>Ссылка на эту страницу — текущий трек и вся очередь.</span></div>
+    </div>
+  </section>
+</section>
+
+<script src="/js/music-client.js"></script>
+<script>
+  (function () {
+    'use strict';
+    var hero = document.getElementById('music-hero');
+    if (!hero) return;
+    var el = function (id) { return document.getElementById(id); };
+    var els = {
+      status: el('music-hero-status'), title: el('music-hero-title'), empty: el('music-hero-empty'),
+      sub: el('music-hero-sub'), author: el('music-hero-author'), avatar: el('music-hero-avatar'), chip: el('music-hero-chip'),
+      paid: el('music-hero-paid'), src: el('music-hero-src'), progress: el('music-hero-progress'),
+      pos: el('music-hero-pos'), len: el('music-hero-len'), fill: el('music-hero-fill'),
+      queueList: el('music-queue-list'), queueEmpty: el('music-queue-empty'), queueCount: el('music-queue-count'),
+    };
+    var lastId = null;
+
+    function artUrl(track, square) {
+      if (!track) return '';
+      if (track.provider === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(String(track.externalId || ''))) {
+        return 'https://i.ytimg.com/vi/' + track.externalId + (square ? '/mqdefault.jpg' : '/hqdefault.jpg');
+      }
+      return '';
+    }
+
+    function setArt(track) {
+      hero.style.setProperty('--music-art', 'url("' + artUrl(track, false) + '")');
+      hero.style.setProperty('--music-art-sq', 'url("' + artUrl(track, true) + '")');
+    }
+
+    function chipText(track) {
+      return track.isBackup ? 'Плейлист' : '@' + (track.requestedBy || '');
+    }
+
+    function appendBadge(row, className, text) {
+      var badge = document.createElement('span');
+      badge.className = className;
+      badge.textContent = text;
+      row.appendChild(badge);
+    }
+
+    function displayTrack(track) {
+      return MusicClient.splitTitle(track);
+    }
+
+    function titleSize(title) {
+      var length = Array.from(title).length;
+      return Math.max(2.4, Math.min(16, 140 / Math.max(length, 1))) + 'cqi';
+    }
+
+    function render(state) {
+      var track = state && state.current;
+      hero.classList.toggle('is-playing', Boolean(track) && state.status === 'playing');
+      hero.classList.toggle('is-empty', !track);
+      hero.classList.toggle('is-paused', Boolean(track) && state.status !== 'playing');
+      if (!track) {
+        lastId = null;
+        setArt(null);
+        els.title.hidden = true;
+        els.author.hidden = true;
+        els.sub.hidden = true;
+        els.progress.hidden = true;
+        els.empty.hidden = false;
+        els.status.textContent = 'Сейчас ничего не играет';
+        hero.classList.remove('has-track');
+        return;
+      }
+      hero.classList.add('has-track');
+      els.empty.hidden = true;
+      els.title.hidden = false;
+      els.sub.hidden = false;
+      els.progress.hidden = false;
+      if (track.id !== lastId) {
+        lastId = track.id;
+        setArt(track);
+        var display = displayTrack(track);
+        els.title.textContent = display.title;
+        els.author.textContent = display.artist;
+        els.author.hidden = !display.artist;
+        hero.style.setProperty('--music-title-size', titleSize(display.title));
+        if (track.url) {
+          els.title.href = track.url;
+          els.title.removeAttribute('aria-disabled');
+        } else {
+          els.title.removeAttribute('href');
+        }
+        els.chip.hidden = false;
+        els.chip.textContent = chipText(track);
+        els.avatar.textContent = track.isBackup ? '♫' : String(track.requestedBy || '?').trim().charAt(0).toUpperCase();
+        els.paid.hidden = !track.isPaid;
+        els.src.hidden = track.source !== 'admin';
+        els.len.textContent = MusicClient.formatTime(track.playSec || track.durationSec);
+      }
+      els.status.textContent = state.status === 'waiting' ? 'Скоро следующий' : (state.status === 'playing' ? 'Играет' : 'Пауза');
+    }
+
+    function renderQueue(queue) {
+      var items = Array.isArray(queue) ? queue : [];
+      els.queueList.textContent = '';
+      var next = el('music-hero-next');
+      next.hidden = !items.length;
+      if (items.length) {
+        var nextTrack = items[0];
+        el('music-hero-next-title').textContent = nextTrack.title || 'Без названия';
+        el('music-hero-next-author').textContent = nextTrack.author || (nextTrack.requestedBy ? '@' + nextTrack.requestedBy : '');
+        el('music-hero-next-art').style.backgroundImage = artUrl(nextTrack, true) ? 'url("' + artUrl(nextTrack, true) + '")' : '';
+      }
+      items.forEach(function (item, index) {
+        var li = document.createElement('li');
+        li.className = 'music-queue__item' + (index === 0 ? ' music-queue__item--first' : '') + (item.isPaid ? ' music-queue__item--paid' : '');
+
+        var num = document.createElement('span');
+        num.className = 'music-queue__num';
+        num.textContent = String(index + 1);
+
+        var art = document.createElement('img');
+        art.className = 'music-queue__art';
+        art.alt = '';
+        art.loading = 'lazy';
+        if (artUrl(item, true)) art.src = artUrl(item, true);
+        else art.hidden = true;
+
+        var info = document.createElement('div');
+        info.className = 'music-queue__info';
+        var title = document.createElement(item.url ? 'a' : 'span');
+        title.className = 'music-queue__title';
+        title.textContent = item.title;
+        if (item.url) {
+          title.href = item.url;
+          title.target = '_blank';
+          title.rel = 'noreferrer';
+        }
+        var meta = document.createElement('div');
+        meta.className = 'music-queue__meta';
+        if (item.author) {
+          var author = document.createElement('span');
+          author.className = 'music-queue__author';
+          author.textContent = item.author;
+          meta.appendChild(author);
+        }
+        appendBadge(meta, 'music-chip', chipText(item));
+        if (item.isPaid) appendBadge(meta, 'music-chip music-chip--paid', 'Донат');
+        if (item.source === 'admin') appendBadge(meta, 'music-chip music-chip--src', 'Админка');
+        info.appendChild(title);
+        info.appendChild(meta);
+
+        var right = document.createElement('span');
+        right.className = 'music-queue__right';
+        var dur = document.createElement('span');
+        dur.className = 'music-queue__duration';
+        dur.textContent = item.playLabel || MusicClient.formatTime(item.playSec || item.durationSec);
+        right.appendChild(dur);
+
+        li.appendChild(num);
+        var artWrap = document.createElement('span');
+        artWrap.className = 'music-queue__art-wrap';
+        var fallback = document.createElement('span');
+        fallback.className = 'music-queue__art-fallback';
+        fallback.textContent = '♫';
+        fallback.setAttribute('aria-hidden', 'true');
+        artWrap.appendChild(fallback);
+        artWrap.appendChild(art);
+        art.addEventListener('error', function () { art.hidden = true; });
+        li.appendChild(artWrap);
+        li.appendChild(info);
+        li.appendChild(right);
+        els.queueList.appendChild(li);
+      });
+      els.queueEmpty.hidden = items.length > 0;
+      els.queueCount.textContent = items.length ? items.length + ' ' + plural(items.length, ['трек', 'трека', 'треков']) : '';
+    }
+
+    function plural(n, forms) {
+      var mod10 = n % 10;
+      var mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return forms[0];
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+      return forms[2];
+    }
+
+    function tick() {
+      var state = client.getState();
+      var track = state && state.current;
+      if (track) {
+        var elapsed = Math.max(0, client.position() - (track.startSec || 0));
+        var total = track.playSec || track.durationSec || 0;
+        els.pos.textContent = MusicClient.formatTime(elapsed);
+        els.fill.style.width = (total > 0 ? Math.min(100, (elapsed / total) * 100) : 0) + '%';
+      }
+      requestAnimationFrame(tick);
+    }
+
+    var client = MusicClient.connect({
+      initial: {{{initialJson}}},
+      websocketPort: '{{websocketPort}}',
+      onState: render,
+      onQueue: renderQueue,
+    });
+    requestAnimationFrame(tick);
+  })();
+</script>
