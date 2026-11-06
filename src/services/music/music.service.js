@@ -13,6 +13,7 @@ const { roleFromTags, hasRoleAtLeast, matchesAnyRole } = require('./musicRoles')
 
 const PLAYER_TIMEOUT_MS = 12000;
 const PROGRESS_BROADCAST_MS = 5000;
+const PLAYER_ERROR_STREAK = 3;
 const BACKUP_REFRESH_MS = 6 * 60 * 60 * 1000;
 
 function createMusicService({
@@ -34,7 +35,8 @@ function createMusicService({
     positionAt: 0,
     userPaused: true, // после запуска бота музыка не стартует сама
     votes: new Map(),
-    player: { id: null, lastSeenAt: 0, online: false },
+    player: { id: null, lastSeenAt: 0, online: false, problem: null },
+    errorStreak: 0, // ошибки плеера подряд без единого реально сыгранного трека
     waitTimer: null,
     nextAt: null,
     seq: 0,
@@ -80,7 +82,7 @@ function createMusicService({
       volume: s.player.volume,
       autoplay: s.player.autoplay,
       votes: voteInfo(),
-      player: { online: state.player.online, activeId: state.player.id },
+      player: { online: state.player.online, activeId: state.player.id, problem: state.player.problem || null },
       overlayMode: s.obs.overlayMode,
       seekSeq: state.seekSeq,
       seq: state.seq,
@@ -446,6 +448,7 @@ function createMusicService({
 
   async function play() {
     state.userPaused = false;
+    clearPlayerProblem();
     if (state.status === 'paused' && state.currentId) {
       state.status = 'playing';
       setPosition(state.positionSec);
@@ -588,12 +591,24 @@ function createMusicService({
 
   // ---------- док-плеер ----------
 
-  function registerPlayer(playerId) {
+  /**
+   * Регистрирует док как активный плеер. Без takeover док не отбирает воспроизведение
+   * у другого плеера, который сейчас онлайн (например, вкладка браузера и док в OBS).
+   */
+  function registerPlayer(playerId, { takeover = true } = {}) {
+    const id = String(playerId).slice(0, 64);
+    if (!takeover && state.player.online && state.player.id && state.player.id !== id) return getState();
     // Фиксируем позицию до смены статуса, чтобы время без плеера не засчиталось как проигранное.
     setPosition(livePosition(current()));
-    state.player = { id: String(playerId).slice(0, 64), lastSeenAt: now(), online: true };
+    state.errorStreak = 0;
+    state.player = { id, lastSeenAt: now(), online: true, problem: null };
     emitState();
     return getState();
+  }
+
+  function clearPlayerProblem() {
+    state.errorStreak = 0;
+    if (state.player.problem) state.player.problem = null;
   }
 
   function touchPlayer(playerId) {
@@ -617,10 +632,16 @@ function createMusicService({
     if (!request || request._id !== requestId) return { ok: true, active: true };
 
     if (event === 'progress') {
-      const pos = Number(position);
+      // Позицию док присылает только когда видео реально идёт; без неё это просто пинг.
+      const hasPosition = position !== undefined && position !== null && position !== '';
+      const pos = hasPosition ? Number(position) : NaN;
       // Прогресс, снятый до применения перемотки, игнорируем.
       const staleSeek = seekSeq !== undefined && seekSeq !== null && Number(seekSeq) !== state.seekSeq;
       if (Number.isFinite(pos) && state.status === 'playing' && !staleSeek) {
+        if (state.errorStreak || state.player.problem) {
+          clearPlayerProblem();
+          emitState();
+        }
         setPosition(pos);
         const endSec = (request.startSec || 0) + effectiveDuration(request);
         if (endSec > 0 && pos >= endSec - 0.3) {
@@ -631,11 +652,22 @@ function createMusicService({
         }
       }
     } else if (event === 'ended') {
+      clearPlayerProblem();
       finishCurrent('played');
       await afterFinish();
     } else if (event === 'error') {
       const code = Number(errorCode);
-      const reason = [101, 150].includes(code) ? 'автор запретил воспроизведение вне YouTube' : (code === 100 ? 'видео удалено или скрыто' : `ошибка плеера ${errorCode}`);
+      state.errorStreak += 1;
+      if (state.errorStreak >= PLAYER_ERROR_STREAK) {
+        // Несколько треков подряд не играют — дело в плеере, а не в треках.
+        // Не пролистываем очередь впустую, а ставим на паузу и показываем причину.
+        setPosition(livePosition(request));
+        state.status = 'paused';
+        state.player.problem = `YouTube не даёт воспроизводить видео в этом плеере (ошибка ${errorCode}), очередь на паузе. Обычно так бывает, когда браузер не вошёл в YouTube и тот принимает его за бота.`;
+        emitState();
+        return { ok: true, active: true };
+      }
+      const reason = [101, 150].includes(code) ? 'YouTube запретил встроенное воспроизведение (автор отключил или плеер не вошёл в YouTube)' : (code === 100 ? 'видео удалено или скрыто' : `ошибка плеера ${errorCode}`);
       finishCurrent('failed', reason);
       if (request.source !== 'backup') say(`⚠️ Не удалось воспроизвести «${request.title}»: ${reason}. Пропускаю.`);
       await afterFinish({ immediate: true });

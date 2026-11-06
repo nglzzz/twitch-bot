@@ -145,7 +145,7 @@ function createMusicRouter({ requireAdmin, requireCsrf, adminPage }) {
     if (!music) return unavailable(res);
     const playerId = String(req.body?.playerId || '').trim();
     if (!playerId) return res.status(422).json({ ok: false, message: 'playerId is required' });
-    return res.json({ ok: true, state: music.registerPlayer(playerId) });
+    return res.json({ ok: true, state: music.registerPlayer(playerId, { takeover: req.body?.takeover !== false }) });
   });
 
   router.post('/api/music/player/report', json, requireObsToken('dock'), async (req, res, next) => {

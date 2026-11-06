@@ -10,6 +10,11 @@
   .music-dock__seek { position: absolute; left: 0; right: 0; top: -9px; width: 100%; height: 24px; margin: 0; opacity: 0; cursor: pointer; }
   .music-dock .music-bar:focus-within { outline: 2px solid rgba(255,255,255,.6); outline-offset: 6px; border-radius: 999px; }
   @media (prefers-reduced-motion: reduce) { .music-dock .music-bar__fill::after { transition: none; } }
+  /* embed=1: док внутри админки — только звук, видео и сообщения, управление уже есть в админке. */
+  html.is-embed, html.is-embed body { background: transparent !important; }
+  .music-dock--embed { max-width: none; padding: 0; }
+  .music-dock--embed .music-dock__controls, .music-dock--embed .music-dock__now, .music-dock--embed .music-dock__next { display: none; }
+  .music-dock--embed .music-dock__video-wrap:not(.is-collapsed) { max-width: 480px; }
 </style>
 
 <div class="music-dock" id="music-dock">
@@ -22,6 +27,12 @@
     <svg class="music-ic music-ic--solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
     Нажмите, чтобы включить звук
   </button>
+  <p class="music-dock__problem" id="music-dock-problem" role="status" hidden></p>
+  <div class="music-dock__login" id="music-dock-login" hidden>
+    <button class="btn btn--primary btn--compact" type="button" data-yt-login>Войти в YouTube</button>
+    <button class="btn btn--ghost btn--compact" type="button" data-yt-reload>Я вошёл — обновить плеер</button>
+  </div>
+  <p class="music-dock__login-note" id="music-dock-login-note" role="status" hidden></p>
 
   <div class="music-dock__controls">
     <button class="music-dock__btn music-dock__btn--play" id="music-dock-toggle" type="button" aria-label="Играть / пауза">
@@ -82,6 +93,8 @@
     <span id="music-dock-ws-label">Подключение…</span>
     <span class="music-dock__status-sep" aria-hidden="true">·</span>
     <span class="music-dock__active" id="music-dock-active">Неактивен</span>
+    <span class="music-dock__status-sep" aria-hidden="true">·</span>
+    <button class="music-dock__link" type="button" data-yt-login>Войти в YouTube</button>
   </div>
 </div>
 
@@ -92,11 +105,18 @@
     var root = document.getElementById('music-dock');
     if (!root) return;
     var TOKEN = '{{token}}';
+    var params = new URLSearchParams(location.search);
+    var EMBED = params.get('embed') === '1';
+    var TAKEOVER = params.get('takeover') === '1';
+    if (EMBED) {
+      document.documentElement.classList.add('is-embed');
+      root.classList.add('music-dock--embed');
+    }
     var PLAYER_ID = 'dock-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
     var el = function (id) { return document.getElementById(id); };
     var els = {
       videoWrap: el('music-dock-video-wrap'), videoToggle: el('music-dock-video-toggle'),
-      banner: el('music-dock-banner'), takeover: el('music-dock-takeover'), unmute: el('music-dock-unmute'),
+      banner: el('music-dock-banner'), takeover: el('music-dock-takeover'), unmute: el('music-dock-unmute'), problem: el('music-dock-problem'), login: el('music-dock-login'), loginNote: el('music-dock-login-note'),
       toggle: el('music-dock-toggle'), skip: el('music-dock-skip'), volume: el('music-dock-volume'),
       now: el('music-dock-now'), nowBg: root.querySelector('.music-dock__now-bg'), art: root.querySelector('.music-dock__art'),
       status: el('music-dock-status'), title: el('music-dock-title'), sub: el('music-dock-sub'),
@@ -120,6 +140,9 @@
     var lastId = null;
     var appliedSeek = null; // seekSeq, уже применённый к YouTube-плееру
     var seeking = false;
+    var stuckHint = false; // видео не стартует: показываем подсказку и само видео
+    var revealedFor = null;
+    var syncedStatus = null; // статус сервера при прошлой синхронизации плеера
 
     function post(path, body) {
       return fetch(path, {
@@ -140,8 +163,9 @@
       });
     }
 
-    function register() {
-      return post('/api/music/player/register', { playerId: PLAYER_ID }).then(function (data) {
+    // takeover=false: при открытии не отбираем воспроизведение у другого онлайн-плеера.
+    function register(takeover) {
+      return post('/api/music/player/register', { playerId: PLAYER_ID, takeover: Boolean(takeover) }).then(function (data) {
         if (data && data.state) {
           registered = true;
           isActive = Boolean(data.state.player && data.state.player.activeId === PLAYER_ID);
@@ -159,6 +183,10 @@
       if (!registered) return;
       isActive = false;
       els.banner.hidden = false;
+      stopPlayCheck();
+      // При возврате док загрузит трек заново с позиции сервера, а не продолжит со своей старой.
+      loadedId = null;
+      syncedStatus = null;
       setActiveUi();
       try { if (ytReady) ytPlayer.pauseVideo(); } catch (error) { /* ignore */ }
     }
@@ -166,6 +194,7 @@
     function setActiveUi() {
       els.active.textContent = isActive ? 'Этот плеер активен' : 'Неактивен';
       els.active.classList.toggle('is-on', isActive);
+      if (client) renderProblem(client.getState());
     }
 
     // ---------- YouTube ----------
@@ -180,27 +209,85 @@
         var state = client.getState();
         if (!state || state.status !== 'playing' || !state.current) return;
         var st = ytPlayer.getPlayerState();
-        if (st !== 1 && st !== 3) els.unmute.hidden = false;
+        if (st === 1 || st === 3) return;
+        els.unmute.hidden = false;
+        stuckHint = true;
+        // Показываем само видео один раз на трек: если YouTube что-то пишет
+        // (например, «Войдите в аккаунт»), это будет видно.
+        if (revealedFor !== loadedId) {
+          revealedFor = loadedId;
+          setVideoCollapsed(false);
+        }
+        renderProblem(state);
       }, 2500);
     }
 
     function stopPlayCheck() {
       clearTimeout(playCheckTimer);
       els.unmute.hidden = true;
+      if (stuckHint) { stuckHint = false; renderProblem(client.getState()); }
     }
+
+    // Позиция надёжна только во время воспроизведения: при буферизации YouTube может отдать 0.
+    function isPlaybackReal() {
+      try { return ytPlayer.getPlayerState() === 1; } catch (error) { return false; }
+    }
+
+    function renderProblem(state) {
+      var problem = state && state.player && state.player.problem;
+      var text = '';
+      // При проблеме один раз раскрываем видео: там будет видно сообщение самого YouTube.
+      if (problem && isActive && revealedFor !== 'problem:' + loadedId) {
+        revealedFor = 'problem:' + loadedId;
+        setVideoCollapsed(false);
+      }
+      if (problem && isActive) text = problem + ' Нажмите «Играть», чтобы попробовать снова, или откройте этот док в обычном браузере.';
+      else if (stuckHint && isActive) text = 'Видео не запускается. Если в видео написано «Войдите в аккаунт», YouTube не доверяет этому браузеру. Встроенный браузер OBS часто так блокируется — откройте ссылку дока в обычном браузере, где вы вошли в YouTube.';
+      els.problem.textContent = text;
+      els.problem.hidden = !text;
+      els.login.hidden = !text && !loginOpened;
+    }
+
+    // Вход в YouTube в отдельном окне: куки общие для доков OBS, после входа плеер нужно перезагрузить.
+    // Google иногда не пускает вход во встроенных браузерах — тогда показываем, что делать.
+    var LOGIN_URL = 'https://accounts.google.com/ServiceLogin?service=youtube&continue=' + encodeURIComponent('https://www.youtube.com/');
+    var loginOpened = false;
+    function openLogin() {
+      loginOpened = true;
+      var popup = null;
+      try { popup = window.open(LOGIN_URL, 'yt-login', 'width=520,height=720'); } catch (error) { popup = null; }
+      els.loginNote.hidden = false;
+      els.loginNote.textContent = popup
+        ? 'Войдите в аккаунт в открывшемся окне, закройте его и нажмите «Я вошёл — обновить плеер». Если Google пишет, что браузер небезопасен, вход здесь не получится — играйте звук из обычного браузера (кнопка «Играть звук здесь» в админке).'
+        : 'Окно входа не открылось. Играйте звук из обычного браузера, где вы вошли в YouTube (кнопка «Играть звук здесь» в админке).';
+      els.login.hidden = false;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-yt-login]'), function (button) {
+      button.addEventListener('click', openLogin);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-yt-reload]'), function (button) {
+      button.addEventListener('click', function () { location.reload(); });
+    });
 
     /** Декларативная синхронизация: сервер — источник истины, док — источник позиции. */
     function syncPlayer(state) {
       if (!ytReady || !state) return;
       var activeNow = Boolean(state.player && state.player.activeId === PLAYER_ID);
-      if (!activeNow) return;
+      if (!activeNow) {
+        // Плеером стал другой док — замолкаем сразу, не дожидаясь отказа на отчёт.
+        if (isActive) deactivate();
+        return;
+      }
       var track = state.current;
       if (!track || track.provider !== 'youtube') {
         stopPlayCheck();
         if (loadedId) { loadedId = null; ytPlayer.stopVideo(); }
         return;
       }
-      if (track.id !== loadedId) {
+      // После ошибки повторное «Играть» должно заново загрузить видео, а не просто playVideo().
+      var retry = errorReportedId === track.id && state.status === 'playing' && syncedStatus !== 'playing';
+      syncedStatus = state.status;
+      if (track.id !== loadedId || retry) {
         loadedId = track.id;
         endedReportedId = null;
         errorReportedId = null;
@@ -230,6 +317,10 @@
             syncPlayer(client.getState());
           },
           onStateChange: function (event) {
+            if (event.data === 1 && stuckHint) {
+              stuckHint = false;
+              renderProblem(client.getState());
+            }
             if (event.data === 0) {
               els.unmute.hidden = true;
               if (loadedId && endedReportedId !== loadedId) {
@@ -357,6 +448,9 @@
 
     function applyState(state) {
       renderNow(state);
+      renderProblem(state);
+      // Активный плеер пропал (закрыли вкладку) — этот док подхватывает воспроизведение сам.
+      if (registered && !isActive && state && state.player && !state.player.online) register(false);
       syncPlayer(state);
       if (document.activeElement !== els.volume) els.volume.value = Math.max(0, Math.min(100, Number(state.volume) || 0));
       els.toggle.classList.toggle('is-playing', state.status === 'playing');
@@ -427,12 +521,16 @@
       else control('play');
     });
 
-    els.takeover.addEventListener('click', function () { register(); });
+    els.takeover.addEventListener('click', function () { register(true); });
 
-    els.videoToggle.addEventListener('click', function () {
-      var collapsed = els.videoWrap.classList.toggle('is-collapsed');
+    function setVideoCollapsed(collapsed) {
+      els.videoWrap.classList.toggle('is-collapsed', collapsed);
       els.videoToggle.textContent = collapsed ? 'Показать видео' : 'Скрыть видео';
       els.videoToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+
+    els.videoToggle.addEventListener('click', function () {
+      setVideoCollapsed(!els.videoWrap.classList.contains('is-collapsed'));
     });
 
     // Шлём прогресс каждые 2 секунды, пока этот док активен (даже на паузе —
@@ -441,9 +539,11 @@
       if (!registered || !isActive) return;
       var state = client.getState();
       var track = state && state.current;
-      var position = 0;
-      if (ytReady && track && track.id === loadedId) {
-        try { position = ytPlayer.getCurrentTime() || 0; } catch (error) { position = 0; }
+      // Позицию шлём только когда видео реально запущено. Иначе YouTube отдаёт 0,
+      // и сервер откатывал бы трек к началу.
+      var position;
+      if (ytReady && track && track.id === loadedId && isPlaybackReal()) {
+        try { position = ytPlayer.getCurrentTime(); } catch (error) { position = undefined; }
       }
       report({ event: 'progress', requestId: track ? track.id : '', position: position });
     }, 2000);
@@ -460,7 +560,7 @@
     });
 
     setActiveUi();
-    register();
+    register(TAKEOVER);
     requestAnimationFrame(tick);
   })();
 </script>

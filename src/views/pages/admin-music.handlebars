@@ -85,6 +85,16 @@
       <p class="form-notice form-notice--error" id="music-player-offline" hidden>Нет связи с плеером — откройте <a href="/admin/music?tab=obs">ссылку дока из вкладки OBS</a> (док в OBS или вкладка браузера).</p>
       <p class="form-notice" id="music-admin-message" hidden></p>
 
+      <section class="admin-card music-local-audio" id="music-local-audio" data-dock-url="{{dockUrl}}" aria-label="Звук в этой вкладке">
+        <div class="music-local-audio__head">
+          <div class="music-local-audio__text">
+            <strong>Звук в этой вкладке</strong>
+            <span id="music-local-audio-hint">Запасной вариант, если док в OBS не играет: вкладка станет плеером. Звук в стрим — через захват звука браузера в OBS.</span>
+          </div>
+          <button class="btn btn--ghost btn--compact" id="music-local-audio-toggle" type="button" aria-pressed="false">Играть звук здесь</button>
+        </div>
+      </section>
+
       <article class="admin-card music-add-card">
         <div class="music-section-kicker">БЫСТРЫЙ ДОСТУП</div>
         <h2>Добавить трек</h2>
@@ -685,6 +695,60 @@
       requestAnimationFrame(tick);
     })();
   </script>
+  <script>
+    // Звук прямо из админки: встраиваем страницу дока (embed=1) и делаем её активным плеером.
+    // Клик по кнопке — жест пользователя, поэтому браузер разрешит звук.
+    (function () {
+      'use strict';
+      var box = document.getElementById('music-local-audio');
+      var button = document.getElementById('music-local-audio-toggle');
+      if (!box || !button || !box.dataset.dockUrl) return;
+      var frame = null;
+      var observer = null;
+
+      function fitFrame() {
+        try {
+          var doc = frame.contentDocument;
+          if (doc && doc.body) frame.style.height = Math.ceil(doc.documentElement.scrollHeight) + 'px';
+        } catch (error) { /* ignore */ }
+      }
+
+      function start() {
+        var url = new URL(box.dataset.dockUrl, location.href);
+        url.searchParams.set('embed', '1');
+        url.searchParams.set('takeover', '1');
+        frame = document.createElement('iframe');
+        frame.className = 'music-local-audio__frame';
+        frame.title = 'Плеер музыки';
+        frame.allow = 'autoplay; encrypted-media; picture-in-picture';
+        frame.src = url.pathname + url.search;
+        frame.addEventListener('load', function () {
+          fitFrame();
+          try {
+            observer = new ResizeObserver(fitFrame);
+            observer.observe(frame.contentDocument.documentElement);
+          } catch (error) { /* ignore */ }
+        });
+        box.appendChild(frame);
+        box.classList.add('is-on');
+        button.textContent = 'Выключить звук здесь';
+        button.setAttribute('aria-pressed', 'true');
+      }
+
+      function stop() {
+        if (observer) { observer.disconnect(); observer = null; }
+        if (frame) { frame.remove(); frame = null; }
+        box.classList.remove('is-on');
+        button.textContent = 'Играть звук здесь';
+        button.setAttribute('aria-pressed', 'false');
+      }
+
+      button.addEventListener('click', function () {
+        if (frame) stop();
+        else start();
+      });
+    })();
+  </script>
   {{/if}}
 
   {{#if isHistoryTab}}
@@ -756,14 +820,14 @@
         <h3>Бесплатные заказы</h3>
         <div class="admin-form__columns">
           <label>На пользователя одновременно <input type="number" name="limits.maxFreePerUser" min="0" max="100" value="{{settings.limits.maxFreePerUser}}" required /><small>сколько треков может стоять в очереди</small></label>
-          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxFreeDurationMin" min="0.5" max="1440" step="0.5" value="{{maxFreeDurationMin}}" required /></label>
+          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxFreeDurationMin" min="0.5" max="1440" step="any" value="{{maxFreeDurationMin}}" required /></label>
         </div>
       </div>
       <div class="music-set-group">
         <h3>Донатные заказы</h3>
         <div class="admin-form__columns">
           <label>На пользователя одновременно <input type="number" name="limits.maxPaidPerUser" min="0" max="100" value="{{settings.limits.maxPaidPerUser}}" required /><small>сколько треков может стоять в очереди</small></label>
-          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxPaidDurationMin" min="0.2" max="1440" step="0.5" value="{{maxPaidDurationMin}}" required /></label>
+          <label>Макс. длительность заказа, мин<input type="number" name="limits.maxPaidDurationMin" min="0.2" max="1440" step="any" value="{{maxPaidDurationMin}}" required /></label>
         </div>
       </div>
     </article>

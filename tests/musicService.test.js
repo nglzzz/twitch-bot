@@ -238,6 +238,53 @@ test('player error marks the request failed and moves on', async () => {
   assert.equal(ctx.service.getState().current.externalId, 'bbbbbbbbbbb');
 });
 
+test('a broken player pauses the queue instead of skipping every track', async () => {
+  const ids = ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc', 'ddddddddddd', 'eeeeeeeeeee', 'fffffffffff'];
+  ids.forEach((id) => { ctx.library[id] = ctx.library[id] || track(id); });
+  for (const [i, id] of ids.entries()) await request(id, viewer(`u${i}`));
+  await ctx.service.play();
+  ctx.service.registerPlayer('dock');
+  const fail = () => ctx.service.playerReport({ playerId: 'dock', event: 'error', requestId: ctx.service.getState().current.id, errorCode: 152 });
+  await fail();
+  await fail();
+  assert.equal(ctx.service.getState().current.externalId, 'ccccccccccc');
+  await fail();
+  let state = ctx.service.getState();
+  assert.equal(state.current.externalId, 'ccccccccccc', 'third error in a row does not skip');
+  assert.equal(state.status, 'paused');
+  assert.match(state.player.problem, /152/);
+
+  // «Играть» сбрасывает проблему; реальная позиция от плеера — тоже.
+  await ctx.service.play();
+  assert.equal(ctx.service.getState().player.problem, null);
+  await fail();
+  await ctx.service.playerReport({ playerId: 'dock', event: 'progress', requestId: ctx.service.getState().current.id, position: 3 });
+  await fail();
+  await fail();
+  state = ctx.service.getState();
+  assert.equal(state.status, 'playing', 'streak was reset by real playback');
+});
+
+test('progress without a position keeps the track position', async () => {
+  await request('aaaaaaaaaaa', viewer('u1'));
+  await ctx.service.play();
+  ctx.service.registerPlayer('dock');
+  const id = ctx.service.getState().current.id;
+  await ctx.service.playerReport({ playerId: 'dock', event: 'progress', requestId: id, position: 40 });
+  ctx.tick(5000);
+  await ctx.service.playerReport({ playerId: 'dock', event: 'progress', requestId: id });
+  await ctx.service.playerReport({ playerId: 'dock', event: 'progress', requestId: id, position: null });
+  assert.ok(ctx.service.getState().positionSec >= 40);
+});
+
+test('a new dock does not take over an online player unless asked', () => {
+  ctx.service.registerPlayer('browser-tab');
+  ctx.service.registerPlayer('obs-dock', { takeover: false });
+  assert.equal(ctx.service.getState().player.activeId, 'browser-tab');
+  ctx.service.registerPlayer('obs-dock');
+  assert.equal(ctx.service.getState().player.activeId, 'obs-dock');
+});
+
 test('reorder and remove keep the queue consistent', async () => {
   await request('aaaaaaaaaaa', viewer('u1'));
   await request('bbbbbbbbbbb', viewer('u2'));
