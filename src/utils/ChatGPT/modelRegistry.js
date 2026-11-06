@@ -12,6 +12,9 @@ const PROVIDERS = Object.freeze({
     url: 'https://openrouter.ai/api/v1/chat/completions',
     apiKeyEnvNames: ['OPENROUTER_API_KEY'],
     maxTokens: 512,
+    payload: {
+      reasoning: { enabled: false },
+    },
     headerEnvNames: {
       'HTTP-Referer': 'OPENROUTER_HTTP_REFERER',
       'X-Title': 'OPENROUTER_TITLE',
@@ -44,7 +47,7 @@ const MODEL_REGISTRY = Object.freeze({
     requestModelEnvNames: ['OPENROUTER_MODEL'],
     defaultRequestModels: [
       'qwen/qwen3.7-flash',
-      'openrouter:free',
+      'openrouter/free',
       'openai/gpt-oss-120b',
     ],
     fallbackModels: ['deepseek'],
