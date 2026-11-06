@@ -86,6 +86,7 @@
 }
 .vq-stage__player > iframe,
 .vq-stage__player > div,
+.vq-stage__player > div > iframe,
 .vq-stage__player > video {
   position: absolute;
   inset: 0;

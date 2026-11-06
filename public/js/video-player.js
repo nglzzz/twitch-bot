@@ -226,49 +226,90 @@
     };
   }
 
+  /**
+   * TikTok Embed Player v1. API: play, pause, seekTo, mute, unMute.
+   * Громкость задать нельзя (только вкл/выкл звука), скорость тоже.
+   * Плеер стартует без звука и шлёт каждое событие дважды.
+   */
   function TikTokAdapter(events) {
     var iframe = null;
+    var ready = false;
     var current = 0;
     var total = null;
     var state = -1;
     var start = 0;
     var wantPlay = false;
-    var volume = 100;
+    var wantSound = true;
+    var muted = null;
+    // Браузер не дал запустить ролик со звуком: играем без звука, пока стример не тронет звук сам.
+    var soundBlocked = false;
+    var debug = false;
+    try { debug = Boolean(window.localStorage && window.localStorage.getItem('vqDebug')); } catch (e) { /* ignore */ }
     function send(type, value) {
       if (!iframe || !iframe.contentWindow) return;
       var message = { type: type, 'x-tiktok-player': true };
       if (value !== undefined) message.value = value;
+      if (debug) console.log('[tiktok] ->', type, value === undefined ? '' : value);
       iframe.contentWindow.postMessage(message, '*');
+    }
+    function applySound() {
+      if (!ready) return;
+      var mute = !wantSound || soundBlocked;
+      if (muted === mute) return;
+      muted = mute;
+      send(mute ? 'mute' : 'unMute');
     }
     function onMessage(event) {
       if (!iframe || event.source !== iframe.contentWindow) return;
       var data = event.data;
       if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { return; } }
       if (!data || !data['x-tiktok-player']) return;
+      if (debug && data.type !== 'onCurrentTime') console.log('[tiktok] <-', data.type, data.value);
       if (data.type === 'onPlayerReady') {
-        if (volume > 0) send('unMute');
+        if (ready) return;
+        ready = true;
+        applySound();
         if (start > 0) send('seekTo', start);
-        if (wantPlay) send('play');
+        send(wantPlay ? 'play' : 'pause');
+      } else if (data.type === 'onMute') {
+        muted = Boolean(data.value);
       } else if (data.type === 'onStateChange') {
-        state = data.value;
+        var next = Number(data.value);
+        if (next === state) return;
+        state = next;
         if (state === 1) events.onPlaying();
         if (state === 2) events.onPaused();
         if (state === 0) events.onEnded();
-      } else if (data.type === 'onCurrentTime' && data.value) {
-        current = Number(data.value.currentTime) || 0;
-        total = Number(data.value.duration) || total;
-      } else if (data.type === 'onError') {
-        events.onError(data.value || 'tiktok');
+      } else if (data.type === 'onCurrentTime' && data.value !== undefined && data.value !== null) {
+        var value = data.value;
+        var time = typeof value === 'object' ? Number(value.currentTime) : Number(value);
+        if (isFinite(time)) current = time;
+        if (typeof value === 'object' && Number(value.duration) > 0) total = Number(value.duration);
+      } else if (data.type === 'onPlayerError') {
+        var code = Number(data.value && data.value.errorCode);
+        if (code === 3002) {
+          // Автозапуск со звуком запрещён браузером: запускаем без звука.
+          soundBlocked = true;
+          muted = null;
+          applySound();
+          if (wantPlay) send('play');
+          if (events.onSoundBlocked) events.onSoundBlocked();
+          return;
+        }
+        events.onError('tiktok-' + (code || 'error'));
       }
+      // onError устарел и дублирует onPlayerError, поэтому его не слушаем.
     }
     window.addEventListener('message', onMessage);
     return {
       load: function (item, startSec, autoplay) {
         start = startSec || 0;
-        wantPlay = autoplay;
+        wantPlay = Boolean(autoplay);
         current = start;
         total = null;
         state = -1;
+        ready = false;
+        muted = null;
         var target = mount();
         iframe = document.createElement('iframe');
         iframe.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
@@ -277,15 +318,20 @@
           '&timestamp=0&loop=0&music_info=0&description=0&rel=0&native_context_menu=0&closed_caption=0';
         target.appendChild(iframe);
       },
-      play: function () { wantPlay = true; send('play'); },
-      pause: function () { wantPlay = false; send('pause'); },
-      seek: function (sec) { send('seekTo', sec); current = sec; },
-      setVolume: function (v) { volume = v; send(v > 0 ? 'unMute' : 'mute'); },
+      play: function () { wantPlay = true; if (ready) send('play'); },
+      pause: function () { wantPlay = false; if (ready) send('pause'); },
+      seek: function (sec) { current = sec; if (ready) send('seekTo', sec); else start = sec; },
+      setVolume: function (v, fromUser) {
+        wantSound = v > 0;
+        if (fromUser) soundBlocked = false;
+        applySound();
+      },
       setPlaybackRate: function () {},
       time: function () { return current; },
       duration: function () { return total; },
-      playing: function () { return state === 1; },
-      destroy: function () { window.removeEventListener('message', onMessage); iframe = null; },
+      // 3 — буферизация: ролик не на паузе, повторный play не нужен.
+      playing: function () { return state === 1 || (state === 3 && wantPlay); },
+      destroy: function () { window.removeEventListener('message', onMessage); iframe = null; ready = false; },
     };
   }
 
@@ -500,6 +546,7 @@
     },
     onPlaybackRate: function () { rateResumeUntil = Date.now() + 4000; },
     onPlaybackRateSettled: function () { rateResumeUntil = 0; },
+    onSoundBlocked: function () { toast('Браузер не дал включить звук TikTok. Подвиньте громкость, чтобы включить его.'); },
     onPaused: function () {
       var settling = Date.now() < Math.max(seekResumeUntil, rateResumeUntil);
       // Пауза от setPlaybackRate/seekTo не должна сохраняться на сервере как пауза стримера.
@@ -769,6 +816,8 @@
     els.rate.title = speedHint;
     if (els.rateLabel) els.rateLabel.title = speedHint;
     if (document.activeElement !== els.rate) els.rate.value = String(playbackRateOf(state.playbackRate));
+    var volumeHint = item && item.provider === 'tiktok' ? 'TikTok: звук только вкл/выкл, уровень громкости не меняется' : 'Громкость';
+    if (els.volume.parentNode && els.volume.parentNode.title !== undefined) els.volume.parentNode.title = volumeHint;
     renderQueueSub(state);
     // Активный плеер пропал (закрыли вкладку) — эта страница подхватывает воспроизведение.
     if (registered && !isActive && state.player && !state.player.online) register(false);
@@ -1006,7 +1055,7 @@
 
   var volumeTimer = null;
   els.volume.addEventListener('input', function () {
-    if (adapter) adapter.setVolume(Number(els.volume.value));
+    if (adapter) adapter.setVolume(Number(els.volume.value), true);
     clearTimeout(volumeTimer);
     volumeTimer = setTimeout(function () { control('volume', Number(els.volume.value)); }, 300);
   });
@@ -1022,7 +1071,7 @@
     els.unmute.hidden = true;
     var state = lastState;
     if (adapter) {
-      adapter.setVolume(Math.max(0, Math.min(100, Number(state && state.volume) || 0)));
+      adapter.setVolume(Math.max(0, Math.min(100, Number(state && state.volume) || 0)), true);
       if (state && state.status === 'playing') askPlay();
       else control('play');
     }

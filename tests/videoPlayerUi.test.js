@@ -66,6 +66,7 @@ function createHarness(initialState = idleState(), registerState = null, harness
   let registrationState = registerState ? structuredClone(registerState) : null;
   const queue = [];
   const youtubePlayers = [];
+  const iframes = [];
 
   class FakeSocket {
     constructor() { this.listeners = Object.create(null); socket = this; }
@@ -159,7 +160,9 @@ function createHarness(initialState = idleState(), registerState = null, harness
   const window = {
     YT,
     location: { protocol: 'http:', hostname: 'localhost', host: 'localhost' },
-    addEventListener() {},
+    listeners: Object.create(null),
+    addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); },
+    removeEventListener(type, listener) { this.listeners[type] = (this.listeners[type] || []).filter((item) => item !== listener); },
     confirm: () => true,
   };
   const document = {
@@ -169,7 +172,15 @@ function createHarness(initialState = idleState(), registerState = null, harness
     querySelector: () => null,
     querySelectorAll: () => [],
     addEventListener() {},
-    createElement: (tag) => new MockElement(tag),
+    createElement: (tag) => {
+      const element = new MockElement(tag);
+      if (tag === 'iframe') {
+        element.sent = [];
+        element.contentWindow = { postMessage: (message) => element.sent.push(message.value === undefined ? message.type : `${message.type}:${message.value}`) };
+        iframes.push(element);
+      }
+      return element;
+    },
     createElementNS: (_namespace, tag) => new MockElement(tag),
     head: { appendChild() {} },
   };
@@ -237,6 +248,10 @@ function createHarness(initialState = idleState(), registerState = null, harness
     setRegistrationState(next) { serverState = structuredClone(next); registrationState = structuredClone(next); },
     get youtube() { return youtube; },
     youtubePlayers,
+    iframes,
+    frameMessage(iframe, type, value) {
+      for (const listener of window.listeners.message || []) listener({ source: iframe.contentWindow, data: { 'x-tiktok-player': true, type, value } });
+    },
     get socket() { return socket; },
     advance(ms) { now += ms; },
     frame() { const callback = clock.frames.shift(); assert.ok(callback, 'animation frame was scheduled'); callback(); },
@@ -624,4 +639,68 @@ test('a native pause immediately after a completed seek is not swallowed', async
   await settle();
   assert.ok(harness.requests.some((entry) => entry.url.endsWith('/player/report') && entry.body.event === 'paused'));
   assert.equal(harness.serverState.status, 'paused');
+});
+
+test('TikTok embed gets play, pause and mute commands and is not spammed with unMute', async () => {
+  const tiktok = { id: 'request-1', provider: 'tiktok', kind: 'tiktok', externalId: '7705128519210241310', title: 'TikTok', requestedBy: 'viewer', startSec: 0, durationSec: null, isPaid: false, isVertical: true };
+  const harness = createHarness(playingState({ current: tiktok, positionSec: 0 }));
+  await settle();
+  await settle();
+  const iframe = harness.iframes.at(-1);
+  assert.ok(iframe, 'TikTok iframe is created');
+  assert.deepEqual(iframe.sent, [], 'nothing is sent before the player is ready');
+
+  // The real player starts muted and repeats every event twice.
+  harness.frameMessage(iframe, 'onPlayerReady');
+  harness.frameMessage(iframe, 'onPlayerReady');
+  assert.deepEqual(iframe.sent, ['unMute', 'play']);
+  harness.frameMessage(iframe, 'onMute', false);
+  harness.frameMessage(iframe, 'onStateChange', 3);
+  harness.frameMessage(iframe, 'onStateChange', 1);
+  harness.frameMessage(iframe, 'onStateChange', 1);
+  harness.frameMessage(iframe, 'onCurrentTime', { currentTime: 4, duration: 20 });
+  const playerId = harness.requests.find((entry) => entry.url.endsWith('/player/register')).body.playerId;
+  harness.broadcastState(playingState({ current: tiktok, positionSec: 0, seq: 6, player: { online: true, activeId: playerId } }));
+  harness.tickProgress();
+  await settle();
+  assert.deepEqual(iframe.sent, ['unMute', 'play'], 'state broadcasts do not repeat commands');
+  const progress = harness.requests.filter((entry) => entry.url.endsWith('/player/report') && entry.body.event === 'progress').at(-1);
+  assert.equal(progress.body.position, 4);
+  assert.equal(progress.body.duration, 20);
+
+  harness.elements['vq-toggle'].dataset.action = 'toggle';
+  harness.elements.vq.dispatch('click', { target: harness.elements['vq-toggle'] });
+  await settle();
+  assert.equal(iframe.sent.at(-1), 'pause');
+  harness.frameMessage(iframe, 'onStateChange', 2);
+  harness.frameMessage(iframe, 'onStateChange', 3);
+  harness.elements.vq.dispatch('click', { target: harness.elements['vq-toggle'] });
+  await settle();
+  assert.equal(iframe.sent.at(-1), 'play');
+
+  harness.elements['vq-volume'].value = '0';
+  harness.elements['vq-volume'].dispatch('input');
+  assert.equal(iframe.sent.at(-1), 'mute');
+});
+
+test('TikTok sound blocked by the browser keeps playing muted until the streamer changes volume', async () => {
+  const tiktok = { id: 'request-1', provider: 'tiktok', kind: 'tiktok', externalId: '7705128519210241310', title: 'TikTok', requestedBy: 'viewer', startSec: 0, durationSec: null, isPaid: false, isVertical: true };
+  const harness = createHarness(playingState({ current: tiktok, positionSec: 0 }));
+  await settle();
+  await settle();
+  const iframe = harness.iframes.at(-1);
+  harness.frameMessage(iframe, 'onPlayerReady');
+  harness.frameMessage(iframe, 'onPlayerError', { errorCode: 3002, errorType: 'AUTOPLAY_ERROR' });
+  assert.deepEqual(iframe.sent, ['unMute', 'play', 'mute', 'play']);
+  assert.equal(harness.requests.some((entry) => entry.body?.event === 'error'), false, 'blocked sound is not a playback error');
+
+  const playerId = harness.requests.find((entry) => entry.url.endsWith('/player/register')).body.playerId;
+  harness.frameMessage(iframe, 'onStateChange', 1);
+  harness.broadcastState(playingState({ current: tiktok, positionSec: 0, seq: 6, player: { online: true, activeId: playerId } }));
+  await settle();
+  assert.deepEqual(iframe.sent, ['unMute', 'play', 'mute', 'play'], 'a state broadcast does not unmute again');
+
+  harness.elements['vq-volume'].value = '70';
+  harness.elements['vq-volume'].dispatch('input');
+  assert.equal(iframe.sent.at(-1), 'unMute');
 });
