@@ -256,6 +256,8 @@ function createYouTubeProvider({ http = axios, now = Date.now, cacheTtlMs = 10 *
       thumbnail: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
       isLive: Boolean(details.isLiveContent) && durationSec === 0,
       url: 'https://www.youtube.com/watch?v=' + id,
+      publishedAt: Date.parse(micro.publishDate || micro.uploadDate || '') || null,
+      channelId: typeof details.channelId === 'string' ? details.channelId : null,
     };
     return { track, status };
   }

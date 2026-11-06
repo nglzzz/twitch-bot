@@ -3,7 +3,7 @@
  * Получает состояние плеера и очередь через WebSocket и плавно считает
  * позицию трека между обновлениями сервера.
  *
- * MusicClient.connect({ initial, websocketPort, onState, onQueue, onConnection })
+ * MusicClient.connect({ initial, websocketPort, onState, onQueue, onConnection, namespace?, stateUrl? })
  *   -> { getState(), getQueue(), position(), refresh(), close() }
  */
 (function () {
@@ -30,6 +30,9 @@
     var socket = null;
     var closed = false;
     var retryMs = 1000;
+    // namespace: 'music' или 'video' — тип сообщений WebSocket и адрес состояния.
+    var ns = opts.namespace || 'music';
+    var stateUrl = opts.stateUrl || '/api/' + ns + '/state';
 
     function emitState() { if (typeof opts.onState === 'function') opts.onState(state); }
     function emitQueue() { if (typeof opts.onQueue === 'function') opts.onQueue(queue); }
@@ -51,7 +54,7 @@
     }
 
     function refresh() {
-      return fetch('/api/music/state', { cache: 'no-store' })
+      return fetch(stateUrl, { cache: 'no-store', credentials: 'same-origin' })
         .then(function (response) { return response.ok ? response.json() : null; })
         .then(function (data) {
           if (!data) return;
@@ -72,8 +75,8 @@
       socket.addEventListener('message', function (event) {
         var data;
         try { data = JSON.parse(event.data); } catch (error) { return; }
-        if (data.type === 'music:state') setState(data.state);
-        else if (data.type === 'music:queue') setQueue(data.queue);
+        if (data.type === ns + ':state') setState(data.state);
+        else if (data.type === ns + ':queue') setQueue(data.queue);
       });
       socket.addEventListener('close', function () {
         emitConnection(false);

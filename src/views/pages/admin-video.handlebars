@@ -1,0 +1,159 @@
+<link rel="stylesheet" href="/css/video.css" />
+<div class="vq" id="vq"
+  data-csrf="{{csrfToken}}"
+  data-ws-port="{{websocketPort}}"
+  data-settings-url="{{settingsUrl}}">
+
+  <main class="vq-stage is-idle" id="vq-stage" aria-label="Видеоплеер">
+    <div class="vq-stage__backdrop" id="vq-backdrop" aria-hidden="true"></div>
+    <div class="vq-stage__frame" id="vq-frame">
+      <div class="vq-stage__player" id="vq-player"></div>
+    </div>
+
+    <section class="vq-idle" id="vq-idle">
+      <div class="vq-idle__card">
+        <div class="vq-idle__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Zm6 2.3v6.4c0 .6.6.9 1.1.6l5-3.2a.7.7 0 0 0 0-1.2l-5-3.2c-.5-.3-1.1 0-1.1.6Z"/></svg>
+        </div>
+        <div class="vq-idle__eyebrow">СМОТРИМ ВМЕСТЕ</div>
+        <h1 class="vq-idle__title" id="vq-idle-title">Заказ видео</h1>
+        <p class="vq-idle__text" id="vq-idle-text">Подключаем видеостудию…</p>
+        <div class="vq-idle__platforms" id="vq-idle-platforms"></div>
+      </div>
+    </section>
+
+    <section class="vq-alert" id="vq-warning" hidden>
+      <div class="vq-alert__card">
+        <svg class="vq-alert__ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="52" class="vq-alert__track"/>
+          <circle cx="60" cy="60" r="52" class="vq-alert__arc" id="vq-warning-arc"/>
+        </svg>
+        <div class="vq-alert__count" id="vq-warning-count">7</div>
+        <div class="vq-alert__title" id="vq-warning-title">Чат пропускает видео</div>
+        <div class="vq-alert__actions">
+          <button class="vq-btn vq-btn--ghost" type="button" data-action="cancelWarning" id="vq-warning-keep">Оставить</button>
+          <button class="vq-btn vq-btn--danger" type="button" data-action="skip" id="vq-warning-skip">Дальше</button>
+        </div>
+      </div>
+    </section>
+
+    <button class="vq-unmute" id="vq-unmute" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8c0 .8.9 1.3 1.6.8l9.6-6.4a1 1 0 0 0 0-1.6L9.6 4.8C8.9 4.3 8 4.8 8 5.6Z"/></svg>
+      Нажмите, чтобы запустить видео
+    </button>
+
+    <div class="vq-banner" id="vq-banner" hidden>
+      <span>Плеер открыт в другой вкладке.</span>
+      <button class="vq-btn vq-btn--primary vq-btn--sm" type="button" id="vq-takeover">Играть здесь</button>
+    </div>
+    <div class="vq-problem" id="vq-problem" hidden></div>
+    <button class="vq-fullscreen vq-icon" id="vq-fullscreen" type="button" title="Видео на весь экран" aria-label="Видео на весь экран"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg></button>
+  </main>
+
+  <footer class="vq-bar" id="vq-bar">
+    <div class="vq-bar__progress" id="vq-progress">
+      <div class="vq-bar__fill" id="vq-fill"></div>
+      <input class="vq-bar__seek" id="vq-seek" type="range" min="0" max="0" value="0" step="1" aria-label="Перемотка" />
+    </div>
+    <div class="vq-bar__body">
+      <div class="vq-now">
+        <div class="vq-now__chips" id="vq-chips"></div>
+        <div class="vq-now__title" id="vq-title">Ничего не идёт</div>
+        <div class="vq-now__meta">
+          <span class="vq-now__by" id="vq-by"></span>
+          <span class="vq-now__time" id="vq-time"></span>
+        </div>
+      </div>
+
+      <div class="vq-vote" id="vq-vote">
+        <div class="vq-vote__row">
+          <div class="vq-vote__side vq-vote__side--keep">
+            <span class="vq-vote__words" id="vq-keep-words"></span>
+            <span class="vq-vote__count" id="vq-keep-count">0</span>
+          </div>
+          <div class="vq-vote__meter" aria-hidden="true">
+            <div class="vq-vote__meter-fill" id="vq-vote-fill"></div>
+          </div>
+          <div class="vq-vote__side vq-vote__side--skip">
+            <span class="vq-vote__count" id="vq-skip-count">0</span>
+            <span class="vq-vote__words" id="vq-skip-words"></span>
+          </div>
+        </div>
+        <div class="vq-vote__hint" id="vq-vote-hint"></div>
+      </div>
+
+      <div class="vq-controls">
+        <button class="vq-icon" id="vq-focus" type="button" title="Скрыть / показать боковую панель" aria-label="Скрыть боковую панель" aria-controls="vq-sidebar" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4V4Zm2 2v12h9V6H6Zm11 0v12h1V6h-1Z"/></svg></button>
+        <button class="vq-icon" type="button" data-action="toggle" id="vq-toggle" aria-label="Воспроизвести" title="Пауза / играть (пробел)">
+          <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8c0 .8.9 1.3 1.6.8l9.6-6.4a1 1 0 0 0 0-1.6L9.6 4.8C8.9 4.3 8 4.8 8 5.6Z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24"><path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z"/></svg>
+        </button>
+        <button class="vq-icon" type="button" data-action="skip" aria-label="Следующее видео" title="Следующее (N)">
+          <svg viewBox="0 0 24 24"><path d="M5 6.2v11.6c0 .8.9 1.2 1.5.8l8.4-5.8a1 1 0 0 0 0-1.6L6.5 5.4C5.9 5 5 5.4 5 6.2ZM17 5h2.4v14H17z"/></svg>
+        </button>
+        <button class="vq-icon" type="button" data-action="lock" id="vq-lock" aria-label="Закрепить видео" aria-pressed="false" title="Закрепить: без голосования (L)">
+          <svg viewBox="0 0 24 24"><path d="M15.5 3.5 20.5 8.5l-2.1.7-3.3 3.3.4 4.1-1.4 1.4-3.6-3.6-4.8 4.8-1-1 4.8-4.8L5.9 9.8l1.4-1.4 4.1.4 3.3-3.3.8-2Z"/></svg>
+        </button>
+        <button class="vq-icon" type="button" data-action="loop" id="vq-loop" aria-label="Повтор видео" aria-pressed="false" title="Повтор">
+          <svg viewBox="0 0 24 24"><path d="M7 7h9.2l-1.6-1.6L16 4l4 4-4 4-1.4-1.4L16.2 9H7a2 2 0 0 0-2 2v1H3v-1a4 4 0 0 1 4-4Zm10 10H7.8l1.6 1.6L8 20l-4-4 4-4 1.4 1.4L7.8 15H17a2 2 0 0 0 2-2v-1h2v1a4 4 0 0 1-4 4Z"/></svg>
+        </button>
+        <label class="vq-volume" title="Громкость">
+          <svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4v-5Zm11.5-1.7a5.5 5.5 0 0 1 0 8.4l-1.3-1.5a3.5 3.5 0 0 0 0-5.4l1.3-1.5Z"/></svg>
+          <input type="range" id="vq-volume" min="0" max="100" step="1" aria-label="Громкость" />
+        </label>
+        <label class="vq-rate" id="vq-rate-label" title="Скорость">
+          <select id="vq-rate" aria-label="Скорость воспроизведения">
+            <option value="0.5">0.5×</option>
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="1.75">1.75×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <a class="vq-icon vq-icon--muted" href="{{settingsUrl}}" target="_blank" rel="noopener" aria-label="Настройки" title="Настройки">
+          <svg viewBox="0 0 24 24"><path d="M13.7 3l.5 2.3c.6.2 1.1.5 1.6.9l2.2-.8 1.7 3-1.7 1.5a6 6 0 0 1 0 1.8l1.7 1.5-1.7 3-2.2-.8c-.5.4-1 .7-1.6.9l-.5 2.3h-3.4l-.5-2.3a6 6 0 0 1-1.6-.9l-2.2.8-1.7-3 1.7-1.5a6 6 0 0 1 0-1.8L4.3 8.4l1.7-3 2.2.8c.5-.4 1-.7 1.6-.9l.5-2.3h3.4ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <aside class="vq-queue" id="vq-sidebar">
+  <header class="vq-header">
+    <a class="vq-brand" href="/admin" aria-label="В админку"><span>Видеостудия</span></a>
+    <div class="vq-header__actions">
+        <button class="vq-accept" type="button" id="vq-accept" data-action="accepting" aria-pressed="false">
+          <span class="vq-accept__dot"></span>
+          <span class="vq-accept__label" id="vq-accept-label">Приём закрыт</span>
+        </button>
+    </div>
+  </header>
+  <div class="vq-stage-heading"><span><span class="vq-status-dot" id="vq-status-dot"></span><span id="vq-status" role="status">Ожидание видео</span></span></div>
+
+    <header class="vq-queue__head">
+      <div>
+        <h2 class="vq-queue__title">На очереди <span id="vq-queue-count">0</span></h2>
+        <div class="vq-queue__sub" id="vq-queue-sub">Очередь пуста</div>
+      </div>
+      <div class="vq-queue__tools">
+        <span class="vq-ws" id="vq-ws" title="Связь с сервером"></span>
+        <button class="vq-icon vq-icon--sm" type="button" id="vq-add-toggle" title="Добавить видео" aria-label="Добавить видео" aria-controls="vq-add" aria-expanded="true">
+          <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+        </button>
+      </div>
+    </header>
+    <form class="vq-add" id="vq-add">
+      <input class="vq-add__input" id="vq-add-input" type="text" aria-label="Ссылка на видео" placeholder="Вставьте ссылку на видео" autocomplete="off" />
+      <button class="vq-btn vq-btn--primary vq-btn--sm" type="submit">Добавить</button>
+    </form>
+    <div class="vq-toast" id="vq-toast" role="status" hidden></div>
+    <div class="vq-queue__empty" id="vq-empty"><span class="vq-empty-icon" aria-hidden="true">☷</span><strong>Здесь будет следующий хит</strong><p>Добавьте видео по ссылке<br />или откройте приём заказов из чата</p><span class="vq-empty-command">!video &lt;ссылка&gt;</span></div>
+    <ol class="vq-list" id="vq-list" aria-label="Очередь видео"></ol>
+  </aside>
+
+</div>
+
+<script>window.__VQ_INITIAL__ = {{{initialJson}}};</script>
+<script src="/js/music-client.js"></script>
+<script src="/js/video-player.js?v=20261107c"></script>

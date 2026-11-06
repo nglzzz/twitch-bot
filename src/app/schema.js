@@ -348,6 +348,75 @@ const STATEMENTS = [
     created_at INTEGER NOT NULL
   )`,
 
+  // --- video: заказ видео (video requests) ---
+  `CREATE TABLE IF NOT EXISTS video_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS video_request (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'video',
+    title TEXT NOT NULL,
+    author TEXT,
+    channel_id TEXT,
+    duration_sec INTEGER,
+    thumbnail TEXT,
+    url TEXT,
+    embed TEXT,
+    is_vertical INTEGER NOT NULL DEFAULT 0,
+    view_count INTEGER,
+    published_at INTEGER,
+    requested_by TEXT NOT NULL,
+    requested_by_display TEXT,
+    requested_by_id TEXT,
+    message_id TEXT,
+    co_requesters TEXT NOT NULL DEFAULT '[]',
+    source TEXT NOT NULL,
+    is_paid INTEGER NOT NULL DEFAULT 0,
+    amount REAL,
+    currency TEXT,
+    amount_rub REAL,
+    donation_id TEXT,
+    start_sec INTEGER NOT NULL DEFAULT 0,
+    play_limit_sec INTEGER,
+    position REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'queued',
+    status_reason TEXT,
+    votes_skip REAL,
+    votes_keep REAL,
+    created_at INTEGER NOT NULL,
+    started_at INTEGER,
+    finished_at INTEGER,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_status_position ON video_request(status, position)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_finished ON video_request(finished_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_requester ON video_request(lower(requested_by), status)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_item ON video_request(provider, external_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_message ON video_request(message_id) WHERE message_id IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_video_request_donation ON video_request(donation_id) WHERE donation_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS video_blacklist_item (
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    title TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (provider, external_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS video_blacklist_user (
+    login TEXT PRIMARY KEY COLLATE NOCASE,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS video_blacklist_channel (
+    provider TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    name TEXT,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (provider, channel_id)
+  )`,
+
   // --- schema_migrations: контроль версий схемы ---
   `CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,

@@ -100,8 +100,11 @@ async function createAndSendDonation(data, source) {
     donation = donationRepo.update(existing._id, { ...donationData, status: 'pending', error: null });
   } else {
     donation = donationRepo.create({ ...donationData, status: 'pending', error: null });
-    // Заказ музыки из текста доната не зависит от пересылки алерта в StreamElements.
-    require('./music').handleDonationForMusic(donation)
+    // Заказ видео или музыки из текста доната не зависит от пересылки алерта в StreamElements.
+    // При открытом приёме видео ссылка на видео уходит в очередь видео, иначе — в музыку.
+    require('./video').handleDonationForVideo(donation)
+      .catch((error) => { console.error('[Video] Donation request failed:', error.message); return null; })
+      .then((handled) => (handled ? null : require('./music').handleDonationForMusic(donation)))
       .catch((error) => console.error('[Music] Donation request failed:', error.message));
   }
 

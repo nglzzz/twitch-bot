@@ -1112,6 +1112,11 @@ function buildNavigation(currentPage) {
       isActive: currentPage === 'music',
     },
     {
+      label: 'Видео',
+      href: '/video',
+      isActive: currentPage === 'video',
+    },
+    {
       label: 'Озвучка',
       href: '/speak',
       isActive: currentPage === 'speak',

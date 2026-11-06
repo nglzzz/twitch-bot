@@ -1,0 +1,408 @@
+<link rel="stylesheet" href="/css/video-settings.css" />
+<section class="admin-page admin-video video-settings-page">
+  <header class="video-settings-hero">
+    <div class="video-settings-hero__copy">
+      <span class="video-settings-eyebrow"><span class="video-settings-eyebrow__dot"></span> УПРАВЛЕНИЕ ЭФИРОМ</span>
+      <h1>Видео</h1>
+      <p>Настройте заказы, правила и поведение видеоплеера.</p>
+    </div>
+    <div class="video-settings-hero__actions">
+      <a class="btn btn--primary" href="{{playerUrl}}" target="_blank" rel="noreferrer">Открыть плеер <span aria-hidden="true">↗</span></a>
+      <a class="video-settings-public-link" href="{{publicUrl}}" target="_blank" rel="noreferrer">Страница зрителей <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+
+  <details class="video-settings-guide">
+    <summary><span class="video-settings-guide__icon" aria-hidden="true">i</span><span><strong>Как работает заказ видео</strong><small>Инструкция по чату, плееру и OBS</small></span><span class="video-settings-guide__chevron" aria-hidden="true">⌄</span></summary>
+    <div class="video-settings-guide__body">
+      <p>Откройте плеер в браузере и захватывайте окно в OBS. Для звука используйте «Захват звука приложения» или звук рабочего стола.</p>
+      <p>Зрители отправляют ссылку в чат или используют <code>!video &lt;ссылка&gt;</code>. Команда <code>!wrongvideo</code> отменяет собственный заказ. Модераторы могут пропустить ролик командой <code>!vskip</code>; остальные зрители голосуют первым словом сообщения.</p>
+      <p>Донат со ссылкой попадает в очередь видео, если приём открыт. Донат с <code>!sr</code> всегда добавляет музыку.</p>
+    </div>
+  </details>
+
+  <nav class="admin-tabs admin-tabs--events" aria-label="Разделы видео">
+    {{#each tabs}}<a class="admin-tabs__link{{#if isActive}} is-active{{/if}}" href="{{href}}">{{label}}</a>{{/each}}
+  </nav>
+  <script>
+    (function () {
+      var active = document.querySelector('.admin-video .admin-tabs__link.is-active');
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+    })();
+  </script>
+
+  {{#if success}}<p class="form-notice form-notice--success" role="status">{{success}}</p>{{/if}}
+  {{#if error}}<p class="form-notice form-notice--error" role="alert">{{error}}</p>{{/if}}
+  {{#unless available}}<p class="form-notice form-notice--error" role="alert">База данных недоступна — заказ видео сейчас не работает.</p>{{/unless}}
+
+  {{#if isSettingsTab}}
+  <div class="video-settings-layout">
+    <nav class="video-settings-nav" aria-label="Настройки видео">
+      <span class="video-settings-nav__label">НАСТРОЙКИ</span>
+      <a href="#video-chat">Заказы из чата</a>
+      <a href="#video-providers">Площадки</a>
+      <a href="#video-limits">Лимиты</a>
+      <a href="#video-filters">Фильтры</a>
+      <a href="#video-voting">Голосование</a>
+      <a href="#video-paid">Донатные заказы</a>
+      <a href="#video-player">Плеер</a>
+    </nav>
+    <div class="video-settings-sections">
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-chat">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="chat" />
+
+    <article class="admin-card">
+      <h2>Заказы из чата</h2>
+      <div class="admin-form__columns">
+        <label>Как принимать ссылки
+          <select name="chat.linkMode">
+            {{#each linkModeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+        <label>Ответы бота
+          <select name="chat.replies">
+            {{#each replyOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="chat.announceAccepting" {{#if settings.chat.announceAccepting}}checked{{/if}} /> Писать в чат об открытии/закрытии приёма</label>
+      <label class="admin-check"><input type="checkbox" name="chat.coRequest" {{#if settings.chat.coRequest}}checked{{/if}} /> Повторный заказ того же видео добавляет зрителя к заказу</label>
+      <label class="admin-check"><input type="checkbox" name="chat.removeOnDelete" {{#if settings.chat.removeOnDelete}}checked{{/if}} /> Удалённое модератором сообщение снимает заказ</label>
+      <label class="admin-check"><input type="checkbox" name="chat.firstTimeChatters" {{#if settings.chat.firstTimeChatters}}checked{{/if}} /> Разрешить заказ с первого сообщения в чате</label>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-providers">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="providers" />
+
+    <article class="admin-card">
+      <h2>Площадки</h2>
+      <p class="admin-card__hint">Какие ссылки принимает бот. TikTok не сообщает длительность до запуска — фильтр максимальной длины применяется только после начала воспроизведения.</p>
+      <div class="music-checks">
+        {{#each providerOptions}}<label class="admin-check music-checks__item"><input type="checkbox" name="{{name}}" {{#if checked}}checked{{/if}} /> {{label}}</label>{{/each}}
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-limits">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="limits" />
+
+    <article class="admin-card">
+      <h2>Лимиты</h2>
+      <div class="music-set-group">
+        <div class="admin-form__columns">
+          <label>Макс. видео в очереди<input type="number" name="limits.maxQueue" min="1" max="1000" value="{{settings.limits.maxQueue}}" required /></label>
+          <label>Макс. длина очереди, мин<input type="number" name="limits.maxQueueDurationMin" min="0" max="1440" step="any" value="{{settings.limits.maxQueueDurationMin}}" /><small>0 — без ограничения; при достижении приём закрывается</small></label>
+        </div>
+      </div>
+      <div class="music-set-group">
+        <div class="admin-form__columns">
+          <label>Макс. длина бесплатного видео, мин<input type="number" name="limits.maxFreeDurationMin" min="0.1" max="1440" step="any" value="{{maxFreeDurationMin}}" required /></label>
+          <label>Макс. длина донатного видео, мин<input type="number" name="limits.maxPaidDurationMin" min="0.1" max="1440" step="any" value="{{maxPaidDurationMin}}" required /></label>
+        </div>
+      </div>
+      <div class="music-set-group">
+        <h3>Бесплатные заказы по ролям</h3>
+        <div class="admin-form__columns">
+          {{#each roleLimitOptions}}
+          <label>{{label}}<input type="number" name="{{name}}" min="0" max="100" value="{{value}}" required /></label>
+          {{/each}}
+        </div>
+        <p class="admin-card__hint">Сколько бесплатных заказов одновременно; 0 — роль не может заказывать; берётся максимум по ролям зрителя.</p>
+      </div>
+      <div class="music-set-group">
+        <div class="admin-form__columns">
+          <label>Донатных видео на зрителя одновременно<input type="number" name="limits.maxPaidPerUser" min="0" max="100" value="{{settings.limits.maxPaidPerUser}}" required /></label>
+          <span></span>
+        </div>
+        <label class="admin-check"><input type="checkbox" name="queue.insertRandomly" {{#if settings.queue.insertRandomly}}checked{{/if}} /> Ставить бесплатные заказы в случайное место очереди</label>
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-filters">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="filters" />
+
+    <article class="admin-card">
+      <h2>Фильтры</h2>
+      <p class="admin-card__hint">Пустое поле или 0 — фильтр выключен.</p>
+      <div class="admin-form__columns">
+        <label>Минимум просмотров<input type="number" name="filters.minViews" min="0" max="1000000000000" step="1" value="{{settings.filters.minViews}}" /></label>
+        <label>Видео не новее N дней<input type="number" name="filters.minAgeDays" min="0" max="18250" step="any" value="{{settings.filters.minAgeDays}}" /></label>
+      </div>
+      <div class="admin-form__columns">
+        <label>Видео не старше N дней<input type="number" name="filters.maxAgeDays" min="0" max="18250" step="any" value="{{settings.filters.maxAgeDays}}" /></label>
+        <span></span>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="filters.uniqueOnly" {{#if settings.filters.uniqueOnly}}checked{{/if}} /> Только видео, которые ещё не смотрели</label>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-voting">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="voting" />
+
+    <article class="admin-card">
+      <h2>Голосование</h2>
+      <label class="admin-check"><input type="checkbox" name="voting.enabled" {{#if settings.voting.enabled}}checked{{/if}} /> Голосование за пропуск видео</label>
+      <div class="admin-form__columns">
+        <label>Слова «скип» — по одному в строке<textarea name="voting.skipWords" rows="4" placeholder="Например:&#10;скип&#10;skip">{{skipWordsText}}</textarea></label>
+        <label>Слова «оставить» — по одному в строке<textarea name="voting.keepWords" rows="4" placeholder="Например:&#10;оставить&#10;keep">{{keepWordsText}}</textarea></label>
+      </div>
+      <p class="admin-card__hint">Сравнивается первое слово сообщения; можно смайлы 7TV/BTTV/FFZ — на экране плеера покажется картинка.</p>
+      <div class="admin-form__columns">
+        <label>Преимущество «скип» для пропуска<input type="number" name="voting.needed" min="1" max="10000" value="{{settings.voting.needed}}" required /><small>сколько голосов «скип» должно быть больше, чем «оставить»</small></label>
+        <label>Голосовать нельзя первые N секунд<input type="number" name="voting.blockSec" min="0" max="600" value="{{settings.voting.blockSec}}" /></label>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="voting.canChangeVote" {{#if settings.voting.canChangeVote}}checked{{/if}} /> Разрешить менять голос</label>
+      <div class="admin-form__columns">
+        <label>Что делать при наборе голосов
+          <select name="voting.action">
+            {{#each voteActionOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+        <label>Отсчёт до скипа, сек<input type="number" name="voting.warningSec" min="1" max="60" value="{{settings.voting.warningSec}}" required /></label>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="voting.lockEnabled" {{#if settings.voting.lockEnabled}}checked{{/if}} /> Досматривать видео, если «оставить» побеждает</label>
+      <div class="admin-form__columns">
+        <label>«Оставить» больше «скип» на N<input type="number" name="voting.lockVotes" min="1" max="10000" value="{{settings.voting.lockVotes}}" required /><small>если «оставить» больше «скип» на N — видео досматриваем</small></label>
+        <span></span>
+      </div>
+      <div class="admin-form__columns">
+        <label>Вес голоса VIP<input type="number" name="voting.vipWeight" min="0" max="100" step="any" value="{{settings.voting.vipWeight}}" /></label>
+        <label>Вес голоса модератора<input type="number" name="voting.modWeight" min="0" max="100" step="any" value="{{settings.voting.modWeight}}" /></label>
+      </div>
+      <div class="admin-form__columns">
+        <label>Кто пропускает видео сразу командой !vskip / !skip
+          <select name="control.skipRole">
+            {{#each skipRoleOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+        <span></span>
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-paid">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="paid" />
+
+    <article class="admin-card">
+      <h2>Донатные заказы</h2>
+      <label class="admin-check"><input type="checkbox" name="paid.prioritize" {{#if settings.paid.prioritize}}checked{{/if}} /> Донатные видео идут раньше бесплатных</label>
+      <label class="admin-check"><input type="checkbox" name="paid.protectFromVotes" {{#if settings.paid.protectFromVotes}}checked{{/if}} /> Донатные видео нельзя пропустить голосованием</label>
+      <div class="admin-form__columns">
+        <label>Минимальная сумма доната, ₽<input type="number" name="paid.minAmountRub" min="0" step="any" value="{{settings.paid.minAmountRub}}" /><small>донат меньше этой суммы не ставит видео в очередь (бот ответит в чат)</small></label>
+        <label>Когда кончилось оплаченное время
+          <select name="paid.endAction">
+            {{#each paidEndOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </label>
+      </div>
+      <label class="admin-check"><input type="checkbox" name="paid.pricePerMinuteEnabled" {{#if settings.paid.pricePerMinuteEnabled}}checked{{/if}} /> Оплата за минуту просмотра</label>
+      <div class="admin-form__columns">
+        <label>₽ за минуту просмотра<input type="number" name="paid.pricePerMinuteRub" min="0.01" step="0.01" value="{{settings.paid.pricePerMinuteRub}}" /><small>видео играет столько минут, сколько оплачено</small></label>
+        <span></span>
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+
+  <form method="post" action="/admin/video/settings" class="admin-form video-settings" id="video-player">
+    <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+    <input type="hidden" name="_section" value="player" />
+
+    <article class="admin-card">
+      <h2>Плеер</h2>
+      <label class="admin-check"><input type="checkbox" name="player.autoplay" {{#if settings.player.autoplay}}checked{{/if}} /> Автоматически включать следующее видео</label>
+      <label class="admin-check"><input type="checkbox" name="player.announce" {{#if settings.player.announce}}checked{{/if}} /> Объявлять в чате следующее видео после скипа</label>
+      <label class="admin-check"><input type="checkbox" name="player.pauseMusic" {{#if settings.player.pauseMusic}}checked{{/if}} /> Ставить музыку на паузу, пока идёт видео</label>
+      <div class="admin-form__columns">
+        <label>Пауза между видео, сек<input type="number" name="player.delaySec" min="0" max="600" value="{{settings.player.delaySec}}" /></label>
+        <span></span>
+      </div>
+      <div class="admin-form__actions">
+        <button class="btn btn--primary btn--compact" type="submit">Сохранить</button>
+      </div>
+    </article>
+  </form>
+    </div>
+  </div>
+  {{/if}}
+
+  {{#if isHistoryTab}}
+  <article class="admin-card">
+    {{#if hasHistory}}
+    <div class="music-table-wrap">
+      <table class="music-table">
+        <thead>
+          <tr><th>Дата</th><th>Видео</th><th>Тип</th><th>Заказчик</th><th>Источник</th><th>Статус</th><th>Голоса</th><th>Сумма</th></tr>
+        </thead>
+        <tbody>
+          {{#each history}}
+          <tr>
+            <td class="music-table__date" data-label="Дата">{{finishedAtLabel}}</td>
+            <td class="music-table__title" data-label="Видео">{{#if url}}<a href="{{url}}" target="_blank" rel="noreferrer">{{title}}</a>{{else}}<span>{{title}}</span>{{/if}}</td>
+            <td data-label="Тип">{{providerLabel}} · {{kindLabel}}</td>
+            <td data-label="Заказчик">{{requestedBy}}{{#if coRequesters.length}} +{{coRequesters.length}}{{/if}}</td>
+            <td data-label="Источник">{{sourceLabel}}</td>
+            <td data-label="Статус"><span class="music-pill music-pill--{{status}}">{{statusLabel}}</span>{{#if reasonLabel}} <small class="music-table__reason">({{reasonLabel}})</small>{{/if}}</td>
+            <td data-label="Голоса" class="music-table__date">{{#if hasVotes}}скип {{votesSkip}} / оставить {{votesKeep}}{{else}}—{{/if}}</td>
+            <td class="music-table__amount" data-label="Сумма">{{amountLabel}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    <div class="music-pager">
+      {{#if historyPrevHref}}<a class="btn btn--ghost btn--compact" href="{{historyPrevHref}}">← Назад</a>{{/if}}
+      <span class="music-pager__info">Страница {{historyPage}} из {{historyTotalPages}}</span>
+      {{#if historyNextHref}}<a class="btn btn--ghost btn--compact" href="{{historyNextHref}}">Вперёд →</a>{{/if}}
+    </div>
+    {{else}}
+    <p class="empty-state music-empty">История заказов пока пуста.</p>
+    {{/if}}
+    {{#if historyTotal}}
+    <form method="post" action="/admin/video/history/clear" onsubmit="return confirm('Очистить всю историю заказов видео?')" style="margin-top: 1rem;">
+      <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+      <button class="btn btn--ghost btn--compact" type="submit">Очистить историю</button>
+    </form>
+    {{/if}}
+  </article>
+  {{/if}}
+
+  {{#if isBlacklistTab}}
+  <div class="music-cards">
+    <article class="admin-card">
+      <div class="admin-card__head">
+        <h2>Чёрный список видео</h2>
+        {{#if blacklistedItems}}<span class="admin-card__meta">Записей: {{blacklistedItems.length}}</span>{{/if}}
+      </div>
+      <p class="admin-card__hint">Эти видео не примутся ни через чат, ни через донат.</p>
+      <form method="post" action="/admin/video/blacklist/item" class="music-add music-add--stack">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <div>
+          <label class="music-add__label" for="video-blacklist-item-input">Видео — ссылка</label>
+          <input class="admin-input" id="video-blacklist-item-input" name="input" placeholder="https://www.youtube.com/watch?v=…" required autocomplete="off" />
+        </div>
+        <button class="btn btn--primary btn--compact" type="submit">Заблокировать видео</button>
+      </form>
+      {{#if blacklistedItems}}
+      <ul class="music-blist">
+        {{#each blacklistedItems}}
+        <li class="music-blist__row">
+          <div class="music-blist__info">
+            <span>{{title}}</span>
+            <small>{{provider}} · {{externalId}} · {{createdAtLabel}}</small>
+          </div>
+          <form method="post" action="/admin/video/blacklist/item">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="provider" value="{{provider}}" />
+            <input type="hidden" name="externalId" value="{{externalId}}" />
+            <button class="btn btn--ghost btn--compact" type="submit">Разблокировать</button>
+          </form>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="empty-state music-empty">Пусто — заблокированных видео нет</p>
+      {{/if}}
+    </article>
+
+    <article class="admin-card">
+      <div class="admin-card__head">
+        <h2>Чёрный список каналов</h2>
+        {{#if blacklistedChannels}}<span class="admin-card__meta">Записей: {{blacklistedChannels.length}}</span>{{/if}}
+      </div>
+      <p class="admin-card__hint">Ссылка на любое видео с канала — заблокируются все его видео.</p>
+      <form method="post" action="/admin/video/blacklist/channel" class="music-add music-add--stack">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <div>
+          <label class="music-add__label" for="video-blacklist-channel-input">Канал — ссылка на любое видео с него</label>
+          <input class="admin-input" id="video-blacklist-channel-input" name="input" placeholder="https://www.youtube.com/watch?v=…" required autocomplete="off" />
+        </div>
+        <button class="btn btn--primary btn--compact" type="submit">Заблокировать канал</button>
+      </form>
+      {{#if blacklistedChannels}}
+      <ul class="music-blist">
+        {{#each blacklistedChannels}}
+        <li class="music-blist__row">
+          <div class="music-blist__info">
+            <span>{{name}}</span>
+            <small>{{provider}} · {{channelId}} · {{createdAtLabel}}</small>
+          </div>
+          <form method="post" action="/admin/video/blacklist/channel">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="provider" value="{{provider}}" />
+            <input type="hidden" name="channelId" value="{{channelId}}" />
+            <button class="btn btn--ghost btn--compact" type="submit">Разблокировать</button>
+          </form>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="empty-state music-empty">Пусто — заблокированных каналов нет</p>
+      {{/if}}
+    </article>
+
+    <article class="admin-card">
+      <div class="admin-card__head">
+        <h2>Чёрный список пользователей</h2>
+        {{#if blacklistedUsers}}<span class="admin-card__meta">Записей: {{blacklistedUsers.length}}</span>{{/if}}
+      </div>
+      <p class="admin-card__hint">Эти зрители не могут заказывать видео.</p>
+      <form method="post" action="/admin/video/blacklist/user" class="music-add music-add--stack">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}" />
+        <div>
+          <label class="music-add__label" for="video-blacklist-user-input">Twitch-логин</label>
+          <input class="admin-input" id="video-blacklist-user-input" name="login" placeholder="viewer123" maxlength="25" required autocomplete="off" />
+        </div>
+        <button class="btn btn--primary btn--compact" type="submit">Заблокировать пользователя</button>
+      </form>
+      {{#if blacklistedUsers}}
+      <ul class="music-blist">
+        {{#each blacklistedUsers}}
+        <li class="music-blist__row">
+          <div class="music-blist__info">
+            <span>@{{login}}</span>
+            <small>{{createdAtLabel}}</small>
+          </div>
+          <form method="post" action="/admin/video/blacklist/user">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}" />
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="login" value="{{login}}" />
+            <button class="btn btn--ghost btn--compact" type="submit">Разблокировать</button>
+          </form>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="empty-state music-empty">Пусто — заблокированных пользователей нет</p>
+      {{/if}}
+    </article>
+  </div>
+  {{/if}}
+</section>

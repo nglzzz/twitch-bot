@@ -1,0 +1,367 @@
+<section class="container section-spacing video-page">
+  <header class="music-page__head">
+    <div>
+      <div class="music-page__overline"><span class="music-page__signal" aria-hidden="true"></span> LIVE SESSION <span class="music-page__overline-sep">/</span> ВИДЕО СТРИМА</div>
+      <h1>Заказ видео</h1>
+      <p class="music-page__lead">Какое видео идёт на стриме прямо сейчас и очередь заказов. Страница обновляется сама — звук идёт на стриме.</p>
+    </div>
+  </header>
+
+  {{#unless available}}<p class="form-notice form-notice--error" role="alert">Заказ видео временно недоступен.</p>{{/unless}}
+
+  <div class="video-accepting" id="video-accepting" role="status"><i aria-hidden="true"></i><span id="video-accepting-text">Уточняем статус приёма заказов…</span></div>
+
+  <section class="video-hero" id="video-hero" aria-label="Сейчас идёт">
+    <div class="video-hero__art-wrap" id="video-hero-art-wrap">
+      <span class="video-hero__art-fallback" id="video-hero-fallback" aria-hidden="true">▶</span>
+      <img class="video-hero__art" id="video-hero-art" alt="" hidden />
+    </div>
+    <div class="video-hero__meta">
+      <span class="music-chip video-hero__status-chip" id="video-hero-status-chip" hidden></span>
+      <a class="video-hero__title" id="video-hero-title" target="_blank" rel="noreferrer" hidden></a>
+      <div class="video-hero__empty" id="video-hero-empty">
+        <div><strong>Сейчас ничего не идёт</strong><span>Закажи видео — кинь ссылку в чат или напиши <code>!video &lt;ссылка&gt;</code></span></div>
+      </div>
+      <div class="video-hero__chips" id="video-hero-chips" hidden></div>
+      <div class="video-hero__requester" id="video-hero-requester" hidden></div>
+      <div class="music-progress" id="video-hero-progress" hidden>
+        <span class="music-progress__time" id="video-hero-pos">0:00</span>
+        <span class="music-bar"><span class="music-bar__fill" id="video-hero-fill"></span></span>
+        <span class="music-progress__time" id="video-hero-len">0:00</span>
+      </div>
+      <div class="video-votes" id="video-votes" hidden></div>
+    </div>
+  </section>
+
+  <section class="video-queue" aria-label="Очередь заказов">
+    <div class="music-queue__head">
+      <div><span class="music-section-kicker">СЛЕДУЮЩИЕ</span><h2>Очередь</h2></div>
+      <span class="music-queue__count" id="video-queue-count"></span>
+    </div>
+    <ol class="video-queue__list" id="video-queue-list"></ol>
+    <p class="empty-state" id="video-queue-empty">Очередь пуста — закажи видео ссылкой в чате.</p>
+  </section>
+
+  <section class="music-howto" aria-label="Как заказать видео" style="margin-top: 32px">
+    <h2>Как заказать видео</h2>
+    <div class="music-howto__grid">
+      <article class="music-howto__card music-howto__card--primary">
+        <code class="music-howto__cmd">!video &lt;ссылка&gt;</code>
+        <p>Заказать видео — или просто кинь ссылку в чат, пока приём открыт. YouTube, Shorts, TikTok, клипы Twitch и другие площадки.</p>
+      </article>
+      <article class="music-howto__card music-howto__card--paid">
+        <code class="music-howto__cmd">Донат со ссылкой на видео</code>
+        <p>Пока приём открыт, донат со ссылкой идёт в очередь видео и имеет приоритет. Донат с <code>!sr</code> всегда идёт в музыку.</p>
+      </article>
+    </div>
+    <div class="music-howto__list">
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">!wrongvideo</code><span>Заказал не то видео? Убери свой последний заказ, пока он в очереди.</span></div>
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">!vskip</code><span>Модераторы пропускают видео сразу, остальные — голосуют за скип.</span></div>
+      <div class="music-howto__row"><code class="music-howto__cmd music-howto__cmd--inline">скип / оставить</code><span>Голосование: напиши слово «скип» или «оставить» первым словом сообщения в чат.</span></div>
+    </div>
+  </section>
+</section>
+
+<style>
+  .video-page .video-accepting { display: inline-flex; align-items: center; gap: .6rem; margin-bottom: 1.25rem; padding: .55rem 1rem; border-radius: 999px; font-size: .9rem; font-weight: 700; background: var(--panel); border: 1px solid var(--panel-border); color: var(--text-soft); }
+  .video-page .video-accepting i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .video-page .video-accepting.is-open { border-color: rgba(134, 239, 172, .4); background: var(--success-soft); color: #86efac; }
+  .video-page .video-accepting.is-open i { background: #86efac; box-shadow: 0 0 10px #86efac; }
+  .video-page .video-accepting.is-closed i { background: #fca5a5; }
+
+  .video-page .video-hero { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1.6rem; align-items: center; padding: 1.5rem; border-radius: var(--radius-lg); background: rgba(14, 14, 18, .82); border: 1px solid var(--panel-border); box-shadow: var(--shadow-md); }
+  .video-page .video-hero__art-wrap { position: relative; width: 260px; height: 146px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); overflow: hidden; background: #000; }
+  .video-page .video-hero__art-wrap.is-vertical { width: 150px; height: 260px; }
+  .video-page .video-hero__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .video-page .video-hero__art-fallback { color: var(--muted); font-size: 2rem; }
+  .video-page .video-hero__meta { display: grid; gap: .6rem; justify-items: start; min-width: 0; }
+  .video-page .video-hero__status-chip { text-transform: uppercase; letter-spacing: .08em; font-size: .68rem; }
+  .video-page .video-hero.is-playing .video-hero__status-chip { background: var(--success-soft); color: #86efac; }
+  .video-page .video-hero__title { color: var(--text); font-weight: 800; font-size: clamp(1.15rem, 2.6vw, 1.7rem); line-height: 1.25; text-decoration: none; overflow-wrap: anywhere; }
+  .video-page .video-hero__title:hover { color: var(--primary-bright); }
+  .video-page .video-hero__empty div { display: grid; gap: .25rem; color: var(--text-soft); }
+  .video-page .video-hero__empty strong { color: var(--text); font-size: 1.1rem; }
+  .video-page .video-hero__empty span { font-size: .88rem; }
+  .video-page .video-hero__chips, .video-page .video-hero__requester { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+  .video-page .video-hero__requester { color: var(--text-soft); font-size: .9rem; }
+  .video-page .video-hero__requester .video-hero__co { color: var(--muted); }
+  .video-page .video-hero__amount { color: #fbbf24; font-weight: 700; }
+  .video-page .video-hero__meta .music-progress { max-width: none; }
+
+  .video-page .video-votes { display: grid; gap: .4rem; padding: .7rem .9rem; border-radius: var(--radius-md); background: rgba(255, 255, 255, .05); border: 1px solid var(--panel-border); font-size: .85rem; color: var(--text-soft); }
+  .video-page .video-votes__counts { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .video-page .video-votes__skip { color: #fca5a5; font-weight: 700; }
+  .video-page .video-votes__keep { color: #86efac; font-weight: 700; }
+  .video-page .video-votes__needed { color: var(--muted); }
+  .video-page .video-votes__words { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+  .video-page .video-votes__label { color: var(--muted); }
+  .video-page .video-votes__word { display: inline-flex; align-items: center; padding: .1em .55em; border-radius: 999px; font-size: .82em; font-weight: 700; color: #fff; background: rgba(255, 255, 255, .14); }
+  .video-page .video-votes__emote { height: 22px; width: auto; vertical-align: middle; }
+  .video-page .video-votes__warning { color: #fbbf24; font-weight: 700; }
+
+  .video-page .video-queue { margin-top: 2rem; }
+  .video-page .video-queue__list { list-style: none; display: grid; gap: .5rem; }
+  .video-page .video-queue__item { display: grid; grid-template-columns: 24px 96px minmax(0, 1fr) auto; align-items: center; gap: .9rem; padding: .55rem .8rem; border-radius: var(--radius-md); background: var(--panel); border: 1px solid var(--panel-border); }
+  .video-page .video-queue__item.is-paid { border-color: rgba(255, 179, 0, .35); }
+  .video-page .video-queue__num { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .85rem; }
+  .video-page .video-queue__art-wrap { position: relative; width: 96px; height: 54px; border-radius: var(--radius-xs); overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; }
+  .video-page .video-queue__art-wrap.is-vertical { width: 40px; }
+  .video-page .video-queue__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .video-page .video-queue__art-fallback { color: var(--muted); }
+  .video-page .video-queue__info { display: grid; gap: .2rem; min-width: 0; }
+  .video-page .video-queue__title { color: var(--text); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+  .video-page .video-queue__title:hover { color: var(--primary-bright); }
+  .video-page .video-queue__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; color: var(--text-soft); font-size: .82rem; }
+  .video-page .video-queue__amount { color: #fbbf24; font-weight: 700; }
+  .video-page .video-queue__right { display: flex; align-items: center; gap: .6rem; color: var(--text-soft); font-variant-numeric: tabular-nums; font-size: .85rem; }
+
+  @media (max-width: 720px) {
+    .video-page .video-hero { grid-template-columns: 1fr; justify-items: start; }
+    .video-page .video-hero__art-wrap, .video-page .video-hero__art-wrap.is-vertical { width: 180px; height: 101px; }
+    .video-page .video-queue__item { grid-template-columns: 18px 64px minmax(0, 1fr); }
+    .video-page .video-queue__art-wrap { width: 64px; height: 36px; }
+    .video-page .video-queue__art-wrap.is-vertical { width: 28px; }
+    .video-page .video-queue__right { grid-column: 3; }
+  }
+</style>
+
+<script src="/js/music-client.js"></script>
+<script>
+  (function () {
+    'use strict';
+    var root = document.getElementById('video-hero');
+    if (!root) return;
+    var el = function (id) { return document.getElementById(id); };
+    var els = {
+      hero: root, artWrap: el('video-hero-art-wrap'), art: el('video-hero-art'), fallback: el('video-hero-fallback'),
+      statusChip: el('video-hero-status-chip'), title: el('video-hero-title'), empty: el('video-hero-empty'),
+      chips: el('video-hero-chips'), requester: el('video-hero-requester'), progress: el('video-hero-progress'),
+      pos: el('video-hero-pos'), len: el('video-hero-len'), fill: el('video-hero-fill'),
+      votes: el('video-votes'), accepting: el('video-accepting'), acceptingText: el('video-accepting-text'),
+      queueList: el('video-queue-list'), queueEmpty: el('video-queue-empty'), queueCount: el('video-queue-count'),
+    };
+    var lastId = null;
+
+    function chip(className, text) {
+      var span = document.createElement('span');
+      span.className = className;
+      span.textContent = text;
+      return span;
+    }
+
+    function requesterRow(node, item) {
+      var name = document.createElement('span');
+      name.textContent = item.requestedBy ? '@' + item.requestedBy : 'Стример';
+      node.appendChild(name);
+      if (item.coRequesters && item.coRequesters.length) {
+        var co = chip('video-hero__co', '+' + item.coRequesters.length);
+        co.title = item.coRequesters.join(', ');
+        node.appendChild(co);
+      }
+      if (item.isPaid && item.amountLabel) node.appendChild(chip('video-hero__amount', '\uD83D\uDCB0 ' + item.amountLabel));
+      return node;
+    }
+
+    function renderAccepting(state) {
+      if (!state) return;
+      els.accepting.classList.toggle('is-open', Boolean(state.accepting));
+      els.accepting.classList.toggle('is-closed', !state.accepting);
+      els.acceptingText.textContent = state.accepting
+        ? 'Приём заказов открыт — кидайте ссылку в чат'
+        : 'Приём заказов закрыт';
+    }
+
+    function wordChip(word) {
+      var span = document.createElement('span');
+      span.className = 'video-votes__word';
+      if (word && word.url) {
+        var img = document.createElement('img');
+        img.className = 'video-votes__emote';
+        img.src = word.url;
+        img.alt = word.word;
+        img.loading = 'lazy';
+        span.appendChild(img);
+      } else {
+        span.textContent = word && word.word ? word.word : '';
+      }
+      return span;
+    }
+
+    function wordsRow(label, words) {
+      if (!words || !words.length) return null;
+      var row = document.createElement('div');
+      row.className = 'video-votes__words';
+      row.appendChild(chip('video-votes__label', label));
+      words.forEach(function (word) { row.appendChild(wordChip(word)); });
+      return row;
+    }
+
+    function renderVotes(state) {
+      var v = state && state.votes;
+      if (!v || !v.enabled || !state.current) { els.votes.hidden = true; return; }
+      els.votes.textContent = '';
+      if (state.warning && state.warning.endsAt) {
+        var left = Math.max(0, Math.ceil((state.warning.endsAt - Date.now()) / 1000));
+        els.votes.appendChild(chip('video-votes__warning', state.warning.reason === 'paid' ? 'Кончилось оплаченное время — видео пропускается через ' + left + ' сек' : 'Голоса набраны — видео пропускается через ' + left + ' сек'));
+      } else if (v.blocked === 'paid') {
+        els.votes.appendChild(chip('video-votes__label', 'Донатное видео нельзя пропустить голосованием.'));
+      } else if (v.blocked === 'locked') {
+        els.votes.appendChild(chip('video-votes__label', 'Голосование закрыто.'));
+      } else {
+        var counts = document.createElement('div');
+        counts.className = 'video-votes__counts';
+        counts.appendChild(chip('video-votes__skip', 'скип ' + v.skip));
+        counts.appendChild(chip('video-votes__keep', 'оставить ' + v.keep));
+        counts.appendChild(chip('video-votes__needed', '· нужно преимущество ' + v.needed));
+        if (v.opensAt) counts.appendChild(chip('video-votes__label', '· голосование откроется через ' + Math.max(0, Math.ceil((v.opensAt - Date.now()) / 1000)) + ' сек'));
+        els.votes.appendChild(counts);
+      }
+      var skipRow = wordsRow('Скип:', v.skipWords);
+      var keepRow = wordsRow('Оставить:', v.keepWords);
+      if (skipRow) els.votes.appendChild(skipRow);
+      if (keepRow) els.votes.appendChild(keepRow);
+      els.votes.hidden = !(els.votes.childNodes.length);
+    }
+
+    function render(state) {
+      if (!state) return;
+      renderAccepting(state);
+      var item = state.current;
+      els.hero.classList.toggle('is-playing', Boolean(item) && state.status === 'playing');
+      if (!item) {
+        lastId = null;
+        els.title.hidden = true;
+        els.chips.hidden = true;
+        els.requester.hidden = true;
+        els.progress.hidden = true;
+        els.empty.hidden = false;
+        els.statusChip.hidden = true;
+        els.votes.hidden = true;
+        return;
+      }
+      els.empty.hidden = true;
+      els.title.hidden = false;
+      els.chips.hidden = false;
+      els.requester.hidden = false;
+      els.statusChip.hidden = false;
+      els.statusChip.textContent = state.status === 'playing' ? 'Играет' : (state.status === 'waiting' ? 'Скоро следующее' : 'Пауза');
+      if (item.id !== lastId) {
+        lastId = item.id;
+        els.title.textContent = item.title || 'Без названия';
+        if (item.url) els.title.href = item.url;
+        else els.title.removeAttribute('href');
+        els.chips.textContent = '';
+        if (item.providerLabel) els.chips.appendChild(chip('music-chip', item.providerLabel));
+        if (item.kindLabel && item.kindLabel !== item.providerLabel && item.kindLabel !== 'Видео') els.chips.appendChild(chip('music-chip', item.kindLabel));
+        els.requester.textContent = '';
+        requesterRow(els.requester, item);
+        if (item.thumbnail) {
+          els.art.src = item.thumbnail;
+          els.art.hidden = false;
+          els.fallback.hidden = true;
+        } else {
+          els.art.hidden = true;
+          els.art.removeAttribute('src');
+          els.fallback.hidden = false;
+        }
+        els.artWrap.classList.toggle('is-vertical', Boolean(item.isVertical));
+        els.len.textContent = item.playSec ? MusicClient.formatTime(item.playSec) : '—';
+        els.progress.hidden = false;
+      }
+      renderVotes(state);
+    }
+
+    function renderQueue(queue) {
+      var items = Array.isArray(queue) ? queue : [];
+      els.queueList.textContent = '';
+      items.forEach(function (item, index) {
+        var li = document.createElement('li');
+        li.className = 'video-queue__item' + (item.isPaid ? ' is-paid' : '');
+
+        var num = document.createElement('span');
+        num.className = 'video-queue__num';
+        num.textContent = String(index + 1);
+
+        var artWrap = document.createElement('span');
+        artWrap.className = 'video-queue__art-wrap' + (item.isVertical ? ' is-vertical' : '');
+        var fallback = document.createElement('span');
+        fallback.className = 'video-queue__art-fallback';
+        fallback.setAttribute('aria-hidden', 'true');
+        fallback.textContent = '▶';
+        var art = document.createElement('img');
+        art.className = 'video-queue__art';
+        art.alt = '';
+        art.loading = 'lazy';
+        if (item.thumbnail) art.src = item.thumbnail;
+        else art.hidden = true;
+        art.addEventListener('error', function () { art.hidden = true; });
+        artWrap.appendChild(fallback);
+        artWrap.appendChild(art);
+
+        var info = document.createElement('div');
+        info.className = 'video-queue__info';
+        var title = document.createElement(item.url ? 'a' : 'span');
+        title.className = 'video-queue__title';
+        title.textContent = item.title || 'Без названия';
+        if (item.url) { title.href = item.url; title.target = '_blank'; title.rel = 'noreferrer'; }
+        var meta = document.createElement('div');
+        meta.className = 'video-queue__meta';
+        var requester = document.createElement('span');
+        requester.textContent = item.requestedBy ? '@' + item.requestedBy : 'Стример';
+        meta.appendChild(requester);
+        if (item.coRequesters && item.coRequesters.length) {
+          var co = document.createElement('span');
+          co.textContent = '+' + item.coRequesters.length;
+          co.title = item.coRequesters.join(', ');
+          meta.appendChild(co);
+        }
+        if (item.providerLabel) meta.appendChild(chip('music-chip', item.providerLabel));
+        if (item.kindLabel && item.kindLabel !== item.providerLabel && item.kindLabel !== 'Видео') meta.appendChild(chip('music-chip', item.kindLabel));
+        if (item.isPaid) meta.appendChild(chip('music-chip music-chip--paid', 'Донат'));
+        if (item.isPaid && item.amountLabel) meta.appendChild(chip('video-queue__amount', '\uD83D\uDCB0 ' + item.amountLabel));
+        info.appendChild(title);
+        info.appendChild(meta);
+
+        var right = document.createElement('span');
+        right.className = 'video-queue__right';
+        var dur = document.createElement('span');
+        dur.textContent = item.playLabel || (item.playSec ? MusicClient.formatTime(item.playSec) : '—');
+        right.appendChild(dur);
+
+        li.appendChild(num);
+        li.appendChild(artWrap);
+        li.appendChild(info);
+        li.appendChild(right);
+        els.queueList.appendChild(li);
+      });
+      els.queueEmpty.hidden = items.length > 0;
+      var state = client.getState();
+      var info = state && state.queueInfo;
+      var countText = items.length + ' видео';
+      if (info && info.totalSec > 0) countText += ' · ~' + Math.max(1, Math.round(info.totalSec / 60)) + ' мин';
+      els.queueCount.textContent = countText;
+    }
+
+    function tick() {
+      var state = client.getState();
+      var item = state && state.current;
+      if (item) {
+        var total = Number(item.playSec) || 0;
+        var elapsed = Math.max(0, client.position() - (Number(item.startSec) || 0));
+        els.pos.textContent = MusicClient.formatTime(elapsed);
+        els.fill.style.width = (total > 0 ? Math.min(100, (elapsed / total) * 100) : 0) + '%';
+        if (state.warning && state.warning.endsAt) renderVotes(state);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    var client = MusicClient.connect({
+      namespace: 'video',
+      initial: {{{initialJson}}},
+      websocketPort: '{{websocketPort}}',
+      onState: render,
+      onQueue: renderQueue,
+    });
+    requestAnimationFrame(tick);
+  })();
+</script>

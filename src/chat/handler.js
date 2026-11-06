@@ -67,6 +67,22 @@ Chat.registerCommand('!суд', require('../commands/court'), '!приговор
 // Заказ музыки
 require('../commands/music').registerMusicCommands(Chat);
 require('../services/music').getMusicService();
+require('../commands/video').registerVideoCommands(Chat);
+
+// Заказ видео: ссылки без команды, голоса «скип / оставить» и удалённые модераторами сообщения.
+Chat.getClient().on('message', (channel, tags, message, self) => {
+  if (self || message.startsWith('!')) return;
+  if (arrayHelper.getBotList().includes(String(tags.username || '').toLowerCase())) return;
+  require('../services/video').handleChatMessage(tags, message)
+    .then((reply) => Chat.handleMessageResult(reply, channel))
+    .catch((error) => console.error('[Video] Chat message failed:', error.message));
+});
+Chat.getClient().on('messagedeleted', (channel, username, deletedMessage, userstate) => {
+  const video = require('../services/video').getVideoService();
+  if (!video) return;
+  video.onMessageDeleted(userstate && userstate['target-msg-id'])
+    .catch((error) => console.error('[Video] Message delete handling failed:', error.message));
+});
 
 // Rewards
 // Chat.registerReward('6f37c88e-7d8d-42aa-963b-73d131f588f3', require('../rewards/lottery'));

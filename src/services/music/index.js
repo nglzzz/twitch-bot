@@ -77,4 +77,4 @@ async function handleDonationForMusic(donation) {
   return music.handleDonation(donation, { findUrl: youtubeUrlFromText });
 }
 
-module.exports = { getMusicService, getSettingsStore, handleDonationForMusic, youtubeUrlFromText, rememberPublicBase, getPublicBase };
+module.exports = { getMusicService, getSettingsStore, handleDonationForMusic, youtubeUrlFromText, rememberPublicBase, getPublicBase, isFollower, getRubAmount };

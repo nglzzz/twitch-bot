@@ -138,6 +138,7 @@ module.exports = {
   ensureInitialAdmin,
   requireAdmin,
   requireCsrf,
+  csrfToken,
   setSessionCookie,
   clearSessionCookie,
 };

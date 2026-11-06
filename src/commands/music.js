@@ -66,6 +66,9 @@ const currentSong = withService(async (music, user) => {
 });
 
 const skip = withService(async (music, user, message, tags) => {
+  // Пока идёт видео (музыка при этом на паузе), !skip относится к видео.
+  const videoCommands = require('./video');
+  if (videoCommands.isVideoActive()) return videoCommands.videoSkip(null, tags, message);
   const result = await music.skipCommand({ login: user.login, tags });
   return `@${user.display} ${result.message}`;
 });
