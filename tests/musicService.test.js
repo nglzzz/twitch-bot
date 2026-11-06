@@ -285,6 +285,34 @@ test('a new dock does not take over an online player unless asked', () => {
   assert.equal(ctx.service.getState().player.activeId, 'obs-dock');
 });
 
+test('!wrongsong removes the viewer\'s latest queued chat request only', async () => {
+  await request('aaaaaaaaaaa', viewer('u1'));
+  await request('bbbbbbbbbbb', viewer('u2'));
+  await request('ccccccccccc', viewer('u2'));
+  let result = await ctx.service.cancelOwnRequest({ login: 'u2' });
+  assert.equal(result.ok, true);
+  assert.deepEqual(queueIds(), ['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+  assert.equal(repo.findHistory()[0].statusReason, 'cancelled');
+
+  result = await ctx.service.cancelOwnRequest({ login: 'nobody' });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /нет твоих/);
+
+  // Играющий трек отменить нельзя.
+  await ctx.service.play();
+  result = await ctx.service.cancelOwnRequest({ login: 'u1' });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /уже играет/);
+  assert.equal(ctx.service.getState().current.externalId, 'aaaaaaaaaaa');
+
+  // Донатный заказ — тоже нет.
+  await donate('ddddddddddd', 100, 'don-1', 'RUB', 'Payer');
+  result = await ctx.service.cancelOwnRequest({ login: 'payer' });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Донатный/);
+  assert.ok(queueIds().includes('ddddddddddd'));
+});
+
 test('reorder and remove keep the queue consistent', async () => {
   await request('aaaaaaaaaaa', viewer('u1'));
   await request('bbbbbbbbbbb', viewer('u2'));

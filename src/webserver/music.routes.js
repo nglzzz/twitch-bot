@@ -1,6 +1,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const config = require('../config');
 const repo = require('../repositories/music.repo');
@@ -8,6 +10,8 @@ const { getMusicService, getSettingsStore, rememberPublicBase } = require('../se
 const { applyForm, ROLES, ROLE_LABELS } = require('../services/music/musicSettings.service');
 const { formatDuration, adminRequest } = require('../services/music/musicFormat');
 const youtube = require('../music/providers/youtube.provider');
+
+const HOTKEYS_SCRIPT = path.join(__dirname, '../music/obs/music-hotkeys.lua');
 
 const OBS_CSP = [
   "default-src 'self' 'unsafe-inline' data:",
@@ -30,7 +34,7 @@ const ADMIN_TABS = [
 
 const STATUS_LABELS = { played: 'сыграл', skipped: 'пропущен', failed: 'ошибка', removed: 'удалён', queued: 'в очереди', playing: 'играет' };
 const SOURCE_LABELS = { chat: 'Чат', donation: 'Донат', admin: 'Админка', backup: 'Бэкап' };
-const REASON_LABELS = { vote: 'голосование', interrupted: 'прерван заказом', removed: 'удалён', blacklisted: 'чёрный список', skipped: 'скип', superseded: 'заменён заказом' };
+const REASON_LABELS = { vote: 'голосование', interrupted: 'прерван заказом', removed: 'удалён', blacklisted: 'чёрный список', skipped: 'скип', superseded: 'заменён заказом', cancelled: 'отменил заказчик' };
 
 function tokensEqual(a, b) {
   const left = Buffer.from(String(a || ''));
@@ -168,6 +172,7 @@ function createMusicRouter({ requireAdmin, requireCsrf, adminPage }) {
     switch (action) {
       case 'play': return music.play();
       case 'pause': return music.pause();
+      case 'toggle': return music.getState().status === 'playing' ? music.pause() : music.play();
       case 'skip': return music.skip('skipped');
       case 'volume': return music.setVolume(value);
       case 'seek': return music.seek(value);
@@ -252,6 +257,21 @@ function createMusicRouter({ requireAdmin, requireCsrf, adminPage }) {
       error: req.query.error || null,
     }));
   }
+
+  // Скрипт OBS с горячими клавишами: адрес сайта и токен дока уже подставлены.
+  router.get('/admin/music/obs-hotkeys.lua', requireAdmin, (req, res, next) => {
+    try {
+      const settings = getSettingsStore().get();
+      const luaString = (value) => String(value || '').replace(/[^\w.:/\-]/g, '');
+      const script = fs.readFileSync(HOTKEYS_SCRIPT, 'utf8')
+        .replace('__BASE_URL__', luaString(publicBase(req)))
+        .replace('__TOKEN__', luaString(settings.obs.dockToken));
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      res.set('Content-Disposition', 'attachment; filename="music-hotkeys.lua"');
+      res.set('Cache-Control', 'no-store');
+      return res.send(script);
+    } catch (error) { return next(error); }
+  });
 
   router.get('/admin/music', requireAdmin, (req, res, next) => {
     try { return renderAdmin(req, res); } catch (error) { return next(error); }

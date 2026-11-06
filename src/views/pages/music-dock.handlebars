@@ -12,8 +12,9 @@
   @media (prefers-reduced-motion: reduce) { .music-dock .music-bar__fill::after { transition: none; } }
   /* embed=1: док внутри админки — только звук, видео и сообщения, управление уже есть в админке. */
   html.is-embed, html.is-embed body { background: transparent !important; }
-  .music-dock--embed { max-width: none; padding: 0; }
-  .music-dock--embed .music-dock__controls, .music-dock--embed .music-dock__now, .music-dock--embed .music-dock__next { display: none; }
+  .music-dock--embed { padding: 0; }
+  .music-dock--embed .music-dock__main, .music-dock--embed .music-dock__next, .music-dock--embed .music-dock__banner,
+  .music-dock--embed .music-dock__status, .music-dock--embed .music-dock__video-toggle { display: none; }
   .music-dock--embed .music-dock__video-wrap:not(.is-collapsed) { max-width: 480px; }
 </style>
 
@@ -34,6 +35,7 @@
   </div>
   <p class="music-dock__login-note" id="music-dock-login-note" role="status" hidden></p>
 
+  <div class="music-dock__main">
   <div class="music-dock__controls">
     <button class="music-dock__btn music-dock__btn--play" id="music-dock-toggle" type="button" aria-label="Играть / пауза">
       <svg class="music-ic music-ic--solid music-ic--play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -74,6 +76,7 @@
       <div class="music-dock__votes" id="music-dock-votes" hidden></div>
     </div>
   </section>
+  </div>
 
   <section class="music-dock__next" aria-label="Далее в очереди">
     <h2 class="music-dock__next-title">Далее</h2>
@@ -189,6 +192,7 @@
       syncedStatus = null;
       setActiveUi();
       try { if (ytReady) ytPlayer.pauseVideo(); } catch (error) { /* ignore */ }
+      if (EMBED && window.parent !== window) window.parent.postMessage({ type: 'music-dock', active: false }, location.origin);
     }
 
     function setActiveUi() {
@@ -258,8 +262,8 @@
       try { popup = window.open(LOGIN_URL, 'yt-login', 'width=520,height=720'); } catch (error) { popup = null; }
       els.loginNote.hidden = false;
       els.loginNote.textContent = popup
-        ? 'Войдите в аккаунт в открывшемся окне, закройте его и нажмите «Я вошёл — обновить плеер». Если Google пишет, что браузер небезопасен, вход здесь не получится — играйте звук из обычного браузера (кнопка «Играть звук здесь» в админке).'
-        : 'Окно входа не открылось. Играйте звук из обычного браузера, где вы вошли в YouTube (кнопка «Играть звук здесь» в админке).';
+        ? 'Войдите в аккаунт в открывшемся окне, закройте его и нажмите «Я вошёл — обновить плеер». Если Google пишет, что браузер небезопасен, вход здесь не получится — играйте звук из обычного браузера (кнопка «Звук здесь» в плеере админки).'
+        : 'Окно входа не открылось. Играйте звук из обычного браузера, где вы вошли в YouTube (кнопка «Звук здесь» в плеере админки).';
       els.login.hidden = false;
     }
     Array.prototype.forEach.call(document.querySelectorAll('[data-yt-login]'), function (button) {

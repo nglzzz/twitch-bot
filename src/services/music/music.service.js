@@ -518,6 +518,27 @@ function createMusicService({
     return { ok: true, message: 'Заявка удалена.' };
   }
 
+  /**
+   * !wrongsong: зритель убирает свой последний заказ из чата, пока тот ещё в очереди.
+   * Донатные заказы так не отменяются — деньги уже заплачены, решает стример.
+   */
+  async function cancelOwnRequest({ login }) {
+    const who = String(login || '').toLowerCase();
+    if (!who) return { ok: false, message: 'В очереди нет твоих заказов.' };
+    const mine = repo.findQueued().filter((item) => item.requestedBy === who);
+    const own = mine.filter((item) => item.source === 'chat' && !item.isPaid);
+    if (!own.length) {
+      if (mine.length) return { ok: false, message: 'Донатный заказ так отменить нельзя — напиши стримеру.' };
+      const playing = current();
+      if (playing && playing.requestedBy === who) return { ok: false, message: 'Твой трек уже играет — отменить можно только заказ в очереди. Пропустить: !voteskip' };
+      return { ok: false, message: 'В очереди нет твоих заказов.' };
+    }
+    const latest = own.reduce((a, b) => (((b.createdAt || 0) > (a.createdAt || 0) || ((b.createdAt || 0) === (a.createdAt || 0) && b.position > a.position)) ? b : a));
+    repo.updateRequest(latest._id, { status: 'removed', statusReason: 'cancelled', finishedAt: now() });
+    emitQueue();
+    return { ok: true, message: `«${latest.title}» убран из очереди.` };
+  }
+
   function reorder(ids) {
     const queued = new Set(repo.findQueued().map((item) => item._id));
     const ordered = (Array.isArray(ids) ? ids : []).map(String).filter((id) => queued.has(id));
@@ -755,6 +776,7 @@ function createMusicService({
     seek,
     setVolume,
     removeRequest,
+    cancelOwnRequest,
     reorder,
     blacklistRequest,
     voteSkip,

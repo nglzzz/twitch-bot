@@ -1,6 +1,6 @@
 'use strict';
 
-// Команды заказа музыки: !sr, !play, !pause, !song, !skip, !voteskip, !songlist.
+// Команды заказа музыки: !sr, !wrongsong, !play, !pause, !song, !skip, !voteskip, !songlist.
 
 const { getMusicService } = require('../services/music');
 const { formatDuration } = require('../services/music/musicFormat');
@@ -36,6 +36,11 @@ function siteUrl() {
 const songRequest = withService(async (music, user, message) => {
   const input = messageHelper.getSubjectFromMessage(message);
   const result = await music.requestTrack({ input, requester: user, source: 'chat' });
+  return `@${user.display} ${result.message}`;
+});
+
+const wrongSong = withService(async (music, user) => {
+  const result = await music.cancelOwnRequest({ login: user.login });
   return `@${user.display} ${result.message}`;
 });
 
@@ -81,6 +86,7 @@ const songList = withService(async (music, user) => {
 function registerMusicCommands(Chat) {
   const commands = [
     [songRequest, ['!sr', '!ык']],
+    [wrongSong, ['!wrongsong', '!отмена']],
     [play, ['!play', '!плей']],
     [pause, ['!pause', '!пауза']],
     [currentSong, ['!currentsong', '!song', '!песня', '!трек']],
@@ -93,4 +99,4 @@ function registerMusicCommands(Chat) {
   }
 }
 
-module.exports = { registerMusicCommands, songRequest, play, pause, currentSong, skip, voteSkip, songList, siteUrl };
+module.exports = { registerMusicCommands, songRequest, wrongSong, play, pause, currentSong, skip, voteSkip, songList, siteUrl };

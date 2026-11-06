@@ -78,22 +78,18 @@
                 <button class="music-menu__item music-menu__item--danger" id="music-now-remove" type="button" hidden>Удалить из очереди</button>
               </div>
             </details>
+            <button class="music-local-toggle" id="music-local-audio-toggle" type="button" aria-pressed="false" title="Играть звук в этой вкладке — запасной вариант, если док в OBS не играет. В стрим — через захват звука браузера в OBS.">
+              <svg class="music-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h3v6H5a1 1 0 0 1-1-1v-5zM20 14h-3v6h2a1 1 0 0 0 1-1v-5z"/></svg>
+              <span id="music-local-audio-label">Звук здесь</span>
+            </button>
           </div>
+          <div class="music-local-audio" id="music-local-audio" data-dock-url="{{dockUrl}}" hidden></div>
         </div>
       </article>
 
-      <p class="form-notice form-notice--error" id="music-player-offline" hidden>Нет связи с плеером — откройте <a href="/admin/music?tab=obs">ссылку дока из вкладки OBS</a> (док в OBS или вкладка браузера).</p>
+      <p class="form-notice form-notice--error" id="music-player-offline" hidden>Нет связи с плеером — откройте <a href="/admin/music?tab=obs">ссылку дока из вкладки OBS</a> (док в OBS или вкладка браузера) или нажмите «Звук здесь» в плеере.</p>
       <p class="form-notice" id="music-admin-message" hidden></p>
 
-      <section class="admin-card music-local-audio" id="music-local-audio" data-dock-url="{{dockUrl}}" aria-label="Звук в этой вкладке">
-        <div class="music-local-audio__head">
-          <div class="music-local-audio__text">
-            <strong>Звук в этой вкладке</strong>
-            <span id="music-local-audio-hint">Запасной вариант, если док в OBS не играет: вкладка станет плеером. Звук в стрим — через захват звука браузера в OBS.</span>
-          </div>
-          <button class="btn btn--ghost btn--compact" id="music-local-audio-toggle" type="button" aria-pressed="false">Играть звук здесь</button>
-        </div>
-      </section>
 
       <article class="admin-card music-add-card">
         <div class="music-section-kicker">БЫСТРЫЙ ДОСТУП</div>
@@ -730,18 +726,24 @@
           } catch (error) { /* ignore */ }
         });
         box.appendChild(frame);
-        box.classList.add('is-on');
-        button.textContent = 'Выключить звук здесь';
+        box.hidden = false;
+        button.classList.add('is-on');
         button.setAttribute('aria-pressed', 'true');
       }
 
       function stop() {
         if (observer) { observer.disconnect(); observer = null; }
         if (frame) { frame.remove(); frame = null; }
-        box.classList.remove('is-on');
-        button.textContent = 'Играть звук здесь';
+        box.hidden = true;
+        button.classList.remove('is-on');
         button.setAttribute('aria-pressed', 'false');
       }
+
+      // Встроенный док сообщает, что плеером стал другой док (например, OBS), — выключаемся.
+      window.addEventListener('message', function (event) {
+        if (event.origin !== location.origin || !frame || event.source !== frame.contentWindow) return;
+        if (event.data && event.data.type === 'music-dock' && event.data.active === false) stop();
+      });
 
       button.addEventListener('click', function () {
         if (frame) stop();
@@ -1067,6 +1069,17 @@
         </div>
         <p class="music-url-row__steps">OBS → Док-панели → Пользовательские док-панели браузера → вставьте ссылку.</p>
       </div>
+    </article>
+
+    <article class="admin-card">
+      <h2>Горячие клавиши в OBS</h2>
+      <p class="admin-card__hint">Скрипт для OBS добавляет глобальные клавиши «Музыка: пауза / играть» и «Музыка: следующий трек» — они работают, даже когда OBS свёрнут. Адрес сайта и токен дока уже внутри.</p>
+      <a class="btn btn--ghost btn--compact" href="/admin/music/obs-hotkeys.lua" download>Скачать скрипт</a>
+      <ol class="music-steps">
+        <li>OBS → Инструменты → Скрипты → «+» → выберите скачанный файл.</li>
+        <li>OBS → Настройки → Горячие клавиши → найдите «Музыка: …» и назначьте клавиши.</li>
+      </ol>
+      <p class="admin-card__hint">После перевыпуска ссылки дока скачайте скрипт заново или вставьте новый токен в настройках скрипта.</p>
     </article>
 
     <article class="admin-card">
