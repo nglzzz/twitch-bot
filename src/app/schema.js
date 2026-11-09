@@ -298,6 +298,13 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_quiz_question_use_question ON quiz_question_use(question_id)`,
 
+  // --- alerts: единые алерты донатов со всех сервисов (настройки key/value JSON) ---
+  `CREATE TABLE IF NOT EXISTS alerts_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+
   // --- music: заказ музыки (song requests) ---
   `CREATE TABLE IF NOT EXISTS music_settings (
     key TEXT PRIMARY KEY,

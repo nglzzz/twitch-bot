@@ -75,6 +75,17 @@ async function sendTipToStreamElements(donation, runtimeSettings) {
   return response.data;
 }
 
+const alerts = () => require('./alerts').getAlerts(); // ленивый require: алерты ссылаются на этот модуль
+
+/** Новый донат: видео или музыка из текста заказываются независимо от алерта. */
+function requestMediaFromDonation(donation) {
+  // При открытом приёме видео ссылка на видео уходит в очередь видео, иначе — в музыку.
+  require('./video').handleDonationForVideo(donation)
+    .catch((error) => { console.error('[Video] Donation request failed:', error.message); return null; })
+    .then((handled) => (handled ? null : require('./music').handleDonationForMusic(donation)))
+    .catch((error) => console.error('[Music] Donation request failed:', error.message));
+}
+
 async function createAndSendDonation(data, source) {
   if (!isDbReady()) throw new Error('Database is unavailable');
   const existing = data.externalId ? donationRepo.findOneByExternalId(source, String(data.externalId)) : null;
@@ -95,17 +106,32 @@ async function createAndSendDonation(data, source) {
     streamSessionId: activeSession?._id || null,
   };
 
+  // Единые алерты включены: донат сразу идёт в нашу очередь, StreamElements больше не нужен.
+  if (alerts().isEnabled()) {
+    const donation = existing
+      ? donationRepo.update(existing._id, { ...donationData, status: 'sent', error: null })
+      : donationRepo.create({ ...donationData, status: 'sent', error: null });
+    if (!existing) requestMediaFromDonation(donation);
+    alerts().handleDonation({
+      source,
+      externalId: donation._id,
+      name: donationData.donorName,
+      amount: donationData.amount,
+      currency: donationData.currency,
+      message: donationData.message,
+      isTest: donationData.isTest,
+      saved: true, // запись уже сделана здесь
+      media: [{ kind: 'se-tts' }],
+    });
+    return donation;
+  }
+
   let donation;
   if (existing) {
     donation = donationRepo.update(existing._id, { ...donationData, status: 'pending', error: null });
   } else {
     donation = donationRepo.create({ ...donationData, status: 'pending', error: null });
-    // Заказ видео или музыки из текста доната не зависит от пересылки алерта в StreamElements.
-    // При открытом приёме видео ссылка на видео уходит в очередь видео, иначе — в музыку.
-    require('./video').handleDonationForVideo(donation)
-      .catch((error) => { console.error('[Video] Donation request failed:', error.message); return null; })
-      .then((handled) => (handled ? null : require('./music').handleDonationForMusic(donation)))
-      .catch((error) => console.error('[Music] Donation request failed:', error.message));
+    requestMediaFromDonation(donation);
   }
 
   try {
@@ -123,6 +149,29 @@ async function createAndSendDonation(data, source) {
     });
     throw error;
   }
+}
+
+/** Донат из очереди алертов (любой сервис) → в базу один раз. */
+async function recordHubDonation(event) {
+  if (!isDbReady()) throw new Error('Database is unavailable');
+  if (event.externalId && donationRepo.findOneByExternalId(event.source, String(event.externalId))) return null;
+  const activeSession = await getActiveSession();
+  const donation = donationRepo.create({
+    source: event.source,
+    isTest: Boolean(event.isTest),
+    externalId: event.externalId ? String(event.externalId) : null,
+    donorId: '',
+    donorName: String(event.name || 'Anonymous').trim().slice(0, 100),
+    amount: normaliseAmount(event.amount),
+    currency: String(event.currency || 'RUB').toUpperCase().slice(0, 8),
+    message: String(event.dbMessage ?? event.message ?? '').slice(0, 255),
+    raw: event.raw || null,
+    streamSessionId: activeSession?._id || null,
+    status: 'sent',
+    error: null,
+  });
+  requestMediaFromDonation(donation);
+  return donation;
 }
 
 function getChannelIdFromToken(token) {
@@ -156,6 +205,15 @@ async function requestDonationAlertsAction(action, alertId) {
 }
 
 async function handleDonationAlertsPayload(payload) {
+  if (alerts().isEnabled()) {
+    try {
+      const { fromDonationAlerts } = require('./alerts/normalize');
+      alerts().handleDonation(fromDonationAlerts(payload, { ttsMinRub: alerts().daTtsMinRub() }));
+    } catch (error) {
+      console.warn('[DonationAlerts] Ignored invalid donation payload:', error.message);
+    }
+    return;
+  }
   let donation;
   try {
     donation = prepareDonationAlert(payload);
@@ -213,8 +271,22 @@ async function refreshDonationAlertsConnection() {
   try { await connectDonationAlerts(); } catch (error) { console.error('[DonationAlerts] Connection refresh failed:', error.message); }
 }
 
+function getDonationAlertsStatus() {
+  if (!socket) return { state: 'error', error: 'нет токена DonationAlerts в настройках' };
+  return socket.connected ? { state: 'connected', error: null } : { state: 'connecting', error: null };
+}
+
+async function restartDonationAlerts() {
+  disconnectDonationAlerts();
+  await refreshDonationAlertsConnection();
+  return true;
+}
+
 module.exports = {
   createAndSendDonation,
+  recordHubDonation,
+  getDonationAlertsStatus,
+  restartDonationAlerts,
   connectDonationAlerts,
   disconnectDonationAlerts,
   refreshDonationAlertsConnection,

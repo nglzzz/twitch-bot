@@ -38,6 +38,7 @@ routes.use(require('./community.routes').createCommunityRouter({ enrichment: req
 routes.use(require('./communityAdmin.routes').createCommunityAdminRouter({ requireAdmin, requireCsrf, navigation: adminNavigation }));
 routes.use(require('./music.routes').createMusicRouter({ requireAdmin, requireCsrf, adminPage }));
 routes.use(require('./video.routes').createVideoRouter({ requireAdmin, requireCsrf, adminPage }));
+routes.use(require('./alerts.routes').createAlertsRouter({ requireAdmin, requireCsrf, adminPage }));
 
 function adminNavigation(currentPage) {
   return [
@@ -45,6 +46,7 @@ function adminNavigation(currentPage) {
     { label: 'События участников', href: '/admin/community-events', isActive: currentPage === 'community-events' },
     { label: 'Музыка', href: '/admin/music', isActive: currentPage === 'music' },
     { label: 'Видео', href: '/admin/video/settings', isActive: currentPage === 'video' },
+    { label: 'Алерты', href: '/admin/alerts', isActive: currentPage === 'alerts' },
     { label: 'Все донаты', href: '/admin/donations/history', isActive: currentPage === 'donation-history' },
     { label: 'Настройки', href: '/admin/settings', isActive: currentPage === 'settings' },
     { label: 'Пользователи', href: '/admin/users', isActive: currentPage === 'users' },
@@ -85,6 +87,15 @@ function parseAmount(value) {
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('Сумма должна быть больше нуля.');
   return Math.round(amount * 100) / 100;
 }
+
+const DONATION_SOURCE_LABELS = {
+  donationalerts: 'DonationAlerts',
+  donatepay: 'DonatePay',
+  donatex: 'Donatex',
+  streamelements: 'StreamElements',
+  'usdt-trc20': 'USDT TRC20',
+  scheduled: 'Расписание',
+};
 
 const QUEUE_STATUS_LABELS = { pending: 'ожидает', processing: 'отправляется', failed: 'ошибка', sent: 'отправлен', canceled: 'отменён' };
 
@@ -257,9 +268,7 @@ routes.get('/admin/donations/history', requireAdmin, async (req, res, next) => {
         ...donation,
         isTest: donation.isTest ?? !['donationalerts', 'usdt-trc20'].includes(donation.source),
         testLabel: (donation.isTest ?? !['donationalerts', 'usdt-trc20'].includes(donation.source)) ? 'Тестовый' : 'Реальный',
-        sourceLabel: donation.source === 'donationalerts'
-          ? 'DonationAlerts'
-          : (donation.source === 'usdt-trc20' ? 'USDT TRC20' : (donation.source === 'scheduled' ? 'Расписание' : 'Админка')),
+        sourceLabel: DONATION_SOURCE_LABELS[donation.source] || 'Админка',
         amountLabel: `${donation.amount} ${donation.currency}`,
         createdAtLabel: formatAdminDate(donation.createdAt),
       })),

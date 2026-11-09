@@ -1,0 +1,173 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { fromDonationAlerts, fromStreamElements, fromDonatePay, fromDonatex } = require('../src/services/alerts/normalize');
+const { extractTipConfig, pickView, renderTitle, seSpeechUrl, parseOverlayUrl } = require('../src/services/alerts/seAlertConfig');
+const { createAlertHub } = require('../src/services/alerts/alertHub');
+
+const DA = {
+  id: 188335993, alert_type: 1, additional_data: '{"randomness":426,"is_commission_covered":1}', username: 'flxx', amount: 50,
+  amount_main: 50, currency: 'RUB', message: 'премия пришла', tts_url: 'https://files.donationalerts.com/da/speechsynthesis/188335/e9.wav',
+  _is_test_alert: false, message_type: 'text',
+};
+
+test('DonationAlerts: ruble amount, heart for covered fee, native TTS file', () => {
+  const d = fromDonationAlerts(JSON.stringify(DA), { ttsMinRub: 25 });
+  assert.equal(d.name, '❤️ flxx');
+  assert.equal(d.amount, 50);
+  assert.deepEqual(d.media, [{ kind: 'tts', url: DA.tts_url }]);
+  assert.equal(fromDonationAlerts({ ...DA, amount: 10, amount_main: 10 }, { ttsMinRub: 25 }).media.length, 0);
+  assert.equal(fromDonationAlerts({ ...DA, alert_type: 4 }), null);
+  const usd = fromDonationAlerts({ ...DA, currency: 'USD', amount: 2, amount_main: 180 });
+  assert.equal(usd.currency, 'RUB');
+  assert.equal(usd.amount, 180);
+});
+
+test('StreamElements tip from astro activity', () => {
+  const d = fromStreamElements({ type: 'tip', provider: 'twitch', data: { amount: 111, currency: 'RUB', username: 'Тест', tipId: 't1', message: 'ТЕЕЕСТ' } });
+  assert.equal(d.externalId, 't1');
+  assert.deepEqual(d.media, [{ kind: 'se-tts' }]);
+  assert.equal(fromStreamElements({ type: 'follower', data: {} }), null);
+});
+
+test('DonatePay builds their voice link the way their widget does', () => {
+  const ctx = { widgetsToken: 'TOK', voiceSum: 25, allowPremium: true, widgets: { '#4702183': { 'a_s.speed': 'medium', 'a_s.play': '1' } } };
+  const pub = { widgetId: 4702183, notification: { id: 77, type: 'donation', vars: { name: 'Петя', sum: '150.00', comment: 'привет', premiumSettings: { voice: 'v', speed: 's', emotion: 'e' } } } };
+  const d = fromDonatePay(pub, ctx);
+  assert.equal(d.amount, 150);
+  const url = new URL(d.media[0].url);
+  assert.equal(url.pathname, '/donation/notifications/widget/TOK/voice');
+  assert.equal(url.searchParams.get('text'), encodeURIComponent(' привет'));
+  assert.equal(url.searchParams.get('widget_id'), '4702183');
+  assert.equal(url.searchParams.get('premium_voice'), 'v');
+  assert.equal(fromDonatePay({ ...pub, notification: { ...pub.notification, vars: { ...pub.notification.vars, sum: 10 } } }, ctx).media.length, 0);
+  assert.equal(fromDonatePay({ data: pub }, ctx).externalId, '77');
+});
+
+test('Donatex: TTS file, voice message wins, AI answer after it', () => {
+  const base = { id: 'x1', username: 'Аноним', message: 'Это тестовый донат!', currency: 'RUB', amount: 50, voiceFilePath: 'https://cdn.donatex.gg/default-donation-voices/x1.mp3' };
+  assert.deepEqual(fromDonatex(base).media, [{ kind: 'tts', url: base.voiceFilePath }]);
+  assert.equal(fromDonatex({ ...base, username: 'Аноним тест' }).isTest, true);
+  assert.equal(fromDonatex(base).isTest, false);
+  const withVoice = fromDonatex({ ...base, voiceMessagePath: 'voice/1.mp3', withAIResponse: true, aiResponseVoiceFilePath: 'ai/1.mp3' });
+  assert.deepEqual(withVoice.media.map((m) => m.kind), ['voice', 'ai']);
+  assert.equal(withVoice.media[0].url, 'https://cdn.donatex.gg/voice/1.mp3');
+  assert.equal(fromDonatex({ ...base, isRefunded: true }), null);
+});
+
+const BOOT = {
+  overlay: {
+    widgets: [
+      { type: 'se-widget-kappagen', listeners: { 'tip-latest': true }, variables: {} },
+      {
+        type: 'se-widget-alert-box', listeners: { 'tip-latest': true }, css: { width: '1034.79px', height: '774.65px' },
+        variables: {
+          tip: {
+            enableRandomPick: true, duration: 7.8, layout: 'column', showMessage: true,
+            graphics: { src: 'base.mp4', type: 'video', volume: 1 }, audio: { src: null },
+            tts: { enabled: true, voice: 'Tatyana', volume: 0.75, minAmount: 10, announceAction: true },
+            text: { message: '{name} занёс {currency}{amount} стримеру!', css: { 'font-size': 30, highlights: { color: 'rgb(106, 111, 252)' }, message: { 'font-size': 16 } } },
+            variations: [
+              { name: 'A200', condition: 'ATLEAST', requirement: 200, chance: 100, type: 'amount', settings: { graphics: { src: 'a.mp4', type: 'video' }, duration: 15 } },
+              { name: 'B300', condition: 'ATLEAST', requirement: 300, chance: 100, type: 'tip', settings: { graphics: { src: 'b.mp4', type: 'video' } } },
+              { name: 'C300', condition: 'ATLEAST', requirement: 300, chance: 100, type: 'tip', settings: { graphics: { src: 'c.mp4', type: 'video' } } },
+              { name: 'Nice', condition: 'EXACT', requirement: 69, chance: 100, type: 'tip', settings: {} },
+              { name: 'Off', condition: 'ATLEAST', requirement: 100, enabled: false, settings: {} },
+            ],
+          },
+        },
+      },
+    ],
+  },
+};
+
+test('SE config: base, thresholds, exact match, random among equal thresholds', () => {
+  const cfg = extractTipConfig(BOOT);
+  assert.equal(cfg.variations.length, 4);
+  assert.equal(Math.round(cfg.box.width), 1035);
+  assert.equal(pickView(cfg, 50).name, '');
+  assert.equal(pickView(cfg, 69).name, 'Nice');
+  assert.equal(pickView(cfg, 250).name, 'A200');
+  assert.equal(pickView(cfg, 250).view.duration, 15);
+  assert.equal(pickView(cfg, 250).view.tts.voice, 'Tatyana');
+  assert.equal(pickView(cfg, 400, () => 0.1).name, 'B300');
+  assert.equal(pickView(cfg, 400, () => 0.9).name, 'C300');
+});
+
+test('title parts highlight name and amount; SE speech reads title and message', () => {
+  const parts = renderTitle('{name} занёс {currency}{amount} стримеру!', { name: 'Тест', amount: 111, currency: 'RUB' });
+  assert.deepEqual(parts, [{ text: 'Тест', hl: true }, { text: ' занёс ' }, { text: '₽111', hl: true }, { text: ' стримеру!' }]);
+  const cfg = extractTipConfig(BOOT);
+  const url = new URL(seSpeechUrl({ view: cfg.base, titleText: 'Тест занёс ₽111 стримеру!', message: 'ТЕЕЕСТ', apiKey: 'K' }));
+  assert.equal(url.searchParams.get('text'), 'Тест занёс ₽111 стримеру!, ТЕЕЕСТ');
+  assert.equal(url.searchParams.get('voice'), 'Tatyana');
+  assert.deepEqual(parseOverlayUrl('https://streamelements.com/overlay/5fe31d38de4c33e3028cd76e/baoy_PrJNOPuCrkUttQfbVFduKYhOr6_B2ZGWW8DpJqWK_sZ'), { overlayId: '5fe31d38de4c33e3028cd76e', apiKey: 'baoy_PrJNOPuCrkUttQfbVFduKYhOr6_B2ZGWW8DpJqWK_sZ' });
+});
+
+function fakeWs() {
+  return { readyState: 1, sent: [], send(raw) { this.sent.push(JSON.parse(raw)); } };
+}
+
+function makeHub(extra = {}) {
+  let t = 1000;
+  const timers = [];
+  const hub = createAlertHub({
+    getTipConfig: () => extractTipConfig(BOOT),
+    getSeApiKey: () => 'K',
+    now: () => t,
+    setTimer: (fn) => { timers.push(fn); return timers.length; },
+    clearTimer: () => {},
+    ...extra,
+  });
+  return { hub, tick: (ms) => { t += ms; }, timers };
+}
+
+const donation = (over = {}) => ({ source: 'donatex', externalId: 'd1', name: 'Аня', amount: 300, currency: 'RUB', message: 'hi', media: [{ kind: 'tts', url: 'u' }], ...over });
+
+test('hub plays one alert at a time and waits for the overlay', () => {
+  const { hub } = makeHub();
+  hub.ingest(donation());
+  hub.ingest(donation({ externalId: 'd2' }));
+  assert.equal(hub.state().queue.length, 2);
+  const ws = fakeWs();
+  hub.attachOverlay(ws);
+  const play = ws.sent.find((m) => m.type === 'alerts:play');
+  assert.equal(play.alert.name, 'Аня');
+  assert.equal(hub.state().queue.length, 1);
+  hub.finish(play.alert.id);
+  assert.equal(ws.sent.filter((m) => m.type === 'alerts:play').length, 2);
+  assert.equal(hub.state().history.length, 1);
+});
+
+test('hub drops repeats, disabled services and SE echoes of imported donations', () => {
+  const disabled = new Set(['donatepay']);
+  const { hub } = makeHub({ isServiceEnabled: (s) => !disabled.has(s) });
+  assert.ok(hub.ingest(donation({ source: 'donationalerts', externalId: '5', name: '❤️ Тест', amount: 111 })));
+  assert.equal(hub.ingest(donation({ source: 'donationalerts', externalId: '5' })), null);
+  assert.equal(hub.ingest(donation({ source: 'streamelements', externalId: 'se1', name: 'Тест', amount: 111, media: [{ kind: 'se-tts' }] })), null);
+  assert.equal(hub.ingest(donation({ source: 'donatepay', externalId: '9' })), null);
+  const se = hub.ingest(donation({ source: 'streamelements', externalId: 'se2', name: 'Боб', amount: 500, message: 'йо', media: [{ kind: 'se-tts' }] }));
+  assert.equal(se.media[0].kind, 'tts');
+  assert.match(se.media[0].url, /speech\?voice=Tatyana/);
+});
+
+test('hub keeps the current alert when the source reloads, pauses and replays', () => {
+  const { hub } = makeHub();
+  const ws = fakeWs();
+  hub.attachOverlay(ws);
+  hub.ingest(donation());
+  const first = hub.state().current.id;
+  hub.detachOverlay(ws);
+  assert.equal(hub.state().current, null);
+  assert.equal(hub.state().queue[0].id, first);
+  hub.setPaused(true);
+  const ws2 = fakeWs();
+  hub.attachOverlay(ws2);
+  assert.equal(hub.state().current, null);
+  hub.setPaused(false);
+  assert.equal(hub.state().current.id, first);
+  hub.skip();
+  assert.ok(ws2.sent.some((m) => m.type === 'alerts:stop' && m.id === first));
+  const again = hub.replay();
+  assert.equal(again.name, 'Аня');
+  assert.equal(hub.state().current.id, again.id);
+});

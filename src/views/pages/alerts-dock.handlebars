@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Алерты донатов</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #17161c; color: #e9e6ef; font: 13px/1.35 system-ui, 'Segoe UI', sans-serif; }
+  body { padding: 10px; }
+  button { font: inherit; color: inherit; background: #2a2833; border: 1px solid #3a3745; border-radius: 4px; padding: 4px 9px; cursor: pointer; }
+  button:hover { background: #34313f; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: #e0b84a; border-color: #e0b84a; color: #17161c; font-weight: 600; }
+  button.icon { padding: 2px 7px; }
+  input, select { font: inherit; color: inherit; background: #201f27; border: 1px solid #3a3745; border-radius: 4px; padding: 4px 6px; }
+  h2 { margin: 14px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8d8899; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .bar .grow { flex: 1; }
+  .muted { color: #8d8899; }
+  .warn { margin: 0 0 8px; padding: 7px 9px; border-radius: 4px; background: #3a2a22; color: #f0c6a8; }
+  .now { padding: 9px 10px; border-radius: 6px; background: #22202a; border-left: 3px solid #e0b84a; }
+  .now.idle { border-left-color: #3a3745; color: #8d8899; }
+  .now .who { font-weight: 600; font-size: 14px; }
+  .now .msg { margin-top: 3px; color: #c9c4d4; overflow-wrap: anywhere; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #24222c; }
+  .row:last-child { border-bottom: 0; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .sub { font-size: 11px; color: #8d8899; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #555; }
+  .dot.connected { background: #5cc977; }
+  .dot.connecting { background: #e0b84a; }
+  .dot.error { background: #e0605a; }
+  .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #2e2b38; color: #b7b0c4; }
+  .switch { position: relative; width: 30px; height: 16px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span { position: absolute; inset: 0; border-radius: 8px; background: #3a3745; cursor: pointer; transition: background .15s; }
+  .switch span::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #e9e6ef; transition: transform .15s; }
+  .switch input:checked + span { background: #5cc977; }
+  .switch input:checked + span::after { transform: translateX(14px); }
+  .empty { color: #6d6878; padding: 4px 0; }
+  .test { display: flex; gap: 6px; flex-wrap: wrap; }
+  .test input { width: 80px; }
+  #err { color: #e0605a; min-height: 1em; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="off" class="warn" hidden>Единые алерты выключены — включите их в админке (раздел «Алерты»).</div>
+<div id="nooverlay" class="warn" hidden>Источник алертов в OBS не подключён — очередь ждёт.</div>
+
+<div class="bar">
+  <h2 class="grow" style="margin:0">Сейчас</h2>
+  <button id="pause" type="button">Пауза</button>
+  <button id="skip" type="button">Пропустить</button>
+</div>
+<div id="now" class="now idle" style="margin-top:6px">Тишина</div>
+
+<h2>Очередь <span id="qcount" class="muted"></span></h2>
+<div id="queue"></div>
+
+<h2>Сервисы</h2>
+<div id="services"></div>
+
+<h2>Недавние</h2>
+<div id="history"></div>
+
+<h2>Тест</h2>
+<div class="test">
+  <input id="tamount" type="number" min="1" value="100" aria-label="Сумма">
+  <select id="tsource" aria-label="Сервис"></select>
+  <button id="tsend" type="button">Прислать тест</button>
+</div>
+<div id="err" role="status"></div>
+
+<script>
+(function () {
+  var TOKEN = {{{tokenJson}}};
+  var STATE = { connected: 'подключён', connecting: 'подключается…', error: 'ошибка', off: 'режим выключен', disabled: 'выключен' };
+  var VOICE = { tts: 'озвучка', voice: 'голосовое', ai: 'ответ ИИ' };
+  var SOURCE = { donationalerts: 'DA', streamelements: 'SE', donatepay: 'DonatePay', donatex: 'Donatex', 'usdt-trc20': 'USDT', scheduled: 'Расписание' };
+  var $ = function (id) { return document.getElementById(id); };
+  var last = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function money(a) { return (a.currency === 'RUB' ? '' : a.currency + ' ') + (Math.round(a.amount * 100) / 100) + (a.currency === 'RUB' ? ' ₽' : ''); }
+  function ago(t) { var s = Math.round((Date.now() - t) / 1000); return s < 60 ? s + ' с' : s < 3600 ? Math.round(s / 60) + ' мин' : Math.round(s / 3600) + ' ч'; }
+  function sub(a) {
+    var bits = [SOURCE[a.source] || a.source];
+    if (a.variation) bits.push(a.variation);
+    if (a.voice && a.voice.length) bits.push(a.voice.map(function (v) { return VOICE[v] || v; }).join(' + '));
+    if (a.isTest) bits.push('тест');
+    if (a.replay) bits.push('повтор');
+    return bits.join(' · ');
+  }
+
+  function api(path, body) {
+    var opts = { headers: { 'x-alerts-token': TOKEN } };
+    if (body) { opts.method = 'POST'; opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(path, opts).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data.ok && data.message) throw new Error(data.message);
+      if (data.state) render(data.state);
+      return data;
+    });
+  }
+  function control(body) { $('err').textContent = ''; return api('/api/alerts/control', body).catch(function (e) { $('err').textContent = e.message; }); }
+
+  function render(s) {
+    last = s;
+    $('off').hidden = s.enabled;
+    $('nooverlay').hidden = !s.enabled || s.overlays > 0;
+    $('pause').textContent = s.paused ? 'Продолжить' : 'Пауза';
+    $('pause').className = s.paused ? 'primary' : '';
+    $('skip').disabled = !s.current;
+
+    var c = s.current;
+    $('now').className = 'now' + (c ? '' : ' idle');
+    $('now').innerHTML = c
+      ? '<div class="who">' + esc(c.name) + ' — ' + esc(money(c)) + '</div><div class="sub muted">' + esc(sub(c)) + '</div>' + (c.message ? '<div class="msg">' + esc(c.message) + '</div>' : '')
+      : (s.paused ? 'Пауза' : 'Тишина');
+
+    $('qcount').textContent = s.queue.length ? '(' + s.queue.length + ')' : '';
+    $('queue').innerHTML = s.queue.length ? s.queue.map(function (a) {
+      return '<div class="row"><div class="main"><div>' + esc(a.name) + ' — ' + esc(money(a)) + '</div><div class="sub">' + esc(sub(a)) + (a.message ? ' · ' + esc(a.message) : '') + '</div></div>'
+        + '<button class="icon" data-remove="' + esc(a.id) + '" title="Убрать из очереди">✕</button></div>';
+    }).join('') : '<div class="empty">пусто</div>';
+
+    $('services').innerHTML = s.services.map(function (v) {
+      var st = v.enabled ? v.state : 'disabled';
+      return '<div class="row"><span class="dot ' + esc(st) + '"></span><div class="main"><div>' + esc(v.label) + '</div><div class="sub">' + esc(STATE[st] || st) + (v.error ? ': ' + esc(v.error) : '') + '</div></div>'
+        + '<button class="icon" data-restart="' + esc(v.id) + '" title="Переподключить">↻</button>'
+        + '<label class="switch" title="Показывать донаты"><input type="checkbox" data-toggle="' + esc(v.id) + '"' + (v.enabled ? ' checked' : '') + '><span></span></label></div>';
+    }).join('') + (s.seConfig.error ? '<div class="sub" style="color:#e0605a">Алерт SE: ' + esc(s.seConfig.error) + '</div>' : '');
+
+    $('history').innerHTML = s.history.length ? s.history.slice(0, 6).map(function (a) {
+      return '<div class="row"><div class="main"><div>' + esc(a.name) + ' — ' + esc(money(a)) + '</div><div class="sub">' + esc(sub(a)) + ' · ' + ago(a.finishedAt) + (a.reason === 'skipped' ? ' · пропущен' : '') + '</div></div>'
+        + '<button class="icon" data-replay="' + esc(a.id) + '" title="Повторить">↺</button></div>';
+    }).join('') : '<div class="empty">пока ничего</div>';
+
+    var sel = $('tsource');
+    if (!sel.options.length) sel.innerHTML = s.services.map(function (v) { return '<option value="' + esc(v.id) + '">' + esc(v.label) + '</option>'; }).join('');
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('button, input');
+    if (!t) return;
+    if (t.id === 'pause') control({ action: last && last.paused ? 'resume' : 'pause' });
+    else if (t.id === 'skip') control({ action: 'skip' });
+    else if (t.id === 'tsend') control({ action: 'test', amount: Number($('tamount').value) || 100, source: $('tsource').value });
+    else if (t.dataset.remove) control({ action: 'remove', id: t.dataset.remove });
+    else if (t.dataset.replay) control({ action: 'replay', id: t.dataset.replay });
+    else if (t.dataset.restart) { t.disabled = true; control({ action: 'restart', service: t.dataset.restart }).then(function () { t.disabled = false; }); }
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.toggle) control({ action: 'toggle', service: t.dataset.toggle, enabled: t.checked });
+  });
+
+  function poll() {
+    api('/api/alerts/state').catch(function (e) { $('err').textContent = 'Нет связи с ботом: ' + e.message; }).then(function () { setTimeout(poll, 1500); });
+  }
+  poll();
+  setInterval(function () { if (last) render(last); }, 10000);
+})();
+</script>
+</body>
+</html>

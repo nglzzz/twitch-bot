@@ -161,7 +161,7 @@ function getStats(userId) {
     (SELECT COUNT(DISTINCT COALESCE(NULLIF(m.event_id, ''), m.id)) FROM meme_log m
       WHERE m.community_user_id = ? AND m.kind = 'sticker-sent' AND ${memeRawIsEligible('m')}) AS memes_sent,
     (SELECT COUNT(*) FROM donation
-      WHERE community_user_id = ? AND source IN ('donationalerts', 'usdt-trc20')
+      WHERE community_user_id = ? AND source IN ('donationalerts', 'usdt-trc20', 'donatepay', 'donatex', 'streamelements')
         AND is_test = 0 AND external_id IS NOT NULL AND trim(external_id) <> '' AND amount > 0) AS donations_count`)
     .get(id, id, id);
   return {
@@ -188,7 +188,7 @@ function findEligibleSupport(kind, recordId) {
   return stmt(`SELECT id, external_id AS eventId, community_user_id AS communityUserId,
       source, donor_name AS displayName, amount, currency,
       created_at AS eventAt, status
-    FROM donation WHERE id = ? AND source IN ('donationalerts', 'usdt-trc20')
+    FROM donation WHERE id = ? AND source IN ('donationalerts', 'usdt-trc20', 'donatepay', 'donatex', 'streamelements')
       AND is_test = 0 AND external_id IS NOT NULL AND trim(external_id) <> '' AND amount > 0
     LIMIT 1`).get(String(recordId));
 }
@@ -273,7 +273,7 @@ function listUnassigned({ kind = null, limit = 50 } = {}) {
         CAST(d.amount AS TEXT) || ' ' || d.currency AS title,
         d.created_at AS eventAt, d.status AS status
       FROM donation d
-      WHERE d.community_user_id IS NULL AND d.source IN ('donationalerts', 'usdt-trc20')
+      WHERE d.community_user_id IS NULL AND d.source IN ('donationalerts', 'usdt-trc20', 'donatepay', 'donatex', 'streamelements')
         AND d.is_test = 0 AND d.external_id IS NOT NULL AND trim(d.external_id) <> '' AND d.amount > 0
       ORDER BY d.created_at DESC, d.id LIMIT ?`).all(safeLimit));
   }

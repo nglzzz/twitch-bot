@@ -104,4 +104,4 @@ function getSettingsView(settings) {
   };
 }
 
-module.exports = { getSettings, getRuntimeSettings, updateSettings, getSettingsView };
+module.exports = { getSettings, getRuntimeSettings, updateSettings, getSettingsView, encrypt, decrypt, encryptionKey };

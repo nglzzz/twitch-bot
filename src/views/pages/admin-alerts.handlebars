@@ -1,0 +1,30 @@
+<section class="admin-page admin-page--narrow"><div class="admin-page__heading"><div><div class="eyebrow">Интеграции</div><h1>Алерты донатов</h1></div></div>
+{{#if success}}<p class="form-notice form-notice--success">{{success}}</p>{{/if}}{{#if error}}<p class="form-notice form-notice--error">{{error}}</p>{{/if}}
+
+<article class="admin-card">
+<p class="admin-card__hint">Бот сам слушает DonationAlerts, StreamElements, DonatePay и Donatex и показывает все донаты одним источником в OBS (<code>{{overlayPath}}</code>). Вид алерта и вариации по суммам берутся из алерта на донаты в оверлее StreamElements, озвучка — своя у каждого сервиса. Пока режим выключен, всё работает по-старому: донаты DA пересылаются в StreamElements.</p>
+<form method="post" action="/admin/alerts" class="admin-form"><input type="hidden" name="_csrf" value="{{csrfToken}}" />
+<label class="admin-check"><input type="checkbox" name="enabled" {{#if settings.enabled}}checked{{/if}} /> Включить единые алерты</label>
+<label>Ссылка на оверлей StreamElements {{#if settings.configured.streamElementsOverlayUrl}}<small>сохранена</small>{{/if}}<input name="streamElementsOverlayUrl" type="password" autocomplete="off" placeholder="https://streamelements.com/overlay/…/…" /></label>
+<label>Токен виджета DonatePay {{#if settings.configured.donatePayToken}}<small>сохранён</small>{{/if}}<input name="donatePayToken" type="password" autocomplete="off" placeholder="последняя часть ссылки widget.donatepay.ru/alert-box/widget/…" /></label>
+<label>Id виджета Donatex {{#if settings.configured.donatexWidgetId}}<small>сохранён</small>{{/if}}<input name="donatexWidgetId" type="password" autocomplete="off" placeholder="последняя часть ссылки donatex.gg/widgets/donations/…" /></label>
+<label>Озвучка DonationAlerts от, ₽<input name="daTtsMinRub" type="number" min="0" step="1" value="{{settings.daTtsMinRub}}" /></label>
+<p class="admin-card__hint">Пустое поле оставляет сохранённое значение. Токен DonationAlerts берётся из <a href="/admin/settings">настроек</a>.</p>
+<button class="btn btn--primary" type="submit">Сохранить</button></form>
+</article>
+
+<article class="admin-card">
+<h2>Сейчас</h2>
+<ul class="admin-list">
+{{#each services}}<li><strong>{{label}}</strong> — {{#if enabled}}{{stateLabel}}{{else}}выключен в доке{{/if}}{{#if error}} <small>({{error}})</small>{{/if}}</li>{{/each}}
+<li><strong>Алерт из StreamElements</strong> — {{#if seConfig.loadedAt}}загружен, вариаций: {{seConfig.variations}}{{else}}не загружен{{/if}}{{#if seConfig.error}} <small>({{seConfig.error}})</small>{{/if}}</li>
+</ul>
+</article>
+
+<article class="admin-card">
+<h2>OBS</h2>
+<p class="admin-card__hint">Док: OBS → Доки → Пользовательские доки браузера → вставьте ссылку. В доке видно подключение каждого сервиса, очередь и повторы; можно выключить или перезапустить сервис, пропустить алерт, поставить очередь на паузу и прислать тест.</p>
+<form method="post" action="/admin/alerts/regenerate-dock" class="admin-form"><input type="hidden" name="_csrf" value="{{csrfToken}}" />
+<label>Ссылка дока<input readonly value="{{dockUrl}}" onclick="this.select()" /></label><button class="btn btn--ghost" type="submit">Перевыпустить ссылку дока</button></form>
+</article>
+</section>

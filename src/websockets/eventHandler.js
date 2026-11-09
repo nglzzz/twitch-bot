@@ -6,6 +6,7 @@ const { publishChatMessage } = require('../services/overlayChat.service');
 const { getPresenceService } = require('../services/presence.service');
 const { getStreamSummaryService } = require('../services/streamSummary.service');
 const { getDonationTopService } = require('../services/donationTop.service');
+const { getAlerts } = require('../services/alerts');
 const arrayHelper = require('../helpers/arrayHelper');
 const allowedAudioCommands = [
   '!badabum',
@@ -119,11 +120,15 @@ websocketServer.on('connection', (ws) => {
     if (raw.length > 256) return;
     let request;
     try { request = JSON.parse(raw); } catch (error) { return; }
+    // Источник алертов (obs/alerts) представляется и сообщает, что алерт закончился.
+    if (request?.type === 'alerts:hello') { getAlerts().hub.attachOverlay(ws); return; }
+    if (request?.type === 'alerts:done') { getAlerts().hub.finish(String(request.id || '')); return; }
     const answer = request && answers[request.type];
     if (!answer) return;
     answer()
       .then((data) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: request.type, ...data })); })
       .catch((error) => console.warn(`[Scene] ${request.type} failed:`, error.message));
   });
+  ws.on('close', () => getAlerts().hub.detachOverlay(ws));
 });
 getPresenceService().start();

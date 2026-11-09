@@ -1,0 +1,141 @@
+'use strict';
+
+// Донаты разных сервисов → один вид. В media — «родная» озвучка сервиса и голосовые, по порядку.
+
+function cleanText(value, max = 500) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function toAmount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+}
+
+const isUrl = (value) => typeof value === 'string' && /^https?:\/\//i.test(value);
+
+function absolute(path, base) {
+  if (!path || typeof path !== 'string') return null;
+  if (isUrl(path)) return path;
+  return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+/** DonationAlerts (socket.io, событие donation). Сумма — в рублях, как раньше уходила в StreamElements. */
+function fromDonationAlerts(payload, { ttsMinRub = 0 } = {}) {
+  const r = typeof payload === 'string' ? JSON.parse(payload) : payload;
+  if (!r || Number(r.alert_type) !== 1) return null;
+  let extra = {};
+  try { extra = typeof r.additional_data === 'string' ? JSON.parse(r.additional_data || '{}') : (r.additional_data || {}); } catch (_) { extra = {}; }
+  const inRub = r.currency !== 'RUB' && r.amount_main !== undefined && r.amount_main !== null;
+  const amount = toAmount(inRub ? r.amount_main : r.amount);
+  if (!amount) return null;
+  let name = cleanText(r.username, 100) || 'Аноним';
+  if (extra.is_commission_covered) name = `❤️ ${name}`;
+  const isAudio = r.message_type && r.message_type !== 'text';
+  const media = [];
+  if (isAudio && isUrl(r.message)) media.push({ kind: 'voice', url: r.message });
+  else if (isUrl(r.tts_url) && cleanText(r.message) && amount >= ttsMinRub) media.push({ kind: 'tts', url: r.tts_url });
+  return {
+    source: 'donationalerts',
+    externalId: r.id ? String(r.id) : null,
+    name,
+    amount,
+    currency: inRub ? 'RUB' : String(r.currency || 'RUB').toUpperCase(),
+    message: isAudio ? '' : cleanText(r.message),
+    dbMessage: isAudio ? '(аудио сообщение)' : cleanText(r.message, 255),
+    isTest: r._is_test_alert === true,
+    media,
+    raw: r,
+  };
+}
+
+/** StreamElements (astro, тема channel.activities). Озвучку собирает хаб по настройкам алерта SE. */
+function fromStreamElements(activity) {
+  const a = activity?.data && activity.type === undefined ? activity.data : activity;
+  if (!a || a.type !== 'tip') return null;
+  const d = a.data || {};
+  const amount = toAmount(d.amount);
+  if (!amount) return null;
+  return {
+    source: 'streamelements',
+    externalId: String(d.tipId || a._id || a.activityId || ''),
+    name: cleanText(d.username || d.displayName, 100) || 'Аноним',
+    amount,
+    currency: String(d.currency || 'RUB').toUpperCase(),
+    message: cleanText(d.message),
+    isTest: Boolean(a.isMock || d.isMock),
+    media: [{ kind: 'se-tts' }],
+    raw: a,
+  };
+}
+
+/**
+ * DonatePay (centrifugo, канал notifications#<id>). Озвучку отдаёт их сервер по ссылке,
+ * как в их виджете: голос выбирается по widget_id, премиум-голос — из настроек доната.
+ */
+function fromDonatePay(publication, ctx = {}) {
+  const data = publication?.data && !publication.notification ? publication.data : publication;
+  const n = data?.notification;
+  if (!n || n.type !== 'donation' || !n.vars) return null;
+  const v = n.vars;
+  const amount = toAmount(v.sum);
+  if (!amount) return null;
+  const message = cleanText(v.comment);
+  const widget = ctx.widgets?.[`#${data.widgetId}`] || ctx.widgets?.[data.widgetId] || null;
+  const media = [];
+  const record = absolute(v.media_record, ctx.base || 'https://widget.donatepay.ru');
+  if (record) media.push({ kind: 'voice', url: record });
+  else if (ctx.widgetsToken && message && amount >= Number(ctx.voiceSum || 0) && (!widget || String(widget['a_s.play']) !== '0')) {
+    const url = new URL(`/donation/notifications/widget/${ctx.widgetsToken}/voice`, ctx.base || 'https://widget.donatepay.ru');
+    url.searchParams.append('text', encodeURIComponent(` ${message}`));
+    url.searchParams.append('rate', widget?.['a_s.speed'] || 'medium');
+    url.searchParams.append('widget_id', String(data.widgetId ?? ''));
+    const premium = v.premiumSettings;
+    if (ctx.allowPremium && premium && Object.values(premium).length > 0) {
+      url.searchParams.append('premium_voice', premium.voice);
+      url.searchParams.append('premium_speed', premium.speed);
+      url.searchParams.append('premium_emotion', premium.emotion);
+    }
+    media.push({ kind: 'tts', url: url.toString() });
+  }
+  return {
+    source: 'donatepay',
+    externalId: n.id ? String(n.id) : null,
+    name: cleanText(v.name, 100) || 'Аноним',
+    amount,
+    currency: 'RUB',
+    message,
+    isTest: false,
+    media,
+    raw: data,
+  };
+}
+
+/** Donatex (SignalR, ReceiveDonation / PlaybackGranted). Озвучка — готовый mp3 на их CDN. */
+function fromDonatex(donation, { mediaBase = 'https://cdn.donatex.gg' } = {}) {
+  const d = donation;
+  if (!d || !d.id) return null;
+  const amount = toAmount(d.amount);
+  if (!amount || d.isRefunded) return null;
+  const media = [];
+  const voiceMessage = absolute(d.voiceMessagePath, mediaBase);
+  const tts = absolute(d.voiceFilePath, mediaBase);
+  if (voiceMessage) media.push({ kind: 'voice', url: voiceMessage });
+  else if (tts) media.push({ kind: 'tts', url: tts });
+  const ai = d.withAIResponse ? absolute(d.aiResponseVoiceFilePath, mediaBase) : null;
+  if (ai) media.push({ kind: 'ai', url: ai });
+  return {
+    source: 'donatex',
+    externalId: String(d.id),
+    name: cleanText(d.username, 100) || 'Аноним',
+    amount,
+    currency: String(d.currency || 'RUB').toUpperCase(),
+    message: cleanText(d.message),
+    // У тестового доната Donatex нет флага — только их неизменный текст.
+    isTest: d.username === 'Аноним тест' && d.message === 'Это тестовый донат!',
+    media,
+    video: absolute(d.videoMessagePath, mediaBase),
+    raw: d,
+  };
+}
+
+module.exports = { fromDonationAlerts, fromStreamElements, fromDonatePay, fromDonatex, cleanText };

@@ -122,6 +122,8 @@ startScheduler();
 const initializeAdminIntegrations = () => {
   ensureInitialAdmin().catch((error) => console.error('[Admin] Bootstrap failed:', error.message));
   refreshDonationAlertsConnection();
+  // Единые алерты донатов: подключения к DonatePay, Donatex и StreamElements.
+  require('../services/alerts').getAlerts().start();
 };
 // В SQLite соединение устанавливается синхронно при загрузке модуля db.js,
 // поэтому инициализируем админ-интеграции сразу.
