@@ -60,6 +60,9 @@ function createAlerts() {
   /** Донат с любого сервиса: в базу (топы, итоги, заказ музыки/видео) и в очередь алертов. */
   function handleDonation(donation) {
     if (!donation || !store.get().enabled) return Promise.resolve(null);
+    // Копию доната, которую переслал SE, и донаты выключенного сервиса не пишем в базу — иначе
+    // заказ музыки/видео из текста сработает второй раз, а донат дважды попадёт в топы.
+    if (!donation.saved && hub.isIgnored(donation)) return Promise.resolve(null);
     if (!donation.isTest && !donation.saved) {
       donations().recordHubDonation(donation).catch((error) => console.error(`[Alerts] Could not save ${donation.source} donation:`, error.message));
     }

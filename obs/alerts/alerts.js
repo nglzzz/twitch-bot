@@ -150,7 +150,16 @@
     note('алерт', alert.source, alert.name, alert.amount, alert.variation || 'база', 'звуки:', (alert.media || []).map((m) => m.kind).join(',') || 'нет');
     const voices = (alert.media || []).filter((m) => m.url).map((m) => prepareSound(m.url));
     state.sounds.push(...voices);
-    const graphics = alert.video ? { src: alert.video, type: 'video', volume: 1 } : view.graphics;
+    // Платная картинка доната DonatePay: на весь экран перед алертом или вместо его картинки.
+    const premium = (D.premium && alert.premium) || {};
+    if (premium.image && premium.imageMode === 'preview') {
+      note('картинка донатера', premium.image.slice(0, 70));
+      await D.premium.preview(premium.image, alive);
+      if (!alive()) return;
+    }
+    const ownPicture = premium.image && premium.imageMode === 'replace'
+      ? { src: premium.image, type: D.premium.isVideo(premium.image) ? 'video' : 'image', volume: 0 } : null;
+    const graphics = alert.video ? { src: alert.video, type: 'video', volume: 1 } : ownPicture || view.graphics;
     state.media = makeMedia(graphics && graphics.src, graphics && graphics.type, graphics ? graphics.volume : 1);
     mediaBox.textContent = '';
     if (state.media.node) {
@@ -164,6 +173,7 @@
     root.hidden = false;
     requestAnimationFrame(() => root.classList.add('is-shown'));
     if (cfg.coins !== false && D.coinRain) D.coinRain(alert.power || 1);
+    if (premium.effect) state.removeEffect = D.premium.effect(root, premium.effect);
     state.media.play();
     if (view.audio && view.audio.src) playSound(view.audio.src, view.audio.volume, alive);
 
@@ -199,6 +209,7 @@
     await wait(FADE_MS);
     state.sounds.forEach((a) => a.pause());
     if (state.media) state.media.stop();
+    if (state.removeEffect) state.removeEffect();
     if (playing === state) { playing = null; root.hidden = true; mediaBox.textContent = ''; }
   }
 
@@ -244,7 +255,11 @@
   }
 
   // #demo — проверка вида без бота: пара алертов по кругу.
+  // Плюшки DonatePay: #demo&fx=HeartUp (ConfettiJump, StarsDown, BubbleBubbles, StarsRight, KappaUp, 4headUp),
+  // &pic=<ссылка на картинку>&picMode=replace (по умолчанию — на весь экран перед алертом).
   function demo() {
+    const arg = (key) => decodeURIComponent((location.hash.match(new RegExp(`[#&]${key}=([^&]+)`)) || [])[1] || '');
+    const premium = arg('fx') || arg('pic') ? { effect: arg('fx') || null, image: arg('pic') || null, imageMode: arg('pic') ? arg('picMode') || 'preview' : null } : null;
     const view = (graphics, template) => ({
       duration: 6, layout: 'column', showMessage: true, graphics, audio: null,
       tts: { enabled: true, voice: 'Tatyana', volume: 0.75, minAmount: 0, announce: true, delay: 0 },
@@ -262,7 +277,7 @@
     const next = () => {
       const s = samples[i++ % samples.length];
       const alert = {
-        id: `demo-${i}`, power: s.power, view: view(s.graphics, '{name} занёс {currency}{amount} стримеру!'), message: s.message, media: [], ttsVolume: 0.75,
+        id: `demo-${i}`, power: s.power, premium, view: view(s.graphics, '{name} занёс {currency}{amount} стримеру!'), message: s.message, media: [], ttsVolume: 0.75,
         title: [{ text: s.name, hl: true }, { text: ' занёс ' }, { text: `₽${s.amount}`, hl: true }, { text: ' стримеру!' }],
       };
       play(alert).then(() => setTimeout(next, 1500));

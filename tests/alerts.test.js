@@ -43,6 +43,20 @@ test('DonatePay builds their voice link the way their widget does', () => {
   assert.equal(fromDonatePay({ data: pub }, ctx).externalId, '77');
 });
 
+test('DonatePay paid picture and effect follow the streamer settings like their widget', () => {
+  const widgets = { '#1': { 'a_m.active': '1', 'a_m.min_sum': '1', 'a_s.play': '1' } };
+  const pub = (premiumSettings) => ({ widgetId: 1, notification: { id: 5, type: 'donation', vars: { name: 'Петя', sum: 300, comment: 'hi', premiumSettings } } });
+  const ctx = { base: 'https://widget.donatepay.ru', widgets, allowPremium: true, premiumImageType: '1' };
+  assert.deepEqual(fromDonatePay(pub({ image: '/uploads/p/1.png', effect: 'HeartUp' }), ctx).premium,
+    { image: 'https://widget.donatepay.ru/uploads/p/1.png', imageMode: 'preview', effect: 'HeartUp' });
+  assert.equal(fromDonatePay(pub({ image: 'a.png', giphy: 'https://media.giphy.com/x.gif' }), { ...ctx, premiumImageType: '2' }).premium.image, 'https://media.giphy.com/x.gif');
+  assert.equal(fromDonatePay(pub({ image: 'a.png', giphy: 'https://media.giphy.com/x.gif' }), { ...ctx, premiumImageType: '2' }).premium.imageMode, 'replace');
+  // премиум выключен — картинки нет, а эффект их виджет всё равно показывает
+  assert.deepEqual(fromDonatePay(pub({ image: 'a.png', effect: 'KappaUp' }), { ...ctx, allowPremium: false }).premium, { image: null, imageMode: null, effect: 'KappaUp' });
+  assert.equal(fromDonatePay(pub({ effect: 'Unknown' }), ctx).premium, null);
+  assert.equal(fromDonatePay(pub(undefined), ctx).premium, null);
+});
+
 test('DonatePay as it really arrives: vars as a JSON string, widget picked by amount, test without id', () => {
   const ctx = { widgetsToken: 'TOK', voiceSum: 25, widgets: {
     '#2611037': { 'a_m.active': '0', 'a_m.min_sum': '1', 'a_s.play': '1' },
@@ -243,6 +257,15 @@ test('SE echo is recognised when DA says Аноним and SE says Anonymous', ()
   assert.ok(hub.ingest(donation({ source: 'donationalerts', externalId: '77', name: 'Аноним', amount: 100, message: 'привет' })));
   assert.equal(hub.ingest(donation({ source: 'streamelements', externalId: 'se77', name: 'Anonymous', amount: 100, message: 'привет', media: [{ kind: 'se-tts' }] })), null);
   assert.ok(hub.ingest(donation({ source: 'streamelements', externalId: 'se78', name: 'Вася', amount: 100, message: 'другое', media: [{ kind: 'se-tts' }] })));
+});
+
+test('SE echo and disabled services are known before the donation is saved (no second music order)', () => {
+  const { hub } = makeHub({ isServiceEnabled: (s) => s !== 'donatex' });
+  hub.expect(donation({ source: 'donatepay', externalId: '5', name: 'Петя', amount: 300, message: 'https://youtu.be/x' }));
+  assert.equal(hub.isIgnored(donation({ source: 'streamelements', externalId: 'se5', name: 'Петя', amount: 300, message: 'https://youtu.be/x' })), true);
+  assert.equal(hub.isIgnored(donation({ source: 'streamelements', externalId: 'se6', name: 'Вася', amount: 300, message: 'другое' })), false);
+  assert.equal(hub.isIgnored(donation({ source: 'donatex', externalId: '7', name: 'Вася', amount: 50 })), true);
+  assert.equal(hub.isIgnored(donation({ source: 'donatepay', externalId: '8', name: 'Вася', amount: 50 })), false);
 });
 
 test('DA alert without its own voice is read by the SE voice', () => {

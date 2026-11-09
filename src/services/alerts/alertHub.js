@@ -120,6 +120,7 @@ function createAlertHub({ onPlay = () => {}, getTipConfig, getSeApiKey = () => '
       ttsVolume: view.tts.volume,
       fallback,
       video: donation.video || null,
+      premium: donation.premium || null,
       receivedAt: now(),
     };
   }
@@ -264,9 +265,15 @@ function createAlertHub({ onPlay = () => {}, getTipConfig, getSeApiKey = () => '
     };
   }
 
+  /** Донат не пойдёт в алерты: сервис выключен или это копия доната из другого сервиса, пересланная SE. */
+  function isIgnored(donation) {
+    return !donation || !isServiceEnabled(donation.source) || isEchoOfOtherService(donation);
+  }
+
   return {
     ingest,
     expect,
+    isIgnored,
     finish,
     skip,
     replay,

@@ -44,3 +44,52 @@ html, body { margin: 0; width: 100%; height: 100%; background: transparent; over
 @keyframes alert-wobble { 0%, 100% { transform: none; } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
 @keyframes alert-tada { 0%, 100% { transform: none; } 20% { transform: scale(0.94) rotate(-3deg); } 50% { transform: scale(1.08) rotate(3deg); } 80% { transform: scale(1.08) rotate(-3deg); } }
 @keyframes alert-flash { 0%, 50%, 100% { opacity: 1; } 25%, 75% { opacity: 0.2; } }
+
+/* Платная картинка/гифка доната DonatePay — на весь экран перед алертом (premium.js) */
+.premium-preview {
+  position: absolute; inset: 0;
+  background: center / contain no-repeat;
+  opacity: 0; transition: opacity 0.5s ease-out;
+  pointer-events: none;
+}
+.premium-preview.is-shown { opacity: 1; }
+.premium-preview video { width: 100%; height: 100%; object-fit: contain; }
+
+/* Платный эффект DonatePay поверх алерта: частицы летят по дорожкам, анимации — как в их виджете */
+.premium-fx { position: absolute; inset: 0; pointer-events: none; transform: translateZ(0); }
+.premium-fx > div { position: absolute; inset: 0; opacity: 0.85; animation: 3s ease-in infinite; }
+.premium-fx > div > div { position: absolute; background: center / contain no-repeat; opacity: 0; animation: 3s ease-in infinite; }
+.premium-fx[data-animation=up] > div { animation-name: fx-up-lane; }
+.premium-fx[data-animation=up] > div > div { animation-name: fx-up; }
+.premium-fx[data-animation=down] > div { animation-name: fx-down-lane; }
+.premium-fx[data-animation=down] > div > div { animation-name: fx-down; }
+.premium-fx[data-animation=down] > div:nth-child(2n) > div { animation-name: fx-down2; }
+.premium-fx[data-animation=down] > div:nth-child(5n) > div { animation-name: fx-down3; }
+.premium-fx[data-animation=bubbles] > div { animation-name: fx-bubbles-lane; }
+.premium-fx[data-animation=bubbles] > div > div { animation-name: fx-bubbles; }
+.premium-fx[data-animation=right] > div { animation-name: fx-right-lane; }
+.premium-fx[data-animation=right] > div > div { animation-name: fx-fade; }
+.premium-fx[data-animation=jump] > div { animation-name: fx-jump-lane; }
+.premium-fx[data-animation=jump] > div > div { animation-name: fx-jump; }
+
+@keyframes fx-fade { 0% { opacity: 0; } 20%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fx-up-lane { 10% { transform: none; } 100% { transform: translate3d(0, -80%, 0); } }
+@keyframes fx-up {
+  0% { opacity: 0; transform: scale(0.5); }
+  5% { opacity: 1; transform: scale(1.2) translate3d(0, 40%, 0); }
+  7% { transform: translate3d(0, 30%, 0); }
+  100% { opacity: 0; }
+}
+@keyframes fx-down-lane { 0% { transform: translate3d(0, -20%, 0); } 100% { transform: translate3d(0, 100%, 0); } }
+@keyframes fx-down { 0% { opacity: 0; transform: rotate(0) scale(0.9); } 10% { opacity: 1; } 90% { opacity: 0.5; } 100% { opacity: 0; transform: rotate(1turn) scale(1.1); } }
+@keyframes fx-down2 { 0% { opacity: 0; transform: rotate(0) scale(0.9); } 10% { opacity: 1; } 90% { opacity: 0.5; } 100% { opacity: 0; transform: rotate(-80deg) scale(1.1); } }
+@keyframes fx-down3 { 0% { opacity: 0; transform: rotate(0) scale(0.9); } 10% { opacity: 1; } 90% { opacity: 0.5; } 100% { opacity: 0; transform: rotate(-120deg) scale(0.8); } }
+@keyframes fx-bubbles-lane { 100% { transform: translate3d(0, -120%, 0); } }
+@keyframes fx-bubbles { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8); } }
+@keyframes fx-right-lane { 100% { transform: translate3d(90%, -90%, 0); } }
+@keyframes fx-jump-lane {
+  32% { transform: translate3d(0, -57%, 0); }
+  35%, 38% { transform: translate3d(0, -60%, 0); }
+  100% { transform: translate3d(0, 90%, 0); }
+}
+@keyframes fx-jump { 0% { opacity: 0; transform: rotate(0); } 10% { opacity: 1; } 35%, 38% { transform: rotate(260deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: rotate(4turn); } }

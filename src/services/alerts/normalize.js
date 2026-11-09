@@ -71,6 +71,23 @@ function fromStreamElements(activity) {
   };
 }
 
+// Платные эффекты DonatePay (названия — как в их виджете).
+const DONATEPAY_EFFECTS = new Set(['HeartUp', 'ConfettiJump', 'StarsDown', 'BubbleBubbles', 'StarsRight', 'KappaUp', '4headUp']);
+
+/**
+ * Платные картинка/гифка и эффект доната DonatePay — как их виджет: картинка только при включённых
+ * премиум-функциях, по настройке либо на весь экран перед алертом (preview), либо вместо картинки алерта
+ * (replace); эффект их виджет показывает всегда, когда он есть.
+ */
+function donatePayPremium(premium, ctx) {
+  if (!premium || typeof premium !== 'object') return null;
+  const picture = ctx.allowPremium ? premium.giphy || premium.image : null;
+  const mode = { 1: 'preview', 2: 'replace' }[String(ctx.premiumImageType)];
+  const image = picture && mode && typeof picture === 'string' ? absolute(picture, ctx.base || 'https://widget.donatepay.ru') : null;
+  const effect = DONATEPAY_EFFECTS.has(premium.effect) ? premium.effect : null;
+  return image || effect ? { image, imageMode: image ? mode : null, effect } : null;
+}
+
 /** Какой виджет DonatePay сработал бы на эту сумму: активный, с подходящим порогом, самый «дорогой». */
 function pickDonatePayWidget(widgets, sum) {
   let best = null;
@@ -129,6 +146,7 @@ function fromDonatePay(publication, ctx = {}) {
     message,
     isTest,
     media,
+    premium: donatePayPremium(v.premiumSettings, ctx),
     raw: data,
   };
 }

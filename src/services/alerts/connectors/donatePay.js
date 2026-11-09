@@ -69,6 +69,7 @@ async function prepare(token, http = axios, apiKey = '') {
       widgetsToken: userSettings.widgetsToken || token,
       voiceSum: Number(userSettings.voiceSum || 0),
       allowPremium: String(userSettings.premium?.allowPremium) === '1',
+      premiumImageType: String(userSettings.premium?.premiumImageType || ''),
       widgets: settings.data?.notifications || {},
     },
   };
