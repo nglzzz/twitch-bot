@@ -52,7 +52,10 @@ test('DonatePay as it really arrives: vars as a JSON string, widget picked by am
   const test1 = fromDonatePay(pub({ name: 'DonatePay', comment: 'цитата', sum: 1 }), ctx);
   assert.equal(test1.isTest, true);
   assert.equal(test1.amount, 1);
-  assert.equal(test1.media.length, 0);
+  // тест озвучивается всегда, даже ниже порога и без подходящего по сумме виджета
+  assert.equal(new URL(test1.media[0].url).searchParams.get('widget_id'), '4702183');
+  const small = fromDonatePay(pub({ name: 'Петя', comment: 'мало', sum: 10 }, 556), ctx);
+  assert.equal(small.media.length, 0);
   const real = fromDonatePay(pub({ name: 'Вася', comment: 'привет', sum: 300 }, 555), ctx);
   assert.equal(real.isTest, false);
   assert.equal(real.externalId, '555');

@@ -98,13 +98,16 @@ function fromDonatePay(publication, ctx = {}) {
   const amount = toAmount(v.sum);
   if (!amount) return null;
   const message = cleanText(v.comment);
+  // Тест из кабинета DonatePay — всегда 1–3 ₽, ниже порога озвучки. Чтобы тестом можно было
+  // услышать их голос, тест озвучиваем всегда — первым активным виджетом, если по сумме ни один не подходит.
+  const isTest = !n.id;
   const picked = data.widgetId !== undefined
     ? { id: String(data.widgetId), widget: ctx.widgets?.[`#${data.widgetId}`] || null }
-    : pickDonatePayWidget(ctx.widgets, amount);
+    : pickDonatePayWidget(ctx.widgets, amount) || (isTest ? pickDonatePayWidget(ctx.widgets, Infinity) : null);
   const media = [];
   const record = absolute(v.media_record, ctx.base || 'https://widget.donatepay.ru');
   if (record) media.push({ kind: 'voice', url: record });
-  else if (ctx.widgetsToken && picked && message && amount >= Number(ctx.voiceSum || 0) && String(picked.widget?.['a_s.play']) !== '0') {
+  else if (ctx.widgetsToken && picked && message && (isTest || amount >= Number(ctx.voiceSum || 0)) && String(picked.widget?.['a_s.play']) !== '0') {
     const url = new URL(`/donation/notifications/widget/${ctx.widgetsToken}/voice`, ctx.base || 'https://widget.donatepay.ru');
     url.searchParams.append('text', encodeURIComponent(` ${message}`));
     url.searchParams.append('rate', picked.widget?.['a_s.speed'] || 'medium');
@@ -124,7 +127,7 @@ function fromDonatePay(publication, ctx = {}) {
     amount,
     currency: 'RUB',
     message,
-    isTest: !n.id,
+    isTest,
     media,
     raw: data,
   };
