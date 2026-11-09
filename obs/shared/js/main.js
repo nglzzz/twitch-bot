@@ -27,23 +27,14 @@
   }
 
   // Итоги эфира для титров: при подключении, раз в минуту и при показе сцены.
-  let socket = null;
+  let bot = null;
   function requestSummary() {
-    if (D.config.mode === 'end' && socket && socket.readyState === 1) socket.send(JSON.stringify({ type: 'stream:summary' }));
+    if (D.config.mode === 'end' && bot) bot.send({ type: 'stream:summary' });
   }
   setInterval(requestSummary, 60000);
 
   function connect() {
-    let delay = 1000;
-    const open = () => {
-      let ws;
-      try { ws = new WebSocket(D.config.websocket); } catch (e) { setTimeout(open, delay); return; }
-      socket = ws;
-      ws.onopen = () => { delay = 1000; requestSummary(); };
-      ws.onclose = () => { setTimeout(open, delay); delay = Math.min(delay * 2, 15000); };
-      ws.onmessage = (event) => { try { handle(JSON.parse(event.data)); } catch (e) { /* чужое сообщение */ } };
-    };
-    open();
+    bot = D.connectBot({ onOpen: requestSummary, onMessage: handle });
   }
 
   function demo() {

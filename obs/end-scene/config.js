@@ -3,7 +3,8 @@ window.SCENE_CONFIG = {
   mode: 'end',
 
   // Websocket бота (docker: порт DOCKER_WEBSOCKET_PORT из .env).
-  websocket: 'ws://localhost:86',
+  // Бот: сначала прод, если он не отвечает — локальный контейнер.
+  websocket: ['wss://nglzzz.xyz/ws', 'ws://localhost:86'],
   channel: 'nglzzz',
 
   // За сколько минут двор пустеет: все прощаются и расходятся, окна гаснут.

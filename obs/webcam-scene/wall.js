@@ -150,28 +150,14 @@
   setInterval(frame, 66);
 
   // Данные от бота: при подключении, раз в 30 секунд и когда сцену показывают.
-  const config = D.config || {};
-  let socket = null;
-  const ask = () => { if (socket && socket.readyState === 1) socket.send(JSON.stringify({ type: 'donations:top' })); };
+  let bot = null;
+  const ask = () => { if (bot) bot.send({ type: 'donations:top' }); };
   setInterval(ask, 30000);
   window.addEventListener('obsSourceActiveChanged', (event) => { if (event.detail && event.detail.active) ask(); });
   if (location.hash.includes('demo')) {
     D.setDonationTop({ day: { name: 'Krolik_Bandit', amount: 1500 }, month: { name: 'Shrek_Na_Raione', amount: 12500 } });
     setTimeout(() => D.setDonationTop({ day: { name: 'pelmen', amount: 2000 }, month: { name: 'Shrek_Na_Raione', amount: 14000 } }), 4000);
-  } else if (config.websocket) {
-    let delay = 1000;
-    const open = () => {
-      let ws;
-      try { ws = new WebSocket(config.websocket); } catch (e) { setTimeout(open, delay); return; }
-      socket = ws;
-      ws.onopen = () => { delay = 1000; ask(); };
-      ws.onclose = () => { setTimeout(open, delay); delay = Math.min(delay * 2, 15000); };
-      ws.onmessage = (event) => {
-        let data;
-        try { data = JSON.parse(event.data); } catch (e) { return; }
-        if (data && data.type === 'donations:top') D.setDonationTop(data.top);
-      };
-    };
-    open();
+  } else {
+    bot = D.connectBot({ onOpen: ask, onMessage: (data) => { if (data.type === 'donations:top') D.setDonationTop(data.top); } });
   }
 })(window.Dvor);

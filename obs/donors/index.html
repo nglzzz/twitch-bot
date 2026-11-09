@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Топ донатеров</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  canvas { display: block; image-rendering: pixelated; transition: opacity 0.4s steps(4); }
+</style>
+</head>
+<body>
+<canvas id="donors"></canvas>
+<script src="config.js"></script>
+<script>window.Dvor = { config: window.SCENE_CONFIG };</script>
+<script src="../shared/js/led.js"></script>
+<script src="../shared/js/socket.js"></script>
+<script src="donors.js"></script>
+</body>
+</html>
