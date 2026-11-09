@@ -12,6 +12,7 @@ const { extractTipConfig, parseOverlayUrl } = require('./seAlertConfig');
 const { createStreamElementsConnector } = require('./connectors/streamElements');
 const { createDonatePayConnector } = require('./connectors/donatePay');
 const { createDonatexConnector } = require('./connectors/donatex');
+const { embedMedia } = require('./embed');
 
 const TIP_CONFIG_KEY = 'seTipConfig';
 const TIP_CONFIG_REFRESH_MS = 5 * 60 * 1000;
@@ -47,13 +48,17 @@ function createAlerts() {
 
   /** Донат с любого сервиса: в базу (топы, итоги, заказ музыки/видео) и в очередь алертов. */
   function handleDonation(donation) {
-    if (!donation || !store.get().enabled) return null;
+    if (!donation || !store.get().enabled) return Promise.resolve(null);
     if (!donation.isTest && !donation.saved) {
       donations().recordHubDonation(donation).catch((error) => console.error(`[Alerts] Could not save ${donation.source} donation:`, error.message));
     }
-    const item = hub.ingest(donation);
-    if (item) console.log(`[Alerts] ${donation.source}: ${donation.name} ${donation.amount} ${donation.currency}${item.variation ? ` → ${item.variation}` : ''}`);
-    return item;
+    hub.expect(donation);
+    // Звук DA/DonatePay сначала скачиваем — см. embed.js. Порядок очереди не страдает: скачивание быстрое.
+    return embedMedia(donation).then((ready) => {
+      const item = hub.ingest(ready);
+      if (item) console.log(`[Alerts] ${donation.source}: ${donation.name} ${donation.amount} ${donation.currency}${item.variation ? ` → ${item.variation}` : ''}`);
+      return item;
+    }).catch((error) => { console.error('[Alerts] Could not queue donation:', error.message); return null; });
   }
 
   const log = console;

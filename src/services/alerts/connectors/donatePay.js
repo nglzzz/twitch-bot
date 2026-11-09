@@ -66,26 +66,6 @@ async function prepare(token, http = axios, apiKey = '') {
   };
 }
 
-/**
- * Озвучку DonatePay скачивает бот и кладёт в алерт как data:-ссылку:
- * браузер источника OBS их сервер озвучки не обслуживает (отвечает не звуком).
- */
-async function withEmbeddedVoice(donation, http = axios, log = console) {
-  const media = await Promise.all(donation.media.map(async (m) => {
-    if (m.kind !== 'tts' || !m.url.startsWith(BASE)) return m;
-    try {
-      const res = await http.get(m.url, { headers: { 'User-Agent': UA }, responseType: 'arraybuffer', timeout: 30000 });
-      const type = String(res.headers['content-type'] || '');
-      if (!type.startsWith('audio/')) throw new Error(`ответ ${type || 'без типа'}`);
-      return { ...m, url: `data:${type.split(';')[0]};base64,${Buffer.from(res.data).toString('base64')}` };
-    } catch (error) {
-      log.warn('[Alerts:donatepay] voice download failed:', error.message);
-      return m;
-    }
-  }));
-  return { ...donation, media };
-}
-
 function createDonatePayConnector({ getToken, getApiKey = () => '', onDonation, log = console, http = axios }) {
   return createConnector({
     id: 'donatepay',
@@ -128,7 +108,7 @@ function createDonatePayConnector({ getToken, getApiKey = () => '', onDonation, 
           const donation = fromDonatePay(data, ctx);
           if (!donation) continue;
           conn.event();
-          withEmbeddedVoice(donation, http, log).then(onDonation);
+          onDonation(donation);
         }
       });
       ws.on('error', (error) => log.warn('[Alerts:donatepay] socket error:', error.message));
@@ -142,4 +122,4 @@ function createDonatePayConnector({ getToken, getApiKey = () => '', onDonation, 
   });
 }
 
-module.exports = { createDonatePayConnector, parseWidgetPage, withEmbeddedVoice };
+module.exports = { createDonatePayConnector, parseWidgetPage };

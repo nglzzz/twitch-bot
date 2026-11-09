@@ -36,11 +36,20 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     for (const [key, at] of seen) if (t - at > DEDUPE_MS) seen.delete(key);
   }
 
+  // Донаты, которые ещё готовятся (бот качает их звук), — чтобы узнать их копии из SE.
+  const expected = [];
+  function expect(donation) {
+    if (!donation || donation.source === 'streamelements') return;
+    const t = now();
+    while (expected.length && t - expected[0].receivedAt > CROSS_DEDUPE_MS) expected.shift();
+    expected.push({ source: donation.source, name: donation.name, amount: donation.amount, receivedAt: t });
+  }
+
   /** SE пересылает донаты, которые к нему импортировали (старый импорт из DA) — такие пропускаем. */
   function isEchoOfOtherService(item) {
     if (item.source !== 'streamelements') return false;
     const t = now();
-    const recent = [...history, ...queue, ...(current ? [current.item] : [])];
+    const recent = [...expected, ...history, ...queue, ...(current ? [current.item] : [])];
     return recent.some((other) => other.source !== 'streamelements' && t - other.receivedAt < CROSS_DEDUPE_MS
       && normName(other.name) === normName(item.name) && Math.abs(other.amount - item.amount) < 0.01);
   }
@@ -218,6 +227,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
 
   return {
     ingest,
+    expect,
     finish,
     skip,
     replay,

@@ -16,6 +16,8 @@
   let bot = null;
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // Журнал в лог OBS: obs-browser пишет туда только console.error.
+  const note = (...parts) => console.error('[alerts]', ...parts);
   const clamp01 = (v) => Math.max(0, Math.min(1, Number(v)));
 
   function loadFont(family) {
@@ -75,15 +77,18 @@
       const a = typeof source === 'string' ? new Audio(source) : source;
       a.volume = clamp01(volume);
       let done = false;
-      const finish = () => { if (done) return; done = true; clearTimeout(cap); a.pause(); resolve(); };
-      const cap = setTimeout(finish, MAX_VOICE_MS);
-      a.addEventListener('ended', finish);
-      a.addEventListener('error', finish);
+      const label = (a.currentSrc || a.src || '').slice(0, 70);
+      const finish = (why) => { if (done) return; done = true; clearTimeout(cap); a.pause(); note('звук', why || 'конец', label); resolve(); };
+      const cap = setTimeout(() => finish('обрезан по времени'), MAX_VOICE_MS);
+      a.addEventListener('ended', () => finish('конец'));
+      a.addEventListener('error', () => finish(`ошибка ${a.error ? a.error.code : ''}`));
+      if (a.error) { finish(`ошибка загрузки ${a.error.code}`); return; }
       a.addEventListener('loadedmetadata', () => {
-        if (Number.isFinite(a.duration) && a.duration > 0) { clearTimeout(cap); setTimeout(finish, a.duration * 1000 + 3000); }
+        if (Number.isFinite(a.duration) && a.duration > 0) { clearTimeout(cap); setTimeout(() => finish('обрезан по длине'), a.duration * 1000 + 3000); }
       });
       if (playing && !playing.sounds.includes(a)) playing.sounds.push(a);
-      a.play().catch(finish);
+      note('звук', 'старт', label);
+      a.play().catch((e) => finish(`не играет: ${e.message}`));
     });
   }
 
@@ -112,6 +117,7 @@
     const view = alert.view;
 
     render(alert);
+    note('алерт', alert.source, alert.name, alert.amount, alert.variation || 'база', 'звуки:', (alert.media || []).map((m) => m.kind).join(',') || 'нет');
     const voices = (alert.media || []).filter((m) => m.url).map((m) => prepareSound(m.url));
     state.sounds.push(...voices);
     const graphics = alert.video ? { src: alert.video, type: 'video', volume: 1 } : view.graphics;

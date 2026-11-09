@@ -187,3 +187,23 @@ test('hub keeps the current alert when the source reloads, pauses and replays', 
   assert.equal(again.name, 'Аня');
   assert.equal(hub.state().current.id, again.id);
 });
+
+test('a donation still being prepared already hides its SE echo', () => {
+  const { hub } = makeHub();
+  hub.expect({ source: 'donationalerts', name: '❤️ Тест', amount: 111 });
+  assert.equal(hub.ingest(donation({ source: 'streamelements', externalId: 'se9', name: 'Тест', amount: 111, media: [{ kind: 'se-tts' }] })), null);
+});
+
+test('DA and DonatePay sounds are downloaded by the bot, others stay links', async () => {
+  const { embedMedia } = require('../src/services/alerts/embed');
+  const riff = Buffer.from('RIFF....WAVEfmt ');
+  const http = { get: async (url) => ({ headers: { 'content-type': url.includes('donatepay') ? 'audio/mpeg' : 'application/octet-stream' }, data: riff }) };
+  const out = await embedMedia({ media: [
+    { kind: 'tts', url: 'https://files.donationalerts.com/da/speechsynthesis/1/a.wav' },
+    { kind: 'tts', url: 'https://widget.donatepay.ru/donation/notifications/widget/T/voice?text=x' },
+    { kind: 'tts', url: 'https://cdn.donatex.gg/v.mp3' },
+  ] }, { http, log: { warn() {} } });
+  assert.match(out.media[0].url, /^data:audio\/wav;base64,/);
+  assert.match(out.media[1].url, /^data:audio\/mpeg;base64,/);
+  assert.equal(out.media[2].url, 'https://cdn.donatex.gg/v.mp3');
+});
