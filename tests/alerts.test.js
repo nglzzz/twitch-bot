@@ -253,3 +253,14 @@ test('a deleted native voice is replaced by the SE voice, and every alert carrie
   const ok = hub.ingest(donation({ externalId: 'g2', media: [{ kind: 'tts', url: 'https://cdn.donatex.gg/v.mp3' }] }));
   assert.match(ok.fallback, /speech\?voice=/);
 });
+
+test('celebration power grows with the amount and every played alert is announced to the scenes', () => {
+  const { powerOf } = require('../src/services/alerts/alertHub');
+  assert.deepEqual([50, 100, 300, 999, 1000, 5000].map(powerOf), [1, 2, 3, 3, 4, 5]);
+  const played = [];
+  const { hub } = makeHub({ onPlay: (item) => played.push(item) });
+  hub.attachOverlay(fakeWs());
+  hub.ingest(donation({ externalId: 'p1', amount: 1500 }));
+  assert.equal(played.length, 1);
+  assert.equal(played[0].power, 4);
+});

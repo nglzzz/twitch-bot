@@ -49,5 +49,6 @@
   .float--bomb { color: #f09a3a; font-size: 48px; }
   .float--defused { color: #7fd08a; font-size: 48px; }
   .float--raid { color: #f2c94a; font-size: 60px; }
+  .float--donate { color: #ffe08a; font-size: 64px; }
 .float--title { color: #efe6cf; font-size: 56px; }
 .float--rank { color: #f2c94a; font-size: 40px; }

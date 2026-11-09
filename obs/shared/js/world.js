@@ -465,8 +465,15 @@
     // красный огонь на трубе
     if (Math.floor(t * 1.2) % 2 === 0) rect(ctx, 576, 102, 2, 2, '#ff4a3a');
 
-    // окна
+    // окна; на крупный донат — дискотека во всех окнах
+    if (partyLeft > 0) partyLeft -= dt;
     for (const w of windows) {
+      if (partyLeft > 0 && w.kind !== 'stair') {
+        const c = DISCO[(Math.floor(t * 3) + Math.floor(w.x / 7) + Math.floor(w.y / 9)) % DISCO.length];
+        rect(ctx, w.x, w.y, w.w, w.h, c);
+        rect(ctx, w.x + Math.floor(w.w / 2), w.y, 1, w.h, C.frame);
+        continue;
+      }
       if (night) {
         // ночью свет только гаснет — по расписанию lightsOut()
         if (w.offAt && t > w.offAt) { w.lit = false; w.offAt = 0; }
@@ -544,6 +551,10 @@
     }
   }
 
+  const DISCO = ['#e0485a', '#f2c94a', '#5cc977', '#4aa3d8', '#9a5ad8', '#ff8aa0'];
+  let partyLeft = 0;
+  function party(seconds) { partyLeft = Math.max(partyLeft, seconds); }
+
   function relight() {
     for (const w of windows) { w.lit = w.initialLit; w.offAt = 0; }
   }
@@ -558,6 +569,6 @@
     W, H, GROUND, BAND, ROAD, MANHOLE, BENCH, LAMP, GAR, B,
     DOOR: { x: B.door.x + B.door.w / 2, y: GROUND + 4 },
     BOMBSITE: { x: GAR.x + 26, y: BAND.top + 2 },
-    build, drawStatic, drawAmbient, openDoor, lightsOut, relight, props, rect, BAYER, C,
+    build, drawStatic, drawAmbient, openDoor, lightsOut, relight, party, props, rect, BAYER, C,
   };
 })(window.Dvor = window.Dvor || {});

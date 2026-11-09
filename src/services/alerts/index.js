@@ -39,7 +39,18 @@ function createAlerts() {
 
   const seOverlay = () => parseOverlayUrl(store.secret('streamElementsOverlayUrl'));
 
+  // Алерт начался — сцены «Двора» празднуют вместе с ним (жители сбегаются, салют).
+  const celebrate = (item) => require('../../app/websocket').broadcast({
+    type: 'donation:celebrate',
+    name: item.name,
+    amount: item.amount,
+    currency: item.currency,
+    power: item.power,
+    source: item.source,
+  });
+
   const hub = createAlertHub({
+    onPlay: celebrate,
     getTipConfig: () => tip.config,
     getSeApiKey: () => seOverlay()?.apiKey || '',
     toRub,

@@ -19,6 +19,7 @@
       case 'chat': if (data.platform === 'twitch' || !data.platform) scene.onChat(data); break;
       case 'scene:action': scene.onAction(data); break;
       case 'raid': scene.onRaid(data); break;
+      case 'donation:celebrate': scene.onDonation(data); break;
       case 'emotes': scene.setEmotes(data.emotes); break;
       case 'chat:clear-user': scene.removeMessagesOf(data.login); break;
       case 'stream:summary': scene.setSummary(data.summary); break;
@@ -62,6 +63,13 @@
       handle({ type: 'chat', login: v.login, nickname: v.name, message: lines[i % lines.length] });
       i += 1;
     }, 3200);
+    // #demo&donate=1000 — праздник от доната (сила как у бота: 100 / 300 / 1000 / 5000 ₽)
+    const donate = /donate=(\d+)/.exec(location.hash);
+    if (donate) {
+      const amount = Number(donate[1]);
+      const power = amount >= 5000 ? 5 : amount >= 1000 ? 4 : amount >= 300 ? 3 : amount >= 100 ? 2 : 1;
+      setTimeout(() => handle({ type: 'donation:celebrate', name: 'Шейх Валера', amount, currency: 'RUB', power }), 7000);
+    }
     if (!/events=/.test(location.hash)) {
       setTimeout(() => handle({ type: 'scene:action', action: 'hug', actor: viewers[1], target: viewers[2] }), 4000);
       setTimeout(() => handle({ type: 'scene:action', action: 'kill', actor: viewers[3], target: viewers[4] }), 9000);

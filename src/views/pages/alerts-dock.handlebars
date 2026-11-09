@@ -27,6 +27,7 @@
   .row:last-child { border-bottom: 0; }
   .row .main { flex: 1; min-width: 0; }
   .row .sub { font-size: 11px; color: #8d8899; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .msg { margin-top: 2px; color: #c9c4d4; overflow-wrap: anywhere; }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #555; }
   .dot.connected { background: #5cc977; }
   .dot.connecting { background: #e0b84a; }
@@ -131,8 +132,9 @@
         + '<label class="switch" title="Показывать донаты"><input type="checkbox" data-toggle="' + esc(v.id) + '"' + (v.enabled ? ' checked' : '') + '><span></span></label></div>';
     }).join('') + (s.seConfig.error ? '<div class="sub" style="color:#e0605a">Алерт SE: ' + esc(s.seConfig.error) + '</div>' : '');
 
-    $('history').innerHTML = s.history.length ? s.history.slice(0, 6).map(function (a) {
-      return '<div class="row"><div class="main"><div>' + esc(a.name) + ' — ' + esc(money(a)) + '</div><div class="sub">' + esc(sub(a)) + ' · ' + ago(a.finishedAt) + (a.reason === 'skipped' ? ' · пропущен' : '') + '</div></div>'
+    $('history').innerHTML = s.history.length ? s.history.slice(0, 10).map(function (a) {
+      return '<div class="row"><div class="main"><div>' + esc(a.name) + ' — ' + esc(money(a)) + '</div><div class="sub">' + esc(sub(a)) + ' · ' + ago(a.finishedAt) + (a.reason === 'skipped' ? ' · пропущен' : '') + '</div>'
+        + (a.message ? '<div class="msg">' + esc(a.message) + '</div>' : '') + '</div>'
         + '<button class="icon" data-replay="' + esc(a.id) + '" title="Повторить">↺</button></div>';
     }).join('') : '<div class="empty">пока ничего</div>';
 

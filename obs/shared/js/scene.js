@@ -135,6 +135,18 @@
       p.pose = 'stand';
     }
     if (p.poseUntil && clock > p.poseUntil) { p.pose = 'stand'; p.poseUntil = 0; }
+    // донат: прыгают и машут руками, пока длится праздник
+    if (p.danceUntil) {
+      if (clock > p.danceUntil) { p.danceUntil = 0; p.z = 0; p.pose = 'stand'; p.timer = rand(1, 3); }
+      else if (p.state !== 'walk' && !p.hidden) {
+        const beat = clock * 2.6 + p.dancePhase;
+        p.z = Math.round(Math.abs(Math.sin(beat * Math.PI)) * (p.danceHop || 3));
+        p.pose = Math.floor(beat) % 2 ? 'cheer' : 'stand';
+        if (Math.floor(beat / 2) !== p.danceTurn) { p.danceTurn = Math.floor(beat / 2); if (Math.random() < 0.5) p.facing *= -1; }
+        if (Math.random() < dt * 0.25) coinsUp(p.x, p.y - 30, 1);
+        return;
+      }
+    }
     if (p.state === 'waitDoor') {
       p.timer -= dt;
       if (p.timer > 0) return;
@@ -304,8 +316,9 @@
 
   /* ---------- кто во дворе ---------- */
   let presenceSeen = false;
+  const viewersCount = () => [...people.values()].filter((p) => !p.fan).length;
   function admit(viewer, fromDoor) {
-    if (people.size >= cfg.maxPeople) {
+    if (viewersCount() >= cfg.maxPeople) {
       // уступает место тот, кто дольше всех молчит
       const quiet = free().sort((a, b) => (lastChatBy.get(a.login) || -1) - (lastChatBy.get(b.login) || -1))[0];
       if (!quiet) return null;
@@ -335,12 +348,13 @@
     let added = 0;
     for (const v of ordered) {
       if (people.has(v.login)) continue;
-      if (people.size >= cfg.maxPeople) break;
+      if (viewersCount() >= cfg.maxPeople) break;
       const p = createPerson(v, { fromDoor: !initial && added < 4 });
       if (!initial && added >= 4) { p.x = pick([-6, 646]); walkTo(p, rand(40, 600), rand(BAND.top + 6, BAND.bottom)); }
       added += 1;
     }
     for (const p of people.values()) {
+      if (p.fan) continue;
       if (!wanted.has(p.login) && !wentHome.has(p.login) && clock - (lastChatBy.get(p.login) || -999) > 600) sendHome(p);
     }
   }
@@ -766,6 +780,7 @@
       return;
     }
     if (clock < nextEventAt) return;
+    if (clock < partyUntil) { nextEventAt = partyUntil + rand(2, 5); return; }
     if (END && !forced.length) {
       nextEventAt = clock + rand(6, 12);
       if (running.size >= 3) return;
@@ -820,6 +835,71 @@
     floatText(`РЕЙД: ${raid.name} +${raid.viewers}`, 320, 150, 'float--raid', 6);
     const p = getOrAdmit(raid);
     if (p) setPose(p, 'cheer', 3);
+  }
+
+  /* ---------- донат: двор празднует ---------- */
+  // Сила 1…5 приходит от бота (по сумме в рублях): больше — больше жителей, монет и салют.
+  const FANS = [0, 2, 4, 7, 11, 16];
+  const FIREWORK_COLORS = [['#ffe08a', '#f2a93a'], ['#ff8aa0', '#e0485a'], ['#9fe0ff', '#4aa3d8'], ['#b7f08a', '#5cc977'], ['#d9a8ff', '#9a5ad8']];
+  let partyUntil = 0;
+  let fanSeq = 0;
+
+  function coinsUp(x, y, n) {
+    for (let i = 0; i < n; i += 1) effects.push({ kind: 'coin', x: x + rand(-3, 3), y, vx: rand(-22, 22), vy: -rand(40, 70), born: clock + i * 0.08, life: 1.6, silver: Math.random() < 0.4 });
+  }
+
+  function firework(delay) {
+    const colors = pick(FIREWORK_COLORS);
+    const parts = Array.from({ length: 26 }, (_, i) => {
+      const a = (i / 26) * Math.PI * 2 + rand(-0.1, 0.1);
+      const v = rand(26, 44);
+      return { vx: Math.cos(a) * v, vy: Math.sin(a) * v, c: Math.random() < 0.5 ? colors[0] : colors[1] };
+    });
+    effects.push({ kind: 'firework', x: rand(70, 570), y: rand(26, 96), from: 250, born: clock + delay, life: 2.4, rise: 0.7, parts });
+  }
+
+  function dance(p, until, hop = 3) {
+    p.danceUntil = until;
+    p.dancePhase = rand(0, 2);
+    p.danceHop = hop;
+    p.danceTurn = -1;
+  }
+
+  async function fanRun(until, hop) {
+    const fromLeft = Math.random() < 0.5;
+    const viewer = { login: `__fan${(fanSeq += 1)}`, name: '' };
+    const p = createPerson(viewer, { fromDoor: false });
+    p.fan = true; p.busy = true;
+    p.tag.style.display = 'none';
+    p.x = fromLeft ? -8 : 648;
+    p.y = rand(BAND.top + 6, BAND.bottom);
+    await walkTo(p, clamp(320 + rand(-200, 200), 20, 620), rand(BAND.top + 6, BAND.bottom), rand(55, 75));
+    alive(p);
+    dance(p, until + rand(-1, 1), hop);
+    await sleep(Math.max(0, p.danceUntil - clock) + 0.3);
+    alive(p);
+    // убегают за край двора
+    p.danceUntil = 0; p.z = 0;
+    p.state = 'walk'; p.speed = rand(55, 75);
+    p.target = { x: p.x < 320 ? -12 : 652, y: p.y };
+    p.onArrive = () => removePerson(p);
+  }
+
+  function onDonation(d) {
+    const power = clamp(Math.round(Number(d.power) || 1), 1, 5);
+    const amount = Math.round(Number(d.amount) * 100) / 100;
+    const money = d.currency && d.currency !== 'RUB' ? `${amount} ${d.currency}` : `${amount} ₽`;
+    floatText(`${d.name || 'Аноним'} +${money}`, 320, 150, 'float--donate', 7);
+    const until = clock + 7 + power * 3;
+    partyUntil = Math.max(partyUntil, until);
+    const hop = 2 + power;
+    for (const p of free()) dance(p, until, hop);
+    const room = Math.max(0, 40 - people.size);
+    for (let i = 0; i < Math.min(FANS[power], room); i += 1) run(`fan-${fanSeq + i}`, (async () => { await sleep(i * 0.35); await fanRun(until, hop); })());
+    coinsUp(320, 200, 4 + power * 4);
+    if (power >= 3) for (let i = 0; i < (power - 2) * 4; i += 1) firework(i * 0.6 + rand(0, 0.3));
+    if (power >= 4 && world.party) world.party(until - clock);
+    scarePigeons(320, 400);
   }
 
   /* ---------- голуби и кот ---------- */
@@ -914,6 +994,27 @@
         ctx.globalAlpha = 0.5 * (1 - k); ctx.fillStyle = '#c9ccd6';
         for (let j = 0; j < 5; j += 1) ctx.fillRect(Math.round(e.x - 6 + j * 3 + Math.sin(age * 3 + j) * 2), Math.round(e.y - 4 - age * 18 - j * 2), 3, 2);
         ctx.globalAlpha = 1;
+      } else if (e.kind === 'coin') {
+        const x = Math.round(e.x + e.vx * age); const y = Math.round(e.y + e.vy * age + 90 * age * age);
+        const spin = Math.floor(clock * 10 + e.x) % 4;
+        const w = spin === 1 || spin === 3 ? 1 : (spin === 2 ? 2 : 3);
+        ctx.fillStyle = '#14111c'; ctx.fillRect(x - 1, y - 1, w + 2, 5);
+        ctx.fillStyle = e.silver ? '#cfd6e0' : '#f2c94a'; ctx.fillRect(x, y, w, 3);
+        if (w === 3) { ctx.fillStyle = e.silver ? '#ffffff' : '#fff1b0'; ctx.fillRect(x, y, 1, 1); }
+      } else if (e.kind === 'firework') {
+        if (age < e.rise) {
+          const k2 = age / e.rise; const y = Math.round(e.from + (e.y - e.from) * (1 - (1 - k2) * (1 - k2)));
+          ctx.fillStyle = '#fff1b0'; ctx.fillRect(Math.round(e.x), y, 1, 2);
+          ctx.fillStyle = '#f2a93a'; ctx.fillRect(Math.round(e.x), y + 2, 1, 2);
+        } else {
+          const t2 = age - e.rise; const fade = 1 - t2 / (e.life - e.rise);
+          if (t2 < 0.08) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(e.x) - 2, Math.round(e.y) - 2, 5, 5); }
+          for (const q of e.parts) {
+            if (Math.random() > fade + 0.15) continue;
+            ctx.fillStyle = q.c;
+            ctx.fillRect(Math.round(e.x + q.vx * t2), Math.round(e.y + q.vy * t2 + 18 * t2 * t2), 1, 1);
+          }
+        }
       } else if (e.kind === 'deadcrab') {
         ctx.save(); ctx.translate(Math.round(e.x), Math.round(e.y)); ctx.scale(1, -1);
         P.drawHeadcrab(ctx, -5, -2, 0, false); ctx.restore();
@@ -971,7 +1072,7 @@
     for (const p of all) {
       if (p !== granny) {
         const inCar = p.hidden && p.carX != null;
-        const hideTag = (p.hidden && !inCar) || p.bubble || p.pose === 'lie';
+        const hideTag = p.fan || (p.hidden && !inCar) || p.bubble || p.pose === 'lie'; // жители без ника
         p.tag.style.display = hideTag ? 'none' : '';
         const tx = inCar ? p.carX : p.x;
         const ty = inCar ? world.ROAD.laneY - 30 : p.y + 2;
@@ -1046,7 +1147,7 @@
   }
 
   D.scene = {
-    start, onChat, onPresence, onAction, onRaid,
+    start, onChat, onPresence, onAction, onRaid, onDonation,
     restart,
     setSummary(value) { summary = value || null; },
     force(names) { forced.push(...names.filter((n) => n in EVENT_ROLL)); nextEventAt = clock + 1.5; },

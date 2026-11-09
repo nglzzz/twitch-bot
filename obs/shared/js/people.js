@@ -261,7 +261,7 @@
   function drawPerson(ctx, p) {
     const outfit = OUTFITS[p.outfit];
     const ox = Math.round(p.x) - 6;
-    const oy = Math.round(p.y) - HEIGHT;
+    const oy = Math.round(p.y) - HEIGHT - (p.z || 0); // z — прыжок, тень остаётся на земле
     if (p.pose === 'lie') { drawLying(ctx, p, outfit); return; }
     // тень
     ctx.globalAlpha = 0.35;

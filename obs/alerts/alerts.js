@@ -15,6 +15,18 @@
   let playing = null;
   let bot = null;
 
+  // Рамка алерта внутри полноэкранного источника — в долях экрана, чтобы превью любого размера совпадало.
+  if (cfg.box && cfg.screen) {
+    const { x, y, width, height } = cfg.box;
+    Object.assign(root.style, {
+      inset: 'auto',
+      left: `${(x / cfg.screen.width) * 100}%`, top: `${(y / cfg.screen.height) * 100}%`,
+      width: `${(width / cfg.screen.width) * 100}%`, height: `${(height / cfg.screen.height) * 100}%`,
+      transform: cfg.scale && cfg.scale !== 1 ? `scale(${cfg.scale})` : '',
+      transformOrigin: 'top center',
+    });
+  }
+
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   // Журнал в лог OBS: obs-browser пишет туда только console.error.
   const note = (...parts) => console.error('[alerts]', ...parts);
@@ -122,6 +134,8 @@
     titleBox.style.marginTop = `${view.text.title.marginTop || 0}px`;
     messageBox.textContent = view.showMessage ? alert.message : '';
     styleText(messageBox, view.text.message);
+    const minMessage = Math.round(view.text.title.fontSize * (cfg.messageMin ?? 0));
+    if (view.text.message.fontSize < minMessage) messageBox.style.fontSize = `${minMessage}px`;
     loadFont(view.text.title.fontFamily);
     loadFont(view.text.message.fontFamily);
   }
@@ -139,12 +153,17 @@
     const graphics = alert.video ? { src: alert.video, type: 'video', volume: 1 } : view.graphics;
     state.media = makeMedia(graphics && graphics.src, graphics && graphics.type, graphics ? graphics.volume : 1);
     mediaBox.textContent = '';
-    if (state.media.node) mediaBox.appendChild(state.media.node);
+    if (state.media.node) {
+      root.hidden = false; // нужна высота рамки
+      state.media.node.style.maxHeight = `${Math.round(root.clientHeight * 0.62)}px`;
+      mediaBox.appendChild(state.media.node);
+    }
     await state.media.ready;
     if (!alive()) return;
 
     root.hidden = false;
     requestAnimationFrame(() => root.classList.add('is-shown'));
+    if (cfg.coins !== false && D.coinRain) D.coinRain(alert.power || 1);
     state.media.play();
     if (view.audio && view.audio.src) playSound(view.audio.src, view.audio.volume, alive);
 
@@ -236,14 +255,14 @@
       },
     });
     const samples = [
-      { name: 'Бабка_Зина', amount: '150', message: 'Внучок, держи на пирожки. И шапку надень!', graphics: { src: 'https://cdn.streamelements.com/uploads/0c0d02cd-ed57-4ffe-b9c1-4ca88e1d47ba.mp4', type: 'video', volume: 0.6 } },
-      { name: 'Шейх Валера', amount: '1000', message: 'За стрим!', graphics: { src: 'https://cdn.streamelements.com/uploads/8927f333-61e1-4124-b6e6-884e16d267f7.mp4', type: 'video', volume: 0.6 } },
+      { name: 'Бабка_Зина', amount: '150', power: 2, message: 'Внучок, держи на пирожки. И шапку надень!', graphics: { src: 'https://cdn.streamelements.com/uploads/0c0d02cd-ed57-4ffe-b9c1-4ca88e1d47ba.mp4', type: 'video', volume: 0.6 } },
+      { name: 'Шейх Валера', amount: '1000', power: 4, message: 'За стрим!', graphics: { src: 'https://cdn.streamelements.com/uploads/8927f333-61e1-4124-b6e6-884e16d267f7.mp4', type: 'video', volume: 0.6 } },
     ];
     let i = 0;
     const next = () => {
       const s = samples[i++ % samples.length];
       const alert = {
-        id: `demo-${i}`, view: view(s.graphics, '{name} занёс {currency}{amount} стримеру!'), message: s.message, media: [], ttsVolume: 0.75,
+        id: `demo-${i}`, power: s.power, view: view(s.graphics, '{name} занёс {currency}{amount} стримеру!'), message: s.message, media: [], ttsVolume: 0.75,
         title: [{ text: s.name, hl: true }, { text: ' занёс ' }, { text: `₽${s.amount}`, hl: true }, { text: ' стримеру!' }],
       };
       play(alert).then(() => setTimeout(next, 1500));

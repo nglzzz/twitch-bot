@@ -12,6 +12,16 @@ const CROSS_DEDUPE_MS = 3 * 60 * 1000;
 const MAX_ALERT_MS = 4 * 60 * 1000;
 const HISTORY = 30;
 
+/** Сила празднования 1…5 по сумме в рублях: сколько монет, жителей, будет ли салют. */
+function powerOf(amountRub) {
+  const a = Number(amountRub) || 0;
+  if (a >= 5000) return 5;
+  if (a >= 1000) return 4;
+  if (a >= 300) return 3;
+  if (a >= 100) return 2;
+  return 1;
+}
+
 const normName = (name) => String(name || '').replace(/^❤️\s*/, '').trim().toLowerCase();
 const ANONYMOUS = new Set(['', 'аноним', 'anonymous', 'anon', 'аноним тест']);
 const normText = (text) => String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -26,7 +36,7 @@ function sameDonation(a, b) {
   return sameText && normText(a.message) !== '';
 }
 
-function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount, currency) => (currency === 'RUB' ? amount : null), isServiceEnabled = () => true, now = Date.now, random = Math.random, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+function createAlertHub({ onPlay = () => {}, getTipConfig, getSeApiKey = () => '', toRub = (amount, currency) => (currency === 'RUB' ? amount : null), isServiceEnabled = () => true, now = Date.now, random = Math.random, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   const overlays = new Set();
   const queue = [];
   const history = [];
@@ -103,6 +113,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
       message: donation.message || '',
       isTest: Boolean(donation.isTest),
       variation,
+      power: powerOf(amountRub ?? donation.amount),
       view,
       title,
       media,
@@ -142,6 +153,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     const item = queue.shift();
     current = { item, startedAt: now() };
     sendAll({ type: 'alerts:play', alert: overlayPayload(item) });
+    try { onPlay(item); } catch (_) { /* сцены не должны ронять очередь */ }
     timer = setTimer(() => finish(item.id, 'timeout'), MAX_ALERT_MS);
     notify();
   }
@@ -268,4 +280,4 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
   };
 }
 
-module.exports = { createAlertHub };
+module.exports = { createAlertHub, powerOf };
