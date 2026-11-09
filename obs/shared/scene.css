@@ -1,0 +1,53 @@
+@font-face {
+    font-family: 'Pixelify';
+    src: url('fonts/pixelify-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+    font-weight: 400 700;
+  }
+  @font-face {
+    font-family: 'Pixelify';
+    src: url('fonts/pixelify-latin.woff2') format('woff2');
+    font-weight: 400 700;
+  }
+  html, body { margin: 0; overflow: hidden; background: #0b1024; }
+  #stage { position: relative; width: 2560px; height: 1440px; transform-origin: 0 0; }
+  #world { display: block; width: 2560px; height: 1440px; image-rendering: pixelated; }
+  #hud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; font-family: 'Pixelify', monospace; }
+
+  /* подпись под ногами */
+  .tag {
+    position: absolute; left: 0; top: 0; white-space: nowrap;
+    font-size: 22px; font-weight: 500; letter-spacing: 1px;
+    text-shadow: 2px 0 #14111c, -2px 0 #14111c, 0 2px #14111c, 0 -2px #14111c, 2px 2px #14111c;
+  }
+
+  /* реплика: бумажный прямоугольник с «пиксельными» углами */
+  .bubble {
+    position: absolute; left: 0; top: 0; max-width: 460px; padding: 10px 16px 12px;
+    background: #efe6cf; color: #1b1726;
+    font-size: 27px; line-height: 1.12;
+    clip-path: polygon(0 4px, 4px 4px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px));
+    box-shadow: inset 0 0 0 4px #14111c;
+    overflow-wrap: anywhere;
+  }
+  .bubble::after {
+    content: ''; position: absolute; top: calc(100% - 4px); left: calc(var(--tail, 30px) - 8px);
+    width: 16px; height: 16px; background: #14111c;
+    clip-path: polygon(0 0, 100% 0, 100% 4px, 75% 4px, 75% 8px, 50% 8px, 50% 12px, 25% 12px, 25% 16px, 0 16px);
+  }
+  .bubble b { display: block; font-size: 20px; font-weight: 700; margin-bottom: 3px; }
+  .bubble .emote { height: 34px; vertical-align: -8px; image-rendering: auto; }
+  .bubble--shout { background: #f6f1e4; font-size: 36px; font-weight: 700; letter-spacing: 2px; }
+
+  /* надписи событий */
+  .float {
+    position: absolute; left: 0; top: 0; white-space: nowrap;
+    font-size: 64px; font-weight: 700; letter-spacing: 3px;
+    text-shadow: 4px 4px 0 #14111c, -2px -2px 0 #14111c, 2px -2px 0 #14111c, -2px 2px 0 #14111c;
+  }
+  .float--wasted { color: #c8322c; font-size: 72px; }
+  .float--bomb { color: #f09a3a; font-size: 48px; }
+  .float--defused { color: #7fd08a; font-size: 48px; }
+  .float--raid { color: #f2c94a; font-size: 60px; }
+.float--title { color: #efe6cf; font-size: 56px; }
+.float--rank { color: #f2c94a; font-size: 40px; }

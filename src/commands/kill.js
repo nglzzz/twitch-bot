@@ -1,3 +1,4 @@
+const { publishSceneAction } = require('../services/sceneActions.service');
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const { getLatestChatters } = require('../chat/chatters');
@@ -34,6 +35,7 @@ async function onKillCommand(channel, tags, message) {
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
+  publishSceneAction('kill', chatter, subject);
   return `@${chatter} ${arrayHelper.getRandomArrayElement(list)}`;
 }
 

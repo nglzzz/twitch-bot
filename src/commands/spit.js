@@ -1,3 +1,4 @@
+const { publishSceneAction } = require('../services/sceneActions.service');
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const { getLatestChatters } = require('../chat/chatters');
@@ -35,6 +36,7 @@ async function onSpitCommand(channel, tags, message) {
     `но тот уворачивается и перенаправляет харчу в лицо @${chatter}`,
   ];
 
+  publishSceneAction('spit', chatter, subject);
   return `${firstSentence} ${arrayHelper.getRandomArrayElement(list)}`;
 }
 

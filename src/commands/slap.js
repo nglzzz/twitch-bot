@@ -1,3 +1,4 @@
+const { publishSceneAction } = require('../services/sceneActions.service');
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const { getLatestChatters } = require('../chat/chatters');
@@ -32,6 +33,7 @@ async function onSlapCommand(channel, tags, message) {
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
+  publishSceneAction('slap', chatter, subject);
   return `@${chatter} шлёпает @${subject} по ${arrayHelper.getRandomArrayElement(list)}`;
 }
 

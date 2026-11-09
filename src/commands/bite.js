@@ -1,3 +1,4 @@
+const { publishSceneAction } = require('../services/sceneActions.service');
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const { getLatestChatters } = require('../chat/chatters');
@@ -32,6 +33,7 @@ async function onBiteCommand(channel, tags, message) {
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
+  publishSceneAction('bite', chatter, subject);
   return `@${chatter} кусает @${subject} за ${arrayHelper.getRandomArrayElement(list)}`;
 }
 

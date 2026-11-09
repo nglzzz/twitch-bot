@@ -1,3 +1,4 @@
+const { publishSceneAction } = require('../services/sceneActions.service');
 const arrayHelper = require('../helpers/arrayHelper');
 const getChannelViewers = require('../twitchApi/viewers');
 const { getLatestChatters } = require('../chat/chatters');
@@ -28,6 +29,7 @@ async function onHugCommand(channel, tags, message) {
   ];
   const chatter = tags['display-name'] ?? tags.username;
 
+  publishSceneAction('hug', chatter, subject);
   return `@${chatter} обнимает @${subject} ${arrayHelper.getRandomArrayElement(list)}`;
 }
 
