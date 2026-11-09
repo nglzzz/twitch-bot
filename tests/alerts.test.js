@@ -196,16 +196,16 @@ test('a donation still being prepared already hides its SE echo', () => {
 
 test('DA and DonatePay sounds are downloaded by the bot, others stay links', async () => {
   const { embedMedia } = require('../src/services/alerts/embed');
-  const riff = Buffer.from('RIFF....WAVEfmt ');
+  const riff = Buffer.from('ID3\u0004\u0000\u0000\u0000\u0000\u0000"TSSE', 'latin1'); // DA: MP3 под именем .wav
   const http = { get: async (url) => ({ headers: { 'content-type': url.includes('donatepay') ? 'audio/mpeg' : 'application/octet-stream' }, data: riff }) };
   const out = await embedMedia({ media: [
     { kind: 'tts', url: 'https://files.donationalerts.com/da/speechsynthesis/1/a.wav' },
     { kind: 'tts', url: 'https://widget.donatepay.ru/donation/notifications/widget/T/voice?text=x' },
     { kind: 'tts', url: 'https://cdn.donatex.gg/v.mp3' },
   ] }, { http, log: { warn() {} } });
-  assert.match(out.media[0].url, /^data:audio\/wav;base64,/);
+  assert.match(out.media[0].url, /^data:audio\/mpeg;base64,/);
   assert.match(out.media[1].url, /^data:audio\/mpeg;base64,/);
-  assert.equal(out.media[2].url, 'https://cdn.donatex.gg/v.mp3');
+  assert.match(out.media[2].url, /^data:audio\/mpeg;base64,/);
 });
 
 test('widget links can be pasted whole', () => {
