@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const { pickView, renderTitle, seSpeechUrl } = require('./seAlertConfig');
 
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
+// DA шлёт одно событие по нескольку раз за секунды; «Повторить» в истории DA — это осознанный повтор.
+const DEDUPE_MS_BY_SOURCE = { donationalerts: 45 * 1000 };
 const CROSS_DEDUPE_MS = 3 * 60 * 1000;
 const MAX_ALERT_MS = 4 * 60 * 1000;
 const HISTORY = 30;
@@ -104,7 +106,8 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     forget();
     if (donation.externalId) {
       const key = `${donation.source}:${donation.externalId}`;
-      if (seen.has(key)) return null;
+      const window = DEDUPE_MS_BY_SOURCE[donation.source] ?? DEDUPE_MS;
+      if (seen.has(key) && now() - seen.get(key) < window) return null;
       seen.set(key, now());
     }
     if (!isServiceEnabled(donation.source)) return null;

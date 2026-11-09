@@ -226,3 +226,16 @@ test('DA alert without its own voice is read by the SE voice', () => {
   const d = fromDonationAlerts({ ...DA, tts_url: null, _is_test_alert: true }, { ttsMinRub: 25 });
   assert.deepEqual(d.media, [{ kind: 'se-tts' }]);
 });
+
+test('DA repeat from its history plays again after the duplicate window', () => {
+  const { hub, tick } = makeHub();
+  assert.ok(hub.ingest(donation({ source: 'donationalerts', externalId: 'r1' })));
+  tick(5000);
+  assert.equal(hub.ingest(donation({ source: 'donationalerts', externalId: 'r1' })), null);
+  tick(60000);
+  assert.ok(hub.ingest(donation({ source: 'donationalerts', externalId: 'r1' })));
+  tick(60000);
+  assert.equal(hub.ingest(donation({ source: 'donatex', externalId: 'x1' })) !== null, true);
+  tick(60000);
+  assert.equal(hub.ingest(donation({ source: 'donatex', externalId: 'x1' })), null);
+});

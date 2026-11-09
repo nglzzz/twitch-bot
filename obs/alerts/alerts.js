@@ -40,7 +40,7 @@
 
   /** Картинка/видео алерта; ждём, пока можно показывать, но не дольше 4 секунд. */
   function makeMedia(src, type, volume) {
-    if (!src) return { node: null, ready: Promise.resolve(), play() {}, stop() {}, ended: Promise.resolve() };
+    if (!src) return { node: null, ready: Promise.resolve(), play() {}, stop() {}, fadeTo: async () => {}, cut: async () => {}, ended: Promise.resolve() };
     if (type === 'video' || /\.(mp4|webm|mov)(\?|$)/i.test(src)) {
       const v = document.createElement('video');
       v.src = src;
@@ -49,18 +49,33 @@
       v.volume = clamp01(volume);
       const ready = new Promise((resolve) => { v.addEventListener('canplay', resolve, { once: true }); v.addEventListener('error', resolve, { once: true }); });
       const ended = new Promise((resolve) => { v.addEventListener('ended', resolve, { once: true }); v.addEventListener('error', resolve, { once: true }); });
+      const base = clamp01(volume);
+      let fader = null;
+      // Плавно меняем громкость видео: приглушаем под озвучку, глушим по окончании алерта.
+      const fadeTo = (level, ms = 400) => new Promise((resolve) => {
+        clearInterval(fader);
+        const from = v.volume; const to = clamp01(base * level); const t0 = performance.now();
+        fader = setInterval(() => {
+          const k = Math.min(1, (performance.now() - t0) / ms);
+          v.volume = from + (to - from) * k;
+          if (k >= 1) { clearInterval(fader); resolve(); }
+        }, 30);
+      });
       return {
         node: v,
         ready: Promise.race([ready, wait(4000)]),
         play() { v.play().catch(() => {}); },
-        stop() { v.pause(); v.removeAttribute('src'); v.load(); },
+        stop() { clearInterval(fader); v.pause(); v.removeAttribute('src'); v.load(); },
+        fadeTo,
+        // как в SE: время алерта вышло — звук видео уходит, кадр остаётся под озвучкой
+        async cut() { await fadeTo(0); v.pause(); },
         ended,
       };
     }
     const img = new Image();
     img.src = src;
     const ready = new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
-    return { node: img, ready: Promise.race([ready, wait(4000)]), play() {}, stop() {}, ended: Promise.resolve() };
+    return { node: img, ready: Promise.race([ready, wait(4000)]), play() {}, stop() {}, fadeTo: async () => {}, cut: async () => {}, ended: Promise.resolve() };
   }
 
   /** Озвучку начинаем качать сразу: SE генерирует её до 10 секунд. */
@@ -132,14 +147,22 @@
     state.media.play();
     if (view.audio && view.audio.src) playSound(view.audio.src, view.audio.volume, alive);
 
-    const minShown = wait(view.duration * 1000);
+    let timeUp = false;
+    const minShown = wait(view.duration * 1000).then(() => {
+      timeUp = true;
+      if (!alert.video && alive()) { note('видео', 'время алерта вышло — звук видео убран'); return state.media.cut(); }
+      return null;
+    });
     const spoken = (async () => {
       if (alert.video) await state.media.ended; // видеосообщение — сначала оно
       await wait(Math.min(view.tts.delay || 0, view.duration) * 1000);
+      if (!voices.length || !alive()) return;
+      if (!timeUp && !alert.video) state.media.fadeTo(0.25); // голос поверх видео — видео тише
       for (const voice of voices) {
         if (!alive()) return;
         await playSound(voice, (alert.ttsVolume ?? 0.75) * (cfg.voiceVolume ?? 1), alive);
       }
+      if (!timeUp && alive() && !alert.video) state.media.fadeTo(1);
     })();
     await Promise.race([Promise.all([minShown, spoken]), wait(MAX_ALERT_MS)]);
     if (!alive()) return;
