@@ -33,7 +33,10 @@ function fromDonationAlerts(payload, { ttsMinRub = 0 } = {}) {
   const isAudio = r.message_type && r.message_type !== 'text';
   const media = [];
   if (isAudio && isUrl(r.message)) media.push({ kind: 'voice', url: r.message });
-  else if (isUrl(r.tts_url) && cleanText(r.message) && amount >= ttsMinRub) media.push({ kind: 'tts', url: r.tts_url });
+  else if (cleanText(r.message) && amount >= ttsMinRub) {
+    // У тестовых алертов DA своей озвучки нет — читаем голосом из настроек алерта SE.
+    media.push(isUrl(r.tts_url) ? { kind: 'tts', url: r.tts_url } : { kind: 'se-tts' });
+  }
   return {
     source: 'donationalerts',
     externalId: r.id ? String(r.id) : null,

@@ -17,6 +17,14 @@ function generateToken() {
   return crypto.randomBytes(24).toString('base64url');
 }
 
+/** В поля можно вставить ссылку на виджет целиком — берём из неё нужную часть. */
+function cleanSecret(key, raw) {
+  const value = String(raw || '').trim();
+  if (key === 'donatePayToken') return (value.match(/alert-box\/widget\/([A-Za-z0-9]+)/) || [])[1] || value.replace(/[?#].*$/, '').split('/').pop();
+  if (key === 'donatexWidgetId') return (value.match(/widgets\/donations\/([0-9a-f-]{36})/i) || [])[1] || value.replace(/[?#].*$/, '').split('/').pop();
+  return value;
+}
+
 function defaultSettings() {
   return {
     enabled: false,
@@ -69,11 +77,12 @@ function createAlertSettingsStore({ repo, encrypt, decrypt }) {
   function secret(key) {
     const value = get().secrets[key];
     if (!value) return '';
-    try { return decrypt(value); } catch (error) { console.warn(`[Alerts] Could not decrypt ${key}:`, error.message); return ''; }
+    try { return cleanSecret(key, decrypt(value)); } catch (error) { console.warn(`[Alerts] Could not decrypt ${key}:`, error.message); return ''; }
   }
 
-  function setSecret(key, value) {
+  function setSecret(key, raw) {
     if (!SECRET_FIELDS.includes(key)) throw new Error(`Unknown secret ${key}`);
+    const value = cleanSecret(key, raw);
     const current = get();
     const secrets = { ...current.secrets };
     if (value) secrets[key] = encrypt(String(value).trim());
@@ -98,4 +107,4 @@ function createAlertSettingsStore({ repo, encrypt, decrypt }) {
   };
 }
 
-module.exports = { SERVICES, SERVICE_LABELS, SECRET_FIELDS, defaultSettings, normalizeSettings, createAlertSettingsStore, generateToken };
+module.exports = { SERVICES, SERVICE_LABELS, SECRET_FIELDS, cleanSecret, defaultSettings, normalizeSettings, createAlertSettingsStore, generateToken };

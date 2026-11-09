@@ -11,6 +11,18 @@ const MAX_ALERT_MS = 4 * 60 * 1000;
 const HISTORY = 30;
 
 const normName = (name) => String(name || '').replace(/^❤️\s*/, '').trim().toLowerCase();
+const ANONYMOUS = new Set(['', 'аноним', 'anonymous', 'anon', 'аноним тест']);
+const normText = (text) => String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** Тот же донат, пересланный в SE: та же сумма и то же имя; у аноников и разных имён — тот же текст. */
+function sameDonation(a, b) {
+  if (Math.abs(a.amount - b.amount) >= 0.01) return false;
+  const na = normName(a.name); const nb = normName(b.name);
+  if (na === nb) return true;
+  const sameText = normText(a.message) === normText(b.message);
+  if (ANONYMOUS.has(na) || ANONYMOUS.has(nb)) return sameText; // аноним: узнаём по тексту
+  return sameText && normText(a.message) !== '';
+}
 
 function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount, currency) => (currency === 'RUB' ? amount : null), isServiceEnabled = () => true, now = Date.now, random = Math.random, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   const overlays = new Set();
@@ -42,7 +54,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     if (!donation || donation.source === 'streamelements') return;
     const t = now();
     while (expected.length && t - expected[0].receivedAt > CROSS_DEDUPE_MS) expected.shift();
-    expected.push({ source: donation.source, name: donation.name, amount: donation.amount, receivedAt: t });
+    expected.push({ source: donation.source, name: donation.name, amount: donation.amount, message: donation.message, receivedAt: t });
   }
 
   /** SE пересылает донаты, которые к нему импортировали (старый импорт из DA) — такие пропускаем. */
@@ -50,8 +62,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     if (item.source !== 'streamelements') return false;
     const t = now();
     const recent = [...expected, ...history, ...queue, ...(current ? [current.item] : [])];
-    return recent.some((other) => other.source !== 'streamelements' && t - other.receivedAt < CROSS_DEDUPE_MS
-      && normName(other.name) === normName(item.name) && Math.abs(other.amount - item.amount) < 0.01);
+    return recent.some((other) => other.source !== 'streamelements' && t - other.receivedAt < CROSS_DEDUPE_MS && sameDonation(other, item));
   }
 
   function build(donation) {

@@ -1,11 +1,11 @@
 'use strict';
 
-// Звук с серверов, до которых браузер OBS достаёт не всегда (у DonationAlerts соединение рвётся,
-// DonatePay отдаёт браузеру не звук), бот скачивает сам и кладёт в алерт как data:-ссылку.
+// Звук с серверов, до которых браузер OBS достаёт не всегда (соединение с CDN DonationAlerts и Donatex
+// у стримера рвётся, DonatePay отдаёт браузеру не звук), бот скачивает сам и кладёт в алерт как data:-ссылку.
 const axios = require('axios');
 const { UA } = require('./connectors/base');
 
-const EMBED_HOSTS = ['files.donationalerts.com', 'widget.donatepay.ru'];
+const EMBED_HOSTS = ['files.donationalerts.com', 'widget.donatepay.ru', 'cdn.donatex.gg'];
 const MAX_BYTES = 8 * 1024 * 1024;
 
 function needsEmbed(url) {

@@ -35,18 +35,26 @@ function parseWidgetPage(html) {
   return { csrf, userId, userSettings };
 }
 
+/** Ошибка запроса → понятная строка для дока: что именно не получилось. */
+function step(what, promise) {
+  return promise.catch((error) => {
+    const status = error.response?.status;
+    throw new Error(`${what}: ${status ? `HTTP ${status}` : error.message}`);
+  });
+}
+
 async function prepare(token, http = axios, apiKey = '') {
   const jar = cookieJar();
   const headers = () => ({ 'User-Agent': UA, Cookie: jar.header() });
-  const page = await http.get(`${BASE}/alert-box/widget/${token}`, { headers: headers(), timeout: 15000 });
+  const page = await step('страница виджета (проверь токен виджета)', http.get(`${BASE}/alert-box/widget/${token}`, { headers: headers(), timeout: 15000 }));
   jar.take(page.headers);
   const { csrf, userId, userSettings } = parseWidgetPage(String(page.data));
   if (!csrf || !userId) throw new Error('не удалось прочитать страницу виджета DonatePay (неверный токен?)');
-  const settings = await http.get(`${BASE}/alert-box/all-settings/${token}`, { headers: headers(), timeout: 15000 });
+  const settings = await step('настройки виджета', http.get(`${BASE}/alert-box/all-settings/${token}`, { headers: headers(), timeout: 15000 }));
   jar.take(settings.headers);
   // С API-ключом — официальный канал DonatePay; без него — канал, который слушает их виджет.
   const socket = apiKey
-    ? await http.post(API_TOKEN_URL, { access_token: apiKey }, { headers: { 'User-Agent': UA }, timeout: 15000 })
+    ? await step('токен API (проверь API-ключ)', http.post(API_TOKEN_URL, { access_token: apiKey }, { headers: { 'User-Agent': UA }, timeout: 15000 }))
     : await http.post(`${BASE}/socket/token`, { _token: csrf, token }, {
       headers: { ...headers(), 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
       timeout: 15000,

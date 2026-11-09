@@ -207,3 +207,22 @@ test('DA and DonatePay sounds are downloaded by the bot, others stay links', asy
   assert.match(out.media[1].url, /^data:audio\/mpeg;base64,/);
   assert.equal(out.media[2].url, 'https://cdn.donatex.gg/v.mp3');
 });
+
+test('widget links can be pasted whole', () => {
+  const { cleanSecret } = require('../src/services/alerts/alertSettings.service');
+  assert.equal(cleanSecret('donatePayToken', 'https://widget.donatepay.ru/alert-box/widget/8fa3f986c1404469646bc87a362fcc19a6ffe8ff00e181252859b3fdfaba8760'), '8fa3f986c1404469646bc87a362fcc19a6ffe8ff00e181252859b3fdfaba8760');
+  assert.equal(cleanSecret('donatePayToken', '8fa3f986c1404469'), '8fa3f986c1404469');
+  assert.equal(cleanSecret('donatexWidgetId', 'https://donatex.gg/widgets/donations/12c3d1ed-cb7f-4f7c-a60b-0d444324c603?x=1'), '12c3d1ed-cb7f-4f7c-a60b-0d444324c603');
+});
+
+test('SE echo is recognised when DA says Аноним and SE says Anonymous', () => {
+  const { hub } = makeHub();
+  assert.ok(hub.ingest(donation({ source: 'donationalerts', externalId: '77', name: 'Аноним', amount: 100, message: 'привет' })));
+  assert.equal(hub.ingest(donation({ source: 'streamelements', externalId: 'se77', name: 'Anonymous', amount: 100, message: 'привет', media: [{ kind: 'se-tts' }] })), null);
+  assert.ok(hub.ingest(donation({ source: 'streamelements', externalId: 'se78', name: 'Вася', amount: 100, message: 'другое', media: [{ kind: 'se-tts' }] })));
+});
+
+test('DA alert without its own voice is read by the SE voice', () => {
+  const d = fromDonationAlerts({ ...DA, tts_url: null, _is_test_alert: true }, { ttsMinRub: 25 });
+  assert.deepEqual(d.media, [{ kind: 'se-tts' }]);
+});
