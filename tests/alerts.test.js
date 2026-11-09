@@ -70,6 +70,8 @@ test('Donatex: TTS file, voice message wins, AI answer after it', () => {
   const withVoice = fromDonatex({ ...base, voiceMessagePath: 'voice/1.mp3', withAIResponse: true, aiResponseVoiceFilePath: 'ai/1.mp3' });
   assert.deepEqual(withVoice.media.map((m) => m.kind), ['voice', 'ai']);
   assert.equal(withVoice.media[0].url, 'https://cdn.donatex.gg/voice/1.mp3');
+  const aiNoPath = fromDonatex({ ...base, withAIResponse: true });
+  assert.deepEqual(aiNoPath.media[1], { kind: 'ai', url: 'https://cdn.donatex.gg/aiassistant-widgets/sounds/x1.mp3', wait: true });
   assert.equal(fromDonatex({ ...base, isRefunded: true }), null);
 });
 
@@ -209,6 +211,24 @@ test('DA and DonatePay sounds are downloaded by the bot, others stay links', asy
   assert.match(out.media[0].url, /^data:audio\/mpeg;base64,/);
   assert.match(out.media[1].url, /^data:audio\/mpeg;base64,/);
   assert.match(out.media[2].url, /^data:audio\/mpeg;base64,/);
+});
+
+test('Donatex AI answer: the bot waits until the file appears, then gives up', async () => {
+  const { embedMedia } = require('../src/services/alerts/embed');
+  const notYet = () => Object.assign(new Error('404'), { response: { status: 404 } });
+  let calls = 0;
+  const http = { get: async () => { calls += 1; if (calls < 3) throw notYet(); return { headers: { 'content-type': 'audio/mpeg' }, data: Buffer.from('ID3') }; } };
+  const opts = { http, log: { warn() {} }, pause: async () => {}, retryMs: 0 };
+  const ai = { kind: 'ai', url: 'https://cdn.donatex.gg/aiassistant-widgets/sounds/x1.mp3', wait: true };
+  const ready = await embedMedia({ media: [ai] }, opts);
+  assert.equal(calls, 3);
+  assert.match(ready.media[0].url, /^data:audio\/mpeg;base64,/);
+  const never = await embedMedia({ media: [ai] }, { ...opts, http: { get: async () => { throw notYet(); } }, waitMs: 0 });
+  assert.equal(never.media[0].broken, true);
+  calls = 0;
+  const tts = await embedMedia({ media: [{ kind: 'tts', url: 'https://cdn.donatex.gg/v.mp3' }] }, { ...opts, http: { get: async () => { calls += 1; throw notYet(); } } });
+  assert.equal(calls, 1, 'only AI answers are waited for');
+  assert.equal(tts.media[0].broken, true);
 });
 
 test('widget links can be pasted whole', () => {

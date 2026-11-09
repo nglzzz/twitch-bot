@@ -144,8 +144,10 @@ function fromDonatex(donation, { mediaBase = 'https://cdn.donatex.gg' } = {}) {
   const tts = absolute(d.voiceFilePath, mediaBase);
   if (voiceMessage) media.push({ kind: 'voice', url: voiceMessage });
   else if (tts) media.push({ kind: 'tts', url: tts });
-  const ai = d.withAIResponse ? absolute(d.aiResponseVoiceFilePath, mediaBase) : null;
-  if (ai) media.push({ kind: 'ai', url: ai });
+  // Ответ ИИ-ассистента Donatex генерирует сам: путь в донате обычно пустой, файл появляется
+  // на CDN под id доната (так его ищет их донатный виджет) и может дозреть уже во время алерта.
+  const ai = d.withAIResponse ? absolute(d.aiResponseVoiceFilePath || `aiassistant-widgets/sounds/${d.id}.mp3`, mediaBase) : null;
+  if (ai) media.push({ kind: 'ai', url: ai, wait: true });
   return {
     source: 'donatex',
     externalId: String(d.id),

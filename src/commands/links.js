@@ -1,6 +1,7 @@
 async function onLinksCommand(channel, tags) {
   return 'DonationAlerts: https://www.donationalerts.com/c/nglzzz | ' +
     'DonateX: https://donatex.gg/donate/nglzzz | ' +
+    'DonatePay: https://new.donatepay.ru/donate/nglzzz | ' +
     'Memealerts: https://memealerts.com/nglzzz | ' +
     'Telegram: https://t.me/nglzzzTV | ' +
     'Discord: https://discord.gg/uKCbdCGwTb | ' +
