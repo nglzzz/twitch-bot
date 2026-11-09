@@ -86,14 +86,15 @@
     return a;
   }
 
+  /** Проигрывает звук; результат — true, если он доиграл, false — если не загрузился или не играет. */
   function playSound(source, volume, alive) {
     return new Promise((resolve) => {
-      if (!source || !alive()) { resolve(); return; }
+      if (!source || !alive()) { resolve(false); return; }
       const a = typeof source === 'string' ? new Audio(source) : source;
       a.volume = clamp01(volume);
       let done = false;
       const label = (a.currentSrc || a.src || '').slice(0, 70);
-      const finish = (why) => { if (done) return; done = true; clearTimeout(cap); a.pause(); note('звук', why || 'конец', label); resolve(); };
+      const finish = (why) => { if (done) return; done = true; clearTimeout(cap); a.pause(); note('звук', why || 'конец', label); resolve(!why || !/ошибка|не играет/.test(why)); };
       const cap = setTimeout(() => finish('обрезан по времени'), MAX_VOICE_MS);
       a.addEventListener('ended', () => finish('конец'));
       a.addEventListener('error', () => finish(`ошибка ${a.error ? a.error.code : ''}`));
@@ -158,10 +159,14 @@
       await wait(Math.min(view.tts.delay || 0, view.duration) * 1000);
       if (!voices.length || !alive()) return;
       if (!timeUp && !alert.video) state.media.fadeTo(0.25); // голос поверх видео — видео тише
+      const volume = (alert.ttsVolume ?? 0.75) * (cfg.voiceVolume ?? 1);
+      let played = false;
       for (const voice of voices) {
         if (!alive()) return;
-        await playSound(voice, (alert.ttsVolume ?? 0.75) * (cfg.voiceVolume ?? 1), alive);
+        if (await playSound(voice, volume, alive)) played = true;
       }
+      // Родная озвучка не загрузилась — читаем голосом из настроек SE.
+      if (!played && alert.fallback && alive()) { note('звук', 'запасной голос SE'); await playSound(alert.fallback, volume, alive); }
       if (!timeUp && alive() && !alert.video) state.media.fadeTo(1);
     })();
     await Promise.race([Promise.all([minShown, spoken]), wait(MAX_ALERT_MS)]);

@@ -239,3 +239,14 @@ test('DA repeat from its history plays again after the duplicate window', () => 
   tick(60000);
   assert.equal(hub.ingest(donation({ source: 'donatex', externalId: 'x1' })), null);
 });
+
+test('a deleted native voice is replaced by the SE voice, and every alert carries an SE fallback', () => {
+  const { hub } = makeHub();
+  const gone = hub.ingest(donation({ externalId: 'g1', media: [{ kind: 'ai', url: 'https://cdn.donatex.gg/ai.mp3', broken: true }] }));
+  assert.equal(gone.media.length, 1);
+  assert.equal(gone.media[0].fallback, true);
+  assert.match(gone.media[0].url, /api\.streamelements\.com\/kappa\/v2\/speech/);
+  assert.equal(gone.fallback, null);
+  const ok = hub.ingest(donation({ externalId: 'g2', media: [{ kind: 'tts', url: 'https://cdn.donatex.gg/v.mp3' }] }));
+  assert.match(ok.fallback, /speech\?voice=/);
+});

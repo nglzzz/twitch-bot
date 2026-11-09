@@ -32,7 +32,9 @@ async function embedOne(m, { http = axios, log = console } = {}) {
     return { ...m, url: `data:${type};base64,${Buffer.from(res.data).toString('base64')}` };
   } catch (error) {
     log.warn(`[Alerts] Could not download ${m.kind} from ${new URL(m.url).hostname}:`, error.message);
-    return m;
+    // Файла нет (удалён, не звук) — пробовать в OBS бесполезно; при обрыве связи пусть OBS попробует сам.
+    const gone = error.response?.status === 404 || error.response?.status === 410 || /не звук/.test(error.message);
+    return gone ? { ...m, broken: true } : m;
   }
 }
 

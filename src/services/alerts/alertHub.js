@@ -73,13 +73,25 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
     const { name: variation, view } = pickView(config, amountRub ?? donation.amount, random);
     const title = renderTitle(view.text.template, donation);
     const titleText = title.map((p) => p.text).join('');
+    const seVoice = () => (view.tts.enabled
+      ? seSpeechUrl({ view, titleText, message: view.showMessage ? donation.message : '', apiKey: getSeApiKey() })
+      : null);
     const media = [];
-    for (const m of donation.media || []) {
+    const source = donation.media || [];
+    for (const m of source) {
+      if (m.broken) continue;
       if (m.kind !== 'se-tts') { media.push(m); continue; }
-      if (!view.tts.enabled || (amountRub ?? donation.amount) < view.tts.minAmount) continue;
-      const url = seSpeechUrl({ view, titleText, message: view.showMessage ? donation.message : '', apiKey: getSeApiKey() });
+      if ((amountRub ?? donation.amount) < view.tts.minAmount) continue;
+      const url = seVoice();
       if (url) media.push({ kind: 'tts', url });
     }
+    // Родная озвучка сервиса пропала (файл удалён) — читаем голосом из настроек алерта SE.
+    if (!media.length && source.some((m) => m.broken)) {
+      const url = seVoice();
+      if (url) media.push({ kind: 'tts', url, fallback: true });
+    }
+    // Запасной голос для источника: если родной звук не загрузится и в OBS.
+    const fallback = media.length && media.every((m) => !m.fallback && !String(m.url).includes('api.streamelements.com')) ? seVoice() : null;
     return {
       id: crypto.randomUUID(),
       source: donation.source,
@@ -95,6 +107,7 @@ function createAlertHub({ getTipConfig, getSeApiKey = () => '', toRub = (amount,
       title,
       media,
       ttsVolume: view.tts.volume,
+      fallback,
       video: donation.video || null,
       receivedAt: now(),
     };
