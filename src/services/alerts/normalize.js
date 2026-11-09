@@ -68,27 +68,44 @@ function fromStreamElements(activity) {
   };
 }
 
+/** Какой виджет DonatePay сработал бы на эту сумму: активный, с подходящим порогом, самый «дорогой». */
+function pickDonatePayWidget(widgets, sum) {
+  let best = null;
+  for (const [key, w] of Object.entries(widgets || {})) {
+    if (String(w['a_m.active']) === '0') continue;
+    const min = Number(w['a_m.min_sum'] || 0);
+    const fixed = String(w['a_m.fixed-sum']) === '1';
+    if (fixed ? sum !== min : sum < min) continue;
+    if (!best || min > best.min) best = { id: key.replace(/^#/, ''), widget: w, min };
+  }
+  return best;
+}
+
 /**
- * DonatePay (centrifugo, канал notifications#<id>). Озвучку отдаёт их сервер по ссылке,
- * как в их виджете: голос выбирается по widget_id, премиум-голос — из настроек доната.
+ * DonatePay (centrifugo, канал notifications#<id>): { notification: { type, id, vars: "<json>" } }.
+ * Озвучку отдаёт их сервер по ссылке, как в их виджете: голос выбирается по widget_id,
+ * премиум-голос — из настроек доната. Тест из их кабинета приходит без id.
  */
 function fromDonatePay(publication, ctx = {}) {
   const data = publication?.data && !publication.notification ? publication.data : publication;
   const n = data?.notification;
   if (!n || n.type !== 'donation' || !n.vars) return null;
-  const v = n.vars;
+  let v = n.vars;
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return null; } }
   const amount = toAmount(v.sum);
   if (!amount) return null;
   const message = cleanText(v.comment);
-  const widget = ctx.widgets?.[`#${data.widgetId}`] || ctx.widgets?.[data.widgetId] || null;
+  const picked = data.widgetId !== undefined
+    ? { id: String(data.widgetId), widget: ctx.widgets?.[`#${data.widgetId}`] || null }
+    : pickDonatePayWidget(ctx.widgets, amount);
   const media = [];
   const record = absolute(v.media_record, ctx.base || 'https://widget.donatepay.ru');
   if (record) media.push({ kind: 'voice', url: record });
-  else if (ctx.widgetsToken && message && amount >= Number(ctx.voiceSum || 0) && (!widget || String(widget['a_s.play']) !== '0')) {
+  else if (ctx.widgetsToken && picked && message && amount >= Number(ctx.voiceSum || 0) && String(picked.widget?.['a_s.play']) !== '0') {
     const url = new URL(`/donation/notifications/widget/${ctx.widgetsToken}/voice`, ctx.base || 'https://widget.donatepay.ru');
     url.searchParams.append('text', encodeURIComponent(` ${message}`));
-    url.searchParams.append('rate', widget?.['a_s.speed'] || 'medium');
-    url.searchParams.append('widget_id', String(data.widgetId ?? ''));
+    url.searchParams.append('rate', picked.widget?.['a_s.speed'] || 'medium');
+    url.searchParams.append('widget_id', picked.id);
     const premium = v.premiumSettings;
     if (ctx.allowPremium && premium && Object.values(premium).length > 0) {
       url.searchParams.append('premium_voice', premium.voice);
@@ -104,7 +121,7 @@ function fromDonatePay(publication, ctx = {}) {
     amount,
     currency: 'RUB',
     message,
-    isTest: false,
+    isTest: !n.id,
     media,
     raw: data,
   };

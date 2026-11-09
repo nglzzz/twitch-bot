@@ -9,6 +9,7 @@ const { fromDonatePay } = require('../normalize');
 const BASE = 'https://widget.donatepay.ru';
 const SOCKET = 'wss://centrifugo.donatepay.ru/connection/websocket';
 const TOKEN_TTL_MS = 5 * 60 * 60 * 1000; // их токен живёт 6 часов
+const API_TOKEN_URL = 'https://donatepay.ru/api/v2/socket/token';
 
 function cookieJar() {
   const jar = new Map();
@@ -34,22 +35,26 @@ function parseWidgetPage(html) {
   return { csrf, userId, userSettings };
 }
 
-async function prepare(token, http = axios) {
+async function prepare(token, http = axios, apiKey = '') {
   const jar = cookieJar();
-  const headers = () => ({ 'User-Agent': UA, Accept: '*/*', Cookie: jar.header(), Referer: `${BASE}/alert-box/widget/${token}` });
-  const page = await http.get(`${BASE}/alert-box/widget/${token}`, { headers: { ...headers(), Accept: 'text/html' }, timeout: 15000 });
+  const headers = () => ({ 'User-Agent': UA, Cookie: jar.header() });
+  const page = await http.get(`${BASE}/alert-box/widget/${token}`, { headers: headers(), timeout: 15000 });
   jar.take(page.headers);
   const { csrf, userId, userSettings } = parseWidgetPage(String(page.data));
   if (!csrf || !userId) throw new Error('не удалось прочитать страницу виджета DonatePay (неверный токен?)');
   const settings = await http.get(`${BASE}/alert-box/all-settings/${token}`, { headers: headers(), timeout: 15000 });
   jar.take(settings.headers);
-  const socket = await http.post(`${BASE}/socket/token`, { _token: csrf, token }, {
-    headers: { ...headers(), 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest', Origin: BASE },
-    timeout: 15000,
-  });
+  // С API-ключом — официальный канал DonatePay; без него — канал, который слушает их виджет.
+  const socket = apiKey
+    ? await http.post(API_TOKEN_URL, { access_token: apiKey }, { headers: { 'User-Agent': UA }, timeout: 15000 })
+    : await http.post(`${BASE}/socket/token`, { _token: csrf, token }, {
+      headers: { ...headers(), 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      timeout: 15000,
+    });
   if (!socket.data?.token) throw new Error('DonatePay не выдал токен сокета');
   return {
     userId,
+    channel: apiKey ? `$public:${userId}` : `notifications#${userId}`,
     socketToken: socket.data.token,
     ctx: {
       base: BASE,
@@ -61,35 +66,69 @@ async function prepare(token, http = axios) {
   };
 }
 
-function createDonatePayConnector({ getToken, onDonation, log = console, http = axios }) {
+/**
+ * Озвучку DonatePay скачивает бот и кладёт в алерт как data:-ссылку:
+ * браузер источника OBS их сервер озвучки не обслуживает (отвечает не звуком).
+ */
+async function withEmbeddedVoice(donation, http = axios, log = console) {
+  const media = await Promise.all(donation.media.map(async (m) => {
+    if (m.kind !== 'tts' || !m.url.startsWith(BASE)) return m;
+    try {
+      const res = await http.get(m.url, { headers: { 'User-Agent': UA }, responseType: 'arraybuffer', timeout: 30000 });
+      const type = String(res.headers['content-type'] || '');
+      if (!type.startsWith('audio/')) throw new Error(`ответ ${type || 'без типа'}`);
+      return { ...m, url: `data:${type.split(';')[0]};base64,${Buffer.from(res.data).toString('base64')}` };
+    } catch (error) {
+      log.warn('[Alerts:donatepay] voice download failed:', error.message);
+      return m;
+    }
+  }));
+  return { ...donation, media };
+}
+
+function createDonatePayConnector({ getToken, getApiKey = () => '', onDonation, log = console, http = axios }) {
   return createConnector({
     id: 'donatepay',
     log,
     async open(conn) {
       const token = getToken();
       if (!token) throw new Error('не указан токен виджета DonatePay');
-      const { userId, socketToken, ctx } = await prepare(token, http);
-      const ws = new WebSocket(SOCKET, { headers: { Origin: BASE, 'User-Agent': UA } });
+      const apiKey = getApiKey();
+      const { channel, socketToken, ctx } = await prepare(token, http, apiKey);
+      const ws = new WebSocket(SOCKET, { headers: { 'User-Agent': UA } });
       let id = 0;
       const send = (payload) => ws.send(JSON.stringify({ ...payload, id: ++id }));
-      ws.on('open', () => {
-        send({ params: { token: socketToken, name: 'js' } });
-        send({ method: 1, params: { channel: `notifications#${userId}` } });
-      });
+      ws.on('open', () => send({ params: { token: socketToken, name: 'js' } }));
+
+      // Приватный канал $public:<id> требует отдельный токен подписки на нашего клиента.
+      async function subscribe(client) {
+        let subToken;
+        if (apiKey) {
+          const res = await http.post(API_TOKEN_URL, { client, channels: [channel], access_token: apiKey }, { headers: { 'User-Agent': UA }, timeout: 15000 });
+          subToken = res.data?.channels?.find((c) => c.channel === channel)?.token;
+          if (!subToken) throw new Error('DonatePay не выдал токен подписки');
+        }
+        send({ method: 1, params: subToken ? { channel, token: subToken } : { channel } });
+      }
+
       ws.on('message', (raw) => {
         for (const line of String(raw).split('\n')) {
           if (!line.trim()) continue;
           let msg;
           try { msg = JSON.parse(line); } catch (_) { continue; }
           if (msg.error) { ws.close(4000, String(msg.error.message || 'error')); return; }
+          if (msg.id === 1 && msg.result?.client) {
+            subscribe(msg.result.client).catch((error) => ws.close(4003, error.message.slice(0, 100)));
+            continue;
+          }
           if (msg.id === 2 && msg.result !== undefined) conn.connected();
           const pub = msg.result && !msg.id ? msg.result : null;
-          if (!pub || !String(pub.channel || '').startsWith('notifications#')) continue;
+          if (!pub || pub.channel !== channel) continue;
           const data = pub.data?.data ?? pub.data;
           const donation = fromDonatePay(data, ctx);
           if (!donation) continue;
           conn.event();
-          onDonation(donation);
+          withEmbeddedVoice(donation, http, log).then(onDonation);
         }
       });
       ws.on('error', (error) => log.warn('[Alerts:donatepay] socket error:', error.message));
@@ -103,4 +142,4 @@ function createDonatePayConnector({ getToken, onDonation, log = console, http = 
   });
 }
 
-module.exports = { createDonatePayConnector, parseWidgetPage };
+module.exports = { createDonatePayConnector, parseWidgetPage, withEmbeddedVoice };

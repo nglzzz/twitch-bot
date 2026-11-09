@@ -59,7 +59,7 @@ function createAlerts() {
   const log = console;
   const connectors = {
     streamelements: createStreamElementsConnector({ getOverlay: seOverlay, onDonation: handleDonation, log }),
-    donatepay: createDonatePayConnector({ getToken: () => store.secret('donatePayToken'), onDonation: handleDonation, log }),
+    donatepay: createDonatePayConnector({ getToken: () => store.secret('donatePayToken'), getApiKey: () => store.secret('donatePayApiKey'), onDonation: handleDonation, log }),
     donatex: createDonatexConnector({ getWidgetId: () => store.secret('donatexWidgetId'), onDonation: handleDonation, log }),
   };
   const configured = {

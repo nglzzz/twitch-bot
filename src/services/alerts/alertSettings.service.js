@@ -11,7 +11,7 @@ const SERVICE_LABELS = {
   donatex: 'Donatex',
 };
 // Ключи виджетов храним зашифрованными, как остальные токены админки.
-const SECRET_FIELDS = ['donatePayToken', 'donatexWidgetId', 'streamElementsOverlayUrl'];
+const SECRET_FIELDS = ['donatePayToken', 'donatePayApiKey', 'donatexWidgetId', 'streamElementsOverlayUrl'];
 
 function generateToken() {
   return crypto.randomBytes(24).toString('base64url');

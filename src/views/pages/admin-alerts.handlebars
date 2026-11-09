@@ -7,6 +7,7 @@
 <label class="admin-check"><input type="checkbox" name="enabled" {{#if settings.enabled}}checked{{/if}} /> Включить единые алерты</label>
 <label>Ссылка на оверлей StreamElements {{#if settings.configured.streamElementsOverlayUrl}}<small>сохранена</small>{{/if}}<input name="streamElementsOverlayUrl" type="password" autocomplete="off" placeholder="https://streamelements.com/overlay/…/…" /></label>
 <label>Токен виджета DonatePay {{#if settings.configured.donatePayToken}}<small>сохранён</small>{{/if}}<input name="donatePayToken" type="password" autocomplete="off" placeholder="последняя часть ссылки widget.donatepay.ru/alert-box/widget/…" /></label>
+<label>API-ключ DonatePay <small>{{#if settings.configured.donatePayApiKey}}сохранён{{else}}необязательно: донаты пойдут через официальный API, а не через канал виджета{{/if}}</small><input name="donatePayApiKey" type="password" autocomplete="off" placeholder="donatepay.ru → Настройки → API" /></label>
 <label>Id виджета Donatex {{#if settings.configured.donatexWidgetId}}<small>сохранён</small>{{/if}}<input name="donatexWidgetId" type="password" autocomplete="off" placeholder="последняя часть ссылки donatex.gg/widgets/donations/…" /></label>
 <label>Озвучка DonationAlerts от, ₽<input name="daTtsMinRub" type="number" min="0" step="1" value="{{settings.daTtsMinRub}}" /></label>
 <p class="admin-card__hint">Пустое поле оставляет сохранённое значение. Токен DonationAlerts берётся из <a href="/admin/settings">настроек</a>.</p>

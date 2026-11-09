@@ -12,7 +12,7 @@ function createStreamElementsConnector({ getOverlay, onDonation, log = console }
     open(ctx) {
       const overlay = getOverlay();
       if (!overlay?.apiKey) throw new Error('не указана ссылка на оверлей StreamElements');
-      const ws = new WebSocket('wss://astro.streamelements.com', { headers: { Origin: 'https://streamelements.com', 'User-Agent': UA } });
+      const ws = new WebSocket('wss://astro.streamelements.com', { headers: { 'User-Agent': UA } });
       ws.on('open', () => {
         ws.send(JSON.stringify({
           type: 'subscribe',

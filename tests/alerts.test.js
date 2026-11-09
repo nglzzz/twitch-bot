@@ -43,6 +43,22 @@ test('DonatePay builds their voice link the way their widget does', () => {
   assert.equal(fromDonatePay({ data: pub }, ctx).externalId, '77');
 });
 
+test('DonatePay as it really arrives: vars as a JSON string, widget picked by amount, test without id', () => {
+  const ctx = { widgetsToken: 'TOK', voiceSum: 25, widgets: {
+    '#2611037': { 'a_m.active': '0', 'a_m.min_sum': '1', 'a_s.play': '1' },
+    '#4702183': { 'a_m.active': '1', 'a_m.min_sum': '3', 'a_s.play': '1', 'a_s.speed': 'medium' },
+  } };
+  const pub = (vars, id) => ({ notification: { type: 'donation', user_id: 675066, ...(id ? { id } : {}), vars: JSON.stringify(vars) } });
+  const test1 = fromDonatePay(pub({ name: 'DonatePay', comment: 'цитата', sum: 1 }), ctx);
+  assert.equal(test1.isTest, true);
+  assert.equal(test1.amount, 1);
+  assert.equal(test1.media.length, 0);
+  const real = fromDonatePay(pub({ name: 'Вася', comment: 'привет', sum: 300 }, 555), ctx);
+  assert.equal(real.isTest, false);
+  assert.equal(real.externalId, '555');
+  assert.equal(new URL(real.media[0].url).searchParams.get('widget_id'), '4702183');
+});
+
 test('Donatex: TTS file, voice message wins, AI answer after it', () => {
   const base = { id: 'x1', username: 'Аноним', message: 'Это тестовый донат!', currency: 'RUB', amount: 50, voiceFilePath: 'https://cdn.donatex.gg/default-donation-voices/x1.mp3' };
   assert.deepEqual(fromDonatex(base).media, [{ kind: 'tts', url: base.voiceFilePath }]);

@@ -17,7 +17,7 @@ function createDonatexConnector({ getWidgetId, onDonation, log = console, http =
     async open(conn) {
       const widgetId = getWidgetId();
       if (!widgetId) throw new Error('не указан id виджета Donatex');
-      const headers = { 'User-Agent': UA, Origin: BASE, Referer: `${BASE}/widgets/donations/${widgetId}` };
+      const headers = { 'User-Agent': UA };
       const settings = await http.get(`${BASE}/api/donation-widget/get-widget-settings`, { params: { widgetId }, headers, timeout: 15000 });
       const mediaBase = settings.data?.mediaBaseUrl || 'https://cdn.donatex.gg';
       const negotiate = await http.post(`${BASE}/api/donations-hub/negotiate?negotiateVersion=1`, '', { headers, timeout: 15000 });
