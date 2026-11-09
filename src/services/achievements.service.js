@@ -68,6 +68,42 @@ function evaluateUser(userId, { now = Date.now(), notify = true, historical = fa
   })();
 }
 
+/** Заказ музыки/видео заиграл: чат-заказ — по id зрителя, донатный — по зрителю, к которому привязан донат. */
+function evaluateRequester(request) {
+  if (!request) return [];
+  let userId = request.source === 'chat' ? request.requestedById : null;
+  if (request.source === 'donation' && request.donationId) {
+    userId = db.prepare('SELECT community_user_id AS userId FROM donation WHERE id = ?').get(String(request.donationId))?.userId || null;
+  }
+  return userId ? evaluateUser(userId) : [];
+}
+
+/**
+ * Новые достижения за то, что зритель сделал ещё до их появления (старые заказы, донаты), выдаём тихо:
+ * без поздравления в чате, с пометкой «Восстановлено». Какие достижения уже были — в community_achievement_known.
+ */
+function backfillNewAchievements({ now = Date.now() } = {}) {
+  db.exec('CREATE TABLE IF NOT EXISTS community_achievement_known (achievement_id TEXT PRIMARY KEY, added_at INTEGER NOT NULL)');
+  const known = new Set(db.prepare('SELECT achievement_id AS id FROM community_achievement_known').all().map((row) => row.id));
+  const fresh = ACHIEVEMENTS.filter((achievement) => !known.has(achievement.id));
+  if (!fresh.length) return 0;
+  const freshIds = new Set(fresh.map((achievement) => achievement.id));
+  const users = db.prepare('SELECT user_id AS userId FROM community_achievement_state').all();
+  let granted = 0;
+  db.transaction(() => {
+    for (const { userId } of users) {
+      const snapshot = collectStats(userId);
+      if (!snapshot) continue;
+      for (const id of unlockedIds(snapshot, now)) {
+        if (freshIds.has(id) && achievementRepo.insertEarned({ userId, achievementId: id, earnedAt: now, historical: true, announce: false })) granted += 1;
+      }
+    }
+    const remember = db.prepare('INSERT OR IGNORE INTO community_achievement_known (achievement_id, added_at) VALUES (?, ?)');
+    for (const achievement of fresh) remember.run(achievement.id, now);
+  })();
+  return granted;
+}
+
 function getEarned(userId) {
   return achievementRepo.getEarned(userId);
 }
@@ -188,6 +224,8 @@ module.exports = {
   collectStats,
   seedBaseline,
   evaluateUser,
+  evaluateRequester,
+  backfillNewAchievements,
   evaluateFollowMilestones,
   getEarned,
   getRecentAchievements,

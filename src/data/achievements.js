@@ -38,6 +38,20 @@ const ACHIEVEMENTS = [
   { id: 'donations_5', title: 'Опора эфира', description: 'Поддержать канал 5 раз.', icon: '🤝', category: 'support', metric: 'donationsCount', target: 5 },
   { id: 'donations_10', title: 'Тихий меценат', description: 'Поддержать канал 10 раз.', icon: '🎁', category: 'support', metric: 'donationsCount', target: 10 },
   { id: 'donations_25', title: 'Спонсор хаоса', description: 'Поддержать канал 25 раз.', icon: '🚀', category: 'support', metric: 'donationsCount', target: 25 },
+  { id: 'donation_donationalerts', title: 'Классика жанра', description: 'Задонатить через DonationAlerts.', icon: '🧡', category: 'support', metric: 'donationsDonationAlerts', target: 1 },
+  { id: 'donation_streamelements', title: 'Иностранный агент', description: 'Задонатить через StreamElements.', icon: '🌍', category: 'support', metric: 'donationsStreamElements', target: 1 },
+  { id: 'donation_donatepay', title: 'Плати и смотри', description: 'Задонатить через DonatePay.', icon: '💳', category: 'support', metric: 'donationsDonatePay', target: 1 },
+  { id: 'donation_donatex', title: 'Икс в кошельке', description: 'Задонатить через Donatex.', icon: '❎', category: 'support', metric: 'donationsDonatex', target: 1 },
+  { id: 'music_free_1', title: 'Диджей чата', description: 'Заказать трек командой в чате — засчитывается, когда он заиграет на стриме.', icon: '🎵', category: 'media', metric: 'musicFree', target: 1 },
+  { id: 'music_free_10', title: 'Свой плейлист', description: 'Заказать в чате 10 треков, которые прозвучали на стриме.', icon: '🎧', category: 'media', metric: 'musicFree', target: 10 },
+  { id: 'music_free_50', title: 'Резидент эфира', description: 'Заказать в чате 50 треков, которые прозвучали на стриме.', icon: '📻', category: 'media', metric: 'musicFree', target: 50 },
+  { id: 'music_paid_1', title: 'Музыка за мой счёт', description: 'Заказать трек через донат — засчитывается, когда он заиграет на стриме.', icon: '💿', category: 'media', metric: 'musicPaid', target: 1 },
+  { id: 'music_paid_10', title: 'Продюсер саундтрека', description: 'Заказать через донат 10 треков, которые прозвучали на стриме.', icon: '🎼', category: 'media', metric: 'musicPaid', target: 10 },
+  { id: 'video_free_1', title: 'Первый показ', description: 'Заказать видео в чате — засчитывается, когда его покажут на стриме.', icon: '📺', category: 'media', metric: 'videoFree', target: 1 },
+  { id: 'video_free_10', title: 'Свой телеканал', description: 'Заказать в чате 10 видео, которые показали на стриме.', icon: '🍿', category: 'media', metric: 'videoFree', target: 10 },
+  { id: 'video_free_50', title: 'Программный директор', description: 'Заказать в чате 50 видео, которые показали на стриме.', icon: '🎞️', category: 'media', metric: 'videoFree', target: 50 },
+  { id: 'video_paid_1', title: 'Премьера за донат', description: 'Заказать видео через донат — засчитывается, когда его покажут на стриме.', icon: '🎟️', category: 'media', metric: 'videoPaid', target: 1 },
+  { id: 'video_paid_10', title: 'Кинопродюсер', description: 'Заказать через донат 10 видео, которые показали на стриме.', icon: '🎬', category: 'media', metric: 'videoPaid', target: 10 },
 ];
 
 module.exports = ACHIEVEMENTS;

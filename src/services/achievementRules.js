@@ -43,6 +43,14 @@ function metricValues(stats, gameModes, now = Date.now()) {
     pointsSpent: Number(stats.pointsSpent) || 0,
     memesSent: Number(stats.memesSent) || 0,
     donationsCount: Number(stats.donationsCount) || 0,
+    musicFree: Number(stats.musicFree) || 0,
+    musicPaid: Number(stats.musicPaid) || 0,
+    videoFree: Number(stats.videoFree) || 0,
+    videoPaid: Number(stats.videoPaid) || 0,
+    donationsDonationAlerts: Number(stats.donationsDonationAlerts) || 0,
+    donationsStreamElements: Number(stats.donationsStreamElements) || 0,
+    donationsDonatePay: Number(stats.donationsDonatePay) || 0,
+    donationsDonatex: Number(stats.donationsDonatex) || 0,
   };
 }
 

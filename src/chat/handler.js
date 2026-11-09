@@ -39,6 +39,7 @@ Chat.registerCommand('!copypast', require('../commands/copypast'), '!копип�
 Chat.registerCommand('!kill', require('../commands/kill'), '!убить');
 Chat.registerCommand('!sex', require('../commands/sex'), '!секс');
 Chat.registerCommand('!boosty', require('../commands/boosty'), '!бусти');
+Chat.registerCommand('!profile', require('../commands/profile'), '!профиль');
 Chat.registerCommand('!tiktok', require('../commands/tiktok'), '!тикток');
 Chat.registerCommand('!чат', require('../commands/chat'), '!chat');
 Chat.registerCommand('!пк', require('../commands/specs'), '!specs');

@@ -24,6 +24,7 @@ function createMusicService({
   say = () => {},
   isFollower = async () => false,
   getRubAmount = async (amount, currency) => (String(currency || 'RUB').toUpperCase() === 'RUB' ? amount : null),
+  onStarted = () => {}, // заказ заиграл — пересчитать ачивки заказавшего
   now = Date.now,
   timers = { setTimeout, clearTimeout, setInterval, clearInterval },
   random = Math.random,
@@ -134,6 +135,7 @@ function createMusicService({
 
   function startRequest(request) {
     const started = repo.updateRequest(request._id, { status: 'playing', startedAt: now() });
+    try { onStarted(started); } catch (error) { console.error('[Achievements] Request check failed:', error.message); }
     state.currentId = started._id;
     state.votes.clear();
     setPosition(started.startSec || 0);

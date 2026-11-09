@@ -65,6 +65,7 @@ function getMusicService() {
     say: (message) => Chat.handleMessageResult(message, `#${config.CHANNEL}`),
     isFollower,
     getRubAmount,
+    onStarted: (request) => require('../achievements.service').evaluateRequester(request),
   });
   service.init();
   return service;

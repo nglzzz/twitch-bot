@@ -23,6 +23,7 @@ function createVideoService({
   getRubAmount = async (amount, currency) => (String(currency || 'RUB').toUpperCase() === 'RUB' ? amount : null),
   emoteUrl = () => null,
   onActivityChange = () => {},
+  onStarted = () => {}, // заказ заиграл — пересчитать ачивки заказавшего
   now = Date.now,
   timers = { setTimeout, clearTimeout, setInterval, clearInterval },
   random = Math.random,
@@ -246,6 +247,7 @@ function createVideoService({
 
   function startRequest(request) {
     const started = repo.updateRequest(request._id, { status: 'playing', startedAt: now() });
+    try { onStarted(started); } catch (error) { console.error('[Achievements] Request check failed:', error.message); }
     state.currentId = started._id;
     clearWarning();
     resetVotes();

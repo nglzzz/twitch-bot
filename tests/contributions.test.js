@@ -63,7 +63,7 @@ test('schema v6 adds paid subscription links without changing old achievement ID
   assert.equal(db.prepare("SELECT name FROM pragma_table_info('donation') WHERE name = 'community_user_id'").get()?.name, 'community_user_id');
 
   const ids = ACHIEVEMENTS.map(({ id }) => id);
-  assert.equal(ids.length, 37);
+  assert.equal(ids.length, 51);
   for (const legacyId of ['messages_1', 'follow', 'quiz_100', 'mode_movie_25']) assert.ok(ids.includes(legacyId));
   assert.equal(new Set(ids).size, ids.length);
 });

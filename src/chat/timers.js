@@ -90,6 +90,15 @@ const saveViewersTimer = setInterval(async () => {
 // Start stream tracking (checks every 5 minutes)
 startTracking(5 * 60 * 1000);
 require('../services/quiz.service').startQuizTimer();
+// Новые достижения за прошлые заказы и донаты — тихо, до того как начнутся поздравления в чате.
+if (isDbReady()) {
+  try {
+    const granted = require('../services/achievements.service').backfillNewAchievements();
+    if (granted) console.log(`[Achievements] Restored ${granted} achievements for past activity`);
+  } catch (error) {
+    console.error('[Achievements] Backfill failed:', error.message);
+  }
+}
 require('../services/achievements.service').startAchievementAnnouncements(Chat, { isDbReady });
 
 let refreshingCommunity = false;

@@ -343,6 +343,7 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_music_request_finished ON music_request(finished_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_music_request_requester ON music_request(lower(requested_by), status)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_music_request_donation ON music_request(donation_id) WHERE donation_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_music_request_requester_id ON music_request(requested_by_id) WHERE requested_by_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS music_blacklist_track (
     provider TEXT NOT NULL,
     external_id TEXT NOT NULL,
@@ -400,6 +401,8 @@ const STATEMENTS = [
     updated_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_video_request_status_position ON video_request(status, position)`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_requester_id ON video_request(requested_by_id) WHERE requested_by_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_video_request_donation ON video_request(donation_id) WHERE donation_id IS NOT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_video_request_finished ON video_request(finished_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_video_request_requester ON video_request(lower(requested_by), status)`,
   `CREATE INDEX IF NOT EXISTS idx_video_request_item ON video_request(provider, external_id)`,

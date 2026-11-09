@@ -50,7 +50,7 @@ test('real community service renders linked leaderboards and all profile achieve
     assert.equal(profile.status, 200);
     const profileHtml = await profile.text();
     assert.match(profileHtml, /Маленькие поводы для гордости/);
-    assert.equal((profileHtml.match(/<li class="community-achievement /g) || []).length, 37);
+    assert.equal((profileHtml.match(/<li class="community-achievement /g) || []).length, 51);
     assert.match(profileHtml, /Private message body/);
     assert.doesNotMatch(profileHtml, /http-viewer-id/);
     const api = await fetch(`${base}/api/community/users/http_viewer`);
@@ -255,7 +255,7 @@ test('schema upgrade preserves old chat rows and safely adds identity columns on
   }
 });
 
-test('all 37 achievement thresholds unlock at the boundary and stay locked below it', () => {
+test('all 51 achievement thresholds unlock at the boundary and stay locked below it', () => {
   function metricsFor(achievement, current) {
     const stats = {
       totalMessages: 0,
@@ -281,6 +281,9 @@ test('all 37 achievement thresholds unlock at the boundary and stay locked below
       case 'pointsSpent': stats.pointsSpent = current; break;
       case 'memesSent': stats.memesSent = current; break;
       case 'donationsCount': stats.donationsCount = current; break;
+      case 'musicFree': case 'musicPaid': case 'videoFree': case 'videoPaid':
+      case 'donationsDonationAlerts': case 'donationsStreamElements': case 'donationsDonatePay': case 'donationsDonatex':
+        stats[achievement.metric] = current; break;
       case 'quizModeWins': modes.quiz = current; break;
       case 'anagramWins': modes.anagram = current; break;
       case 'gameWins': modes.game = current; break;
@@ -290,7 +293,7 @@ test('all 37 achievement thresholds unlock at the boundary and stay locked below
     return { stats, modes };
   }
 
-  assert.equal(ACHIEVEMENTS.length, 37);
+  assert.equal(ACHIEVEMENTS.length, 51);
   for (const achievement of ACHIEVEMENTS) {
     const belowTarget = metricsFor(achievement, achievement.target - 1);
     const locked = communityService.makeAchievements(belowTarget.stats, belowTarget.modes)

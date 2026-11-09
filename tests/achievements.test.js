@@ -182,8 +182,8 @@ test('achievement cards retain persisted earned state after a current follow end
   assert.equal(catalog.find((entry) => entry.id === 'follow_days_30').unlocked, false);
 });
 
-test('achievement catalogue has 37 definitions with follow tenure milestones', () => {
-  assert.equal(ACHIEVEMENTS.length, 37);
+test('achievement catalogue has 51 definitions with follow tenure milestones', () => {
+  assert.equal(ACHIEVEMENTS.length, 51);
   assert.deepEqual(ACHIEVEMENTS.filter((entry) => entry.id.startsWith('follow_days_')).map((entry) => entry.target), [7, 30, 90, 180, 365]);
 });
 
@@ -301,4 +301,60 @@ test('schema v4 adds identity, follow, and achievement tables to an existing dat
   } finally {
     legacyDb.close();
   }
+});
+
+function addDonation(id, source, userId, { isTest = 0, now = Date.now() } = {}) {
+  db.prepare(`INSERT INTO donation (id, source, is_test, external_id, donor_name, amount, currency, status, community_user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'Донатер', 300, 'RUB', 'sent', ?, ?, ?)`).run(id, source, isTest, `ext-${id}`, userId, now, now);
+}
+
+function addRequest(table, id, { source, userId = null, donationId = null, started = true, status = 'played', now = Date.now() }) {
+  db.prepare(`INSERT INTO ${table} (id, provider, external_id, title, requested_by, requested_by_id, source, is_paid, donation_id, status, created_at, started_at, updated_at)
+    VALUES (?, 'youtube', ?, 'Трек', 'viewer', ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, `yt-${id}`, userId, source, source === 'donation' ? 1 : 0, donationId, status, now, started ? now : null, now);
+}
+
+test('music and video orders count once they play: free by chat id, paid through the linked donation', () => {
+  const now = Date.now();
+  addUser('dj-user', 'dj_user', now);
+  achievementService.seedBaseline('dj-user', { now });
+  addRequest('music_request', 'm-free', { source: 'chat', userId: 'dj-user', status: 'queued', started: false });
+  assert.equal(achievementService.evaluateRequester({ source: 'chat', requestedById: 'dj-user' }).length, 0, 'queued, not played yet');
+  db.prepare("UPDATE music_request SET status = 'playing', started_at = ? WHERE id = 'm-free'").run(now);
+  assert.deepEqual(achievementService.evaluateRequester({ source: 'chat', requestedById: 'dj-user' }).map((a) => a.id), ['music_free_1']);
+
+  addDonation('don-video', 'donatex', 'dj-user', { now });
+  addRequest('video_request', 'v-paid', { source: 'donation', donationId: 'don-video', status: 'skipped' });
+  const earned = achievementService.evaluateRequester({ source: 'donation', donationId: 'don-video' }).map((a) => a.id);
+  assert.ok(earned.includes('video_paid_1'));
+  assert.ok(earned.includes('donation_donatex'));
+  assert.equal(earned.includes('video_free_1'), false);
+
+  addRequest('video_request', 'v-removed', { source: 'chat', userId: 'dj-user', status: 'removed', started: false });
+  addDonation('don-test', 'donatepay', 'dj-user', { isTest: 1, now });
+  const after = new Set(achievementService.getEarned('dj-user').map((a) => a.achievementId));
+  achievementService.evaluateUser('dj-user', { now });
+  assert.equal(after.has('video_free_1'), false);
+  assert.equal(new Set(achievementService.getEarned('dj-user').map((a) => a.achievementId)).has('donation_donatepay'), false, 'test donations do not count');
+  // донат без привязки к зрителю — заказ некому засчитать
+  addRequest('music_request', 'm-orphan', { source: 'donation', donationId: 'nope' });
+  assert.deepEqual(achievementService.evaluateRequester({ source: 'donation', donationId: 'nope' }), []);
+});
+
+test('achievements added later are granted silently for past activity, once', () => {
+  const now = Date.now();
+  addUser('old-fan', 'old_fan', now);
+  achievementService.seedBaseline('old-fan', { now });
+  addDonation('don-da-old', 'donationalerts', 'old-fan', { now });
+  addDonation('don-se-old', 'streamelements', 'old-fan', { now });
+  addRequest('music_request', 'm-old', { source: 'chat', userId: 'old-fan' });
+  db.exec('DROP TABLE IF EXISTS community_achievement_known');
+  const pendingBefore = achievementRepo.getPendingAnnouncements().length;
+  assert.ok(achievementService.backfillNewAchievements({ now }) >= 3);
+  const earned = achievementService.getEarned('old-fan');
+  const ids = new Set(earned.map((a) => a.achievementId));
+  for (const id of ['donation_donationalerts', 'donation_streamelements', 'music_free_1']) assert.ok(ids.has(id), id);
+  assert.ok(earned.filter((a) => ['donation_donationalerts', 'music_free_1'].includes(a.achievementId)).every((a) => a.isHistorical));
+  assert.equal(achievementRepo.getPendingAnnouncements().length, pendingBefore, 'no chat announcements for the past');
+  assert.equal(achievementService.backfillNewAchievements({ now }), 0, 'runs only for definitions it has not seen');
 });

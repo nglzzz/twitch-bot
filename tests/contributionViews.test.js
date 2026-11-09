@@ -335,7 +335,7 @@ test('profile service returns private contribution totals without exposing exter
   seedProfileContributions();
   const profile = communityService.getProfile('PROFILE_VIEWER');
   assert.ok(profile);
-  assert.equal(profile.achievements.length, 37);
+  assert.equal(profile.achievements.length, 51);
   assert.equal(profile.contributions.pointsSpent, 4500);
   assert.equal(profile.contributions.memesSent, 1);
   assert.equal(profile.contributions.donationsCount, 1);
@@ -370,7 +370,7 @@ test('public profile template renders the full achievement and contribution view
   const html = render({ userProfile: { ...profile, available: true, found: true } });
 
   assert.equal(profile.achievements.length, achievementData.length);
-  assert.equal(profile.achievements.length, 37);
+  assert.equal(profile.achievements.length, 51);
   assert.match(html, /Первые 1 000 в дело/);
   assert.match(html, /Накоплено баллов<\/small><strong>Недоступно<\/strong>/);
   assert.match(html, /Баллов на выполненные награды<\/small><strong>4500<\/strong>/);

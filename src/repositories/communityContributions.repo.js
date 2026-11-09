@@ -153,6 +153,35 @@ function claimRedemption(id) {
     .run(Date.now(), String(id)).changes === 1;
 }
 
+// Заказ засчитывается, когда он заиграл на стриме (скипнутый на ходу тоже считается).
+const STARTED_REQUEST = "r.started_at IS NOT NULL AND r.status IN ('playing', 'played', 'skipped')";
+const REAL_DONATION = "d.is_test = 0 AND d.external_id IS NOT NULL AND trim(d.external_id) <> '' AND d.amount > 0";
+const DONATION_SERVICES = { donationalerts: 'donationsDonationAlerts', streamelements: 'donationsStreamElements', donatepay: 'donationsDonatePay', donatex: 'donationsDonatex' };
+
+/** Заказы музыки и видео: бесплатные — командой в чате, платные — через донат, привязанный к зрителю. */
+function getRequestStats(id) {
+  const count = (table, paid) => Number(stmt(paid
+    ? `SELECT COUNT(*) AS n FROM ${table} r JOIN donation d ON d.id = r.donation_id
+        WHERE d.community_user_id = ? AND r.source = 'donation' AND ${STARTED_REQUEST} AND ${REAL_DONATION}`
+    : `SELECT COUNT(*) AS n FROM ${table} r WHERE r.requested_by_id = ? AND r.source = 'chat' AND ${STARTED_REQUEST}`)
+    .get(id)?.n) || 0;
+  return {
+    musicFree: count('music_request', false),
+    musicPaid: count('music_request', true),
+    videoFree: count('video_request', false),
+    videoPaid: count('video_request', true),
+  };
+}
+
+function getDonationServiceStats(id) {
+  const rows = stmt(`SELECT d.source AS source, COUNT(*) AS n FROM donation d
+    WHERE d.community_user_id = ? AND d.source IN (${Object.keys(DONATION_SERVICES).map(() => '?').join(', ')}) AND ${REAL_DONATION}
+    GROUP BY d.source`).all(id, ...Object.keys(DONATION_SERVICES));
+  const stats = Object.fromEntries(Object.values(DONATION_SERVICES).map((key) => [key, 0]));
+  for (const row of rows) stats[DONATION_SERVICES[row.source]] = Number(row.n) || 0;
+  return stats;
+}
+
 function getStats(userId) {
   const id = String(userId || '');
   if (!id) return { pointsSpent: 0, memesSent: 0, donationsCount: 0, pointsBalance: null };
@@ -169,6 +198,8 @@ function getStats(userId) {
     memesSent: Number(row?.memes_sent) || 0,
     donationsCount: Number(row?.donations_count) || 0,
     pointsBalance: null,
+    ...getRequestStats(id),
+    ...getDonationServiceStats(id),
   };
 }
 

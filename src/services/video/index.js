@@ -63,6 +63,7 @@ function getVideoService() {
     getRubAmount: music.getRubAmount,
     emoteUrl,
     onActivityChange,
+    onStarted: (request) => require('../achievements.service').evaluateRequester(request),
   });
   service.init();
   // Каталог смайлов нужен, чтобы показать на странице картинки слов для голосования.
